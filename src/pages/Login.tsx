@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import Footer from "@/components/Footer";
 import { Lock, Mail, ArrowRight, ShieldCheck, AlertTriangle, Eye, EyeOff } from "lucide-react";
@@ -9,6 +9,15 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("error") === "user_not_found") {
+      setError("User record not found in our database. Please sign up first!");
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,12 +79,14 @@ export default function Login() {
     setLoading(true);
     setError(null);
     try {
+      localStorage.setItem("recodex_auth_intent", "login");
       const { error: authError } = await supabase.auth.signInWithOAuth({
         provider: provider,
         options: {
           redirectTo: window.location.origin + "/dashboard",
         },
       });
+
 
       if (authError) {
         throw authError;

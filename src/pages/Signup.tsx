@@ -326,12 +326,14 @@ export default function Signup() {
     setLoading(true);
     setError(null);
     try {
+      localStorage.setItem("recodex_auth_intent", "signup");
       const { error: authError } = await supabase.auth.signInWithOAuth({
         provider: provider,
         options: {
           redirectTo: window.location.origin + "/dashboard",
         },
       });
+
 
       if (authError) {
         throw authError;

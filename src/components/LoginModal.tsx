@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { useLoginModal } from "@/context/LoginModalContext";
 
 export default function LoginModal() {
-  const { isLoginOpen, closeLogin } = useLoginModal();
+  const { isLoginOpen, openLogin, closeLogin } = useLoginModal();
   const [formData, setFormData] = useState({ email: "", password: "" });
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -20,6 +20,16 @@ export default function LoginModal() {
     }
   }, [isLoginOpen]);
 
+  // Check for URL query errors (e.g. Google OAuth login of unregistered user)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("error") === "user_not_found") {
+      setError("User record not found in our database. Please sign up first!");
+      window.history.replaceState({}, document.title, window.location.pathname);
+      openLogin();
+    }
+  }, [openLogin]);
+
   // Handle escape key to close modal
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -32,6 +42,7 @@ export default function LoginModal() {
   }, [isLoginOpen, closeLogin]);
 
   if (!isLoginOpen) return null;
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -95,12 +106,14 @@ export default function LoginModal() {
     setLoading(true);
     setError(null);
     try {
+      localStorage.setItem("recodex_auth_intent", "login");
       const { error: authError } = await supabase.auth.signInWithOAuth({
         provider: provider,
         options: {
           redirectTo: window.location.origin + "/dashboard",
         },
       });
+
 
       if (authError) {
         throw authError;

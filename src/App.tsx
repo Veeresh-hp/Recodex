@@ -51,7 +51,34 @@ export default function App() {
       console.log(`[RECODEX AUTH] Event: ${event}`, session);
 
       if (session) {
+        const intent = localStorage.getItem("recodex_auth_intent");
+
+        if (intent === "login") {
+          // Verify if user exists in the public users table
+          const { data: dbUser, error: checkError } = await supabase
+            .from("users")
+            .select("id")
+            .eq("id", session.user.id)
+            .maybeSingle();
+
+          if (!dbUser || checkError) {
+            console.warn("[RECODEX AUTH] Access Denied: User record not found in database. Signup required.");
+            
+            // Sign out completely
+            await supabase.auth.signOut();
+            localStorage.removeItem("camcod_session_token");
+            localStorage.removeItem("camcod_admin_user");
+            localStorage.removeItem("recodex_auth_intent");
+            
+            // Redirect to login with error parameter
+            window.location.href = "/login?error=user_not_found";
+            return;
+          }
+        }
+
+        // Standard user sync (for signups or valid logins)
         localStorage.setItem("camcod_session_token", session.access_token);
+        localStorage.removeItem("recodex_auth_intent");
 
         if (session.user) {
           const fullName = session.user.user_metadata?.full_name ||
