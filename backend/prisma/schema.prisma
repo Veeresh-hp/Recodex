@@ -1,0 +1,52 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id           String       @id // References Supabase Auth ID or Clerk ID
+  email        String       @unique
+  name         String
+  role         String       @default("developer") // "developer" | "client"
+  profileImage String?      // Cloudinary secure HTTPS URL
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+  projects     ProjectDev[]
+
+  @@map("users")
+}
+
+model Project {
+  id              String       @id // E.g., "quantum-flux-core"
+  title           String
+  description     String
+  longDescription String       @map("long_description")
+  status          String       @default("Active") // "Active" | "Maintenance" | "Beta"
+  imageUrl        String       @map("image_url") // Cloudinary secure HTTPS URL
+  category        String       // "Web Systems" | "AI & Intelligence" | "Blockchain & Web3" | "Low-Level Shells"
+  tags            String[]     // Postgres Text Array
+  devsCount       Int          @default(0) @map("devs_count")
+  stars           Int          @default(0)
+  forks           Int          @default(0)
+  files           Json         // Stores mockup files tree: Record<string, string>
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+  devs            ProjectDev[]
+
+  @@map("projects")
+}
+
+// Joint model representing developer assignment to projects
+model ProjectDev {
+  projectId String @map("project_id")
+  userId    String @map("user_id")
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, userId])
+  @@map("project_devs")
+}

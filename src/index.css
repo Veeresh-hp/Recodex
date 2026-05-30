@@ -1,0 +1,274 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme inline {
+  --color-primary: var(--primary);
+  --color-primary-dim: var(--primary-dim);
+  --color-on-primary: var(--on-primary);
+  --color-primary-fixed: var(--primary-fixed);
+  --color-primary-fixed-dim: var(--primary-fixed-dim);
+  --color-primary-container: var(--primary-container);
+  
+  --color-secondary: var(--secondary);
+  --color-secondary-container: var(--secondary-container);
+  
+  --color-background-dark: #000000;
+  --color-background-light: var(--background);
+  
+  --color-surface-dark: #000000;
+  --color-surface-dim-dark: #000000;
+  --color-surface-bright-dark: #383939;
+  
+  --color-surface-container-low-dark: #0A0A0A;
+  --color-surface-container-dark: #0A0A0A;
+  --color-surface-container-high-dark: #292a2a;
+  --color-surface-container-highest-dark: #1A1A1A;
+  
+  --color-surface-light: var(--surface-light);
+  --color-surface-dim-light: var(--surface-dim-light);
+  --color-surface-bright-light: var(--surface-bright-light);
+  --color-surface-container-low-light: var(--surface-container-low-light);
+  --color-surface-container-light: var(--surface-container-light);
+  --color-surface-container-high-light: var(--surface-container-high-light);
+  --color-surface-container-highest-light: var(--surface-container-highest-light);
+  
+  --color-on-surface-variant-dark: #bbc9cf;
+  --color-on-surface-variant-light: var(--on-surface-variant-light);
+  
+  --color-outline-dark: #859399;
+  --color-outline-variant-dark: #3c494e;
+  --color-outline-light: var(--outline-light);
+  --color-outline-variant-light: var(--outline-variant-light);
+  
+  --color-error: var(--error);
+  --color-error-container: var(--error-container);
+  
+  --font-sans: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), var(--font-geist-mono), monospace;
+  
+  --radius-sm: 0.125rem;
+  --radius-default: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+  --radius-full: 9999px;
+  
+  --animate-marquee: marquee 30s linear infinite;
+  --animate-float: float 4s ease-in-out infinite;
+}
+
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+:root {
+  --mouse-x: 50%;
+  --mouse-y: 50%;
+  --font-geist-sans: "Geist", Arial, Helvetica, sans-serif;
+  --font-geist-mono: "Geist Mono", monospace;
+  --font-jetbrains-mono: "JetBrains Mono", monospace;
+}
+
+/* Light Mode Variables */
+:root:not(.dark) {
+  --background: #f7f9fb;
+  --foreground: #191c1e;
+  --border-color: #bcc8cd;
+  --glass-bg: rgba(247, 249, 251, 0.85);
+  --grid-line: rgba(109, 121, 125, 0.05);
+
+  --primary: #00677c;
+  --primary-dim: #5cd5f6;
+  --on-primary: #ffffff;
+  --primary-fixed: #b1ecff;
+  --primary-fixed-dim: #5cd5f6;
+  --primary-container: #00a3c2;
+
+  --secondary: #565e74;
+  --secondary-container: #dae2fd;
+
+  --surface-light: #f7f9fb;
+  --surface-dim-light: #d8dadc;
+  --surface-bright-light: #f7f9fb;
+  --surface-container-low-light: #f2f4f6;
+  --surface-container-light: #eceef0;
+  --surface-container-high-light: #e6e8ea;
+  --surface-container-highest-light: #e0e3e5;
+
+  --on-surface-variant-light: #3d494d;
+
+  --outline-light: #6d797d;
+  --outline-variant-light: #bcc8cd;
+
+  --error: #ba1a1a;
+  --error-container: #ffdad6;
+}
+
+/* Dark Mode Variables */
+:root.dark {
+  --background: #000000;
+  --foreground: #e3e2e2;
+  --border-color: rgba(255, 255, 255, 0.08);
+  --glass-bg: rgba(10, 10, 10, 0.6);
+  --grid-line: rgba(133, 147, 153, 0.04);
+
+  --primary: #00d1ff;
+  --primary-dim: #4cd6ff;
+  --on-primary: #003543;
+  --primary-fixed: #b7eaff;
+  --primary-fixed-dim: #4cd6ff;
+  --primary-container: #00d1ff;
+
+  --secondary: #c9c6c5;
+  --secondary-container: #4a4949;
+
+  --error: #ffb4ab;
+  --error-container: #93000a;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  transition: background-color 0.4s ease, color 0.4s ease;
+  overflow-x: hidden;
+}
+
+/* Custom Glassmorphism */
+.glass-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-color);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
+}
+
+:root.dark .glass-card {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+}
+
+:root:not(.dark) .glass-card {
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
+}
+
+.glass-card:hover {
+  border-color: rgba(0, 209, 255, 0.3);
+  box-shadow: 0 0 25px rgba(0, 209, 255, 0.08);
+}
+
+/* Grid overlay background */
+.bg-grid-layout {
+  background-size: 50px 50px;
+  background-image: 
+    linear-gradient(to right, var(--grid-line) 1px, transparent 1px), 
+    linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
+  position: relative;
+}
+
+.bg-grid-layout::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(500px circle at var(--mouse-x) var(--mouse-y), rgba(0, 209, 255, 0.06), transparent 45%);
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* Custom Terminal Scrollbar */
+.terminal-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.terminal-scrollbar::-webkit-scrollbar-track {
+  background: rgba(0,0,0,0.3);
+}
+.terminal-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.1);
+  border-radius: 3px;
+}
+.terminal-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(0,209,255,0.3);
+}
+
+/* Pulse Glows */
+.pulse-glow-cyan {
+  box-shadow: 0 0 15px rgba(0, 209, 255, 0.4);
+  animation: pulse-cyan 2s infinite;
+}
+
+@keyframes pulse-cyan {
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 209, 255, 0.5); }
+  70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(0, 209, 255, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 209, 255, 0); }
+}
+
+/* Force all footers globally across all pages to render in stable ultra-premium dark theme with 100% visible text */
+footer {
+  background-color: #050608 !important; /* Stable deep dark background */
+  color: #a1a1aa !important; /* Zinc-400 text color */
+  border-top-width: 1px !important;
+  border-color: rgba(255, 255, 255, 0.08) !important; /* Sub-pixel border line */
+}
+
+/* Ensure headings, links, and foreground classes inside the footer are highly visible */
+footer h1,
+footer h2,
+footer h3,
+footer h4,
+footer h5,
+footer h6,
+footer [class*="text-foreground"],
+footer .text-foreground,
+footer a:not(.text-zinc-500):not(.text-gray-500) {
+  color: #ffffff !important; /* Pure white for high-contrast visibility */
+}
+
+/* Force standard paragraphs and spans to remain clear and readable gray */
+footer p,
+footer span:not(.font-mono):not(.text-primary):not([class*="text-[#00d1ff]"]) {
+  color: #a1a1aa !important; /* Zinc-400 text */
+}
+
+/* Specific styling for copyright footer and developer marketplace text */
+footer span.font-mono,
+footer .text-zinc-500,
+footer .text-gray-400,
+footer .text-zinc-650,
+footer .text-zinc-600 {
+  color: #71717a !important; /* Zinc-500 copyright and telemetry logs */
+}
+
+/* Brand highlights, signature logo color, and hovers */
+footer .text-primary,
+footer [class*="text-primary"],
+footer span.font-light,
+footer a:hover,
+footer span:hover,
+footer div:hover > span {
+  color: #00d1ff !important; /* RecodeX signature cyan styling */
+}
+
+/* Sub-containers backgrounds should be transparent so the dark background flows perfectly */
+footer div,
+footer nav,
+footer p,
+footer span,
+footer aside {
+  background-color: transparent !important;
+}
+
+/* Specific overrides for security circles at the bottom */
+footer div.rounded-full {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+footer div.rounded-full svg {
+  color: #a1a1aa !important;
+}
+
