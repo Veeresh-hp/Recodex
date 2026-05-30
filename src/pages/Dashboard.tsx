@@ -75,7 +75,23 @@ export default function Dashboard() {
             const displayName = user.user_metadata?.full_name || user.user_metadata?.name;
             if (displayName) setAdminName(displayName);
             return;
+          } else {
+            // Verify if user exists in the public.users table
+            const { data: dbUser } = await supabase
+              .from("users")
+              .select("id")
+              .eq("id", user.id)
+              .maybeSingle();
 
+            if (!dbUser) {
+              // Unregistered user! Purge session immediately and redirect to login
+              await supabase.auth.signOut();
+              localStorage.removeItem("camcod_session_token");
+              localStorage.removeItem("camcod_admin_user");
+              localStorage.removeItem("recodex_auth_intent");
+              window.location.href = "/login?error=user_not_found";
+              return;
+            }
           }
         }
       } catch (err) {

@@ -53,7 +53,7 @@ export default function App() {
       if (session) {
         const intent = localStorage.getItem("recodex_auth_intent");
 
-        if (intent === "login") {
+        if (intent !== "signup") {
           // Verify if user exists in the public users table
           const { data: dbUser, error: checkError } = await supabase
             .from("users")
@@ -61,7 +61,9 @@ export default function App() {
             .eq("id", session.user.id)
             .maybeSingle();
 
-          if (!dbUser || checkError) {
+          const isAdmin = session.user.email === "veereshhp2004@gmail.com" || session.user.email === "veereshhp04@gmail.com";
+
+          if ((!dbUser || checkError) && !isAdmin) {
             console.warn("[RECODEX AUTH] Access Denied: User record not found in database. Signup required.");
             
             // Sign out completely

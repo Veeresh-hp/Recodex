@@ -46,11 +46,28 @@ export default function LoginPage() {
         throw authError;
       }
 
+      if (data.user) {
+        const isAdmin = data.user.email === "veereshhp2004@gmail.com" || data.user.email === "veereshhp04@gmail.com";
+        if (!isAdmin) {
+          // Verify if user exists in the public users table
+          const { data: dbUser, error: checkError } = await supabase
+            .from("users")
+            .select("id")
+            .eq("id", data.user.id)
+            .maybeSingle();
+
+          if (!dbUser || checkError) {
+            await supabase.auth.signOut();
+            throw new Error("User record not found in our database. Please sign up first!");
+          }
+        }
+      }
+
       if (data.session) {
         localStorage.setItem("camcod_session_token", data.session.access_token);
       }
 
-      const isAdmin = data.user?.email === "veereshhp2004@gmail.com";
+      const isAdmin = data.user?.email === "veereshhp2004@gmail.com" || data.user?.email === "veereshhp04@gmail.com";
       if (isAdmin) {
         localStorage.setItem("camcod_admin_user", "true");
         window.location.href = "/dashboard";
