@@ -97,6 +97,21 @@ export default function App() {
             role: session.user.user_metadata?.role || "developer",
             profileImage: session.user.user_metadata?.avatar_url || null,
           });
+
+          // Auto-login redirect for landing / auth pages after signup/signin resolves
+          const currentPath = window.location.pathname;
+          const isAuthPage = currentPath === "/" || currentPath === "/login" || currentPath === "/signup";
+          if (isAuthPage) {
+            const isAdmin = session.user.email === "veereshhp2004@gmail.com" || session.user.email === "veereshhp04@gmail.com";
+            if (isAdmin) {
+              localStorage.setItem("camcod_admin_user", "true");
+              window.dispatchEvent(new Event("recodex-auth-update"));
+              window.location.href = "/dashboard";
+            } else {
+              window.dispatchEvent(new Event("recodex-auth-update"));
+              window.location.href = "/projects";
+            }
+          }
         }
       } else {
         const currentToken = localStorage.getItem("camcod_session_token");
