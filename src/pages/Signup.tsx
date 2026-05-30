@@ -237,9 +237,11 @@ export default function Signup() {
         if (isBypassAdmin) {
           localStorage.setItem("camcod_session_token", "admin-bypass-token");
           localStorage.setItem("camcod_admin_user", "true");
+          window.dispatchEvent(new Event("recodex-auth-update"));
           window.location.href = "/dashboard";
         } else {
           localStorage.setItem("camcod_session_token", "dev-bypass-token");
+          window.dispatchEvent(new Event("recodex-auth-update"));
           window.location.href = "/projects";
         }
       } catch (err) {
@@ -283,6 +285,7 @@ export default function Signup() {
       // 3. Store active session token
       if (data.session) {
         localStorage.setItem("camcod_session_token", data.session.access_token);
+        window.dispatchEvent(new Event("recodex-auth-update"));
       }
 
       // Redirect to dashboard if admin, otherwise to projects page

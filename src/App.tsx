@@ -71,6 +71,7 @@ export default function App() {
             localStorage.removeItem("camcod_session_token");
             localStorage.removeItem("camcod_admin_user");
             localStorage.removeItem("recodex_auth_intent");
+            window.dispatchEvent(new Event("recodex-auth-update"));
             
             // Redirect to login with error parameter
             window.location.href = "/login?error=user_not_found";
@@ -81,6 +82,7 @@ export default function App() {
         // Standard user sync (for signups or valid logins)
         localStorage.setItem("camcod_session_token", session.access_token);
         localStorage.removeItem("recodex_auth_intent");
+        window.dispatchEvent(new Event("recodex-auth-update"));
 
         if (session.user) {
           const fullName = session.user.user_metadata?.full_name ||
@@ -101,6 +103,7 @@ export default function App() {
         if (currentToken && currentToken !== "admin-bypass-token") {
           localStorage.removeItem("camcod_session_token");
           localStorage.removeItem("camcod_admin_user");
+          window.dispatchEvent(new Event("recodex-auth-update"));
         }
       }
     });

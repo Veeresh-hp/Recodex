@@ -26,6 +26,7 @@ export default function LoginPage() {
     ) {
       localStorage.setItem("camcod_session_token", "admin-bypass-token");
       localStorage.setItem("camcod_admin_user", "true");
+      window.dispatchEvent(new Event("recodex-auth-update"));
       window.location.href = "/dashboard";
       return;
     }
@@ -65,6 +66,7 @@ export default function LoginPage() {
 
       if (data.session) {
         localStorage.setItem("camcod_session_token", data.session.access_token);
+        window.dispatchEvent(new Event("recodex-auth-update"));
       }
 
       const isAdmin = data.user?.email === "veereshhp2004@gmail.com" || data.user?.email === "veereshhp04@gmail.com";

@@ -34,6 +34,7 @@ export default function Login() {
     ) {
       localStorage.setItem("camcod_session_token", "admin-bypass-token");
       localStorage.setItem("camcod_admin_user", "true");
+      window.dispatchEvent(new Event("recodex-auth-update"));
       window.location.href = "/dashboard";
       return;
     }
@@ -74,6 +75,7 @@ export default function Login() {
       // Sync local storage token for client fetch calls if needed
       if (data.session) {
         localStorage.setItem("camcod_session_token", data.session.access_token);
+        window.dispatchEvent(new Event("recodex-auth-update"));
       }
 
       // Redirect to dashboard if admin, otherwise to projects page

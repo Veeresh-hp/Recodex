@@ -39,22 +39,7 @@ export default function Navbar() {
       // Check if a live Supabase Auth session exists
       const checkSession = async () => {
         const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-          setIsAuthenticated(true);
-          if (session.user && (session.user.email === "veereshhp2004@gmail.com" || session.user.email === "veereshhp04@gmail.com")) {
-            setIsAdmin(true);
-          }
-          // Load avatar: prefer localStorage override, then Google avatar
-          const userId = session.user.id;
-          const savedAvatar = localStorage.getItem(`profile_avatar_${userId}`);
-          const googleAvatar = session.user.user_metadata?.avatar_url || null;
-          setNavAvatar(savedAvatar || googleAvatar);
-          // Build initials
-          const name = session.user.user_metadata?.full_name ||
-                       session.user.user_metadata?.name ||
-                       session.user.email?.split("@")[0] || "";
-          setNavInitials(name.split(" ").map((n: string) => n[0]).join("").substring(0, 2).toUpperCase());
-        }
+        await updateNavbarState(session);
       };
       checkSession();
     }
@@ -68,42 +53,71 @@ export default function Navbar() {
     window.addEventListener("storage", handleStorageChange);
 
     // Subscribe to session transitions
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      await updateNavbarState(session);
+    });
+
+    // Custom event to sync authentication state changes (such as database checks resolving)
+    const handleAuthUpdate = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      await updateNavbarState(session);
+    };
+    window.addEventListener("recodex-auth-update", handleAuthUpdate);
+
+    return () => {
+      clearTimeout(timer);
+      subscription.unsubscribe();
+      window.removeEventListener("storage", handleStorageChange);
+      window.removeEventListener("recodex-auth-update", handleAuthUpdate);
+    };
+  }, []);
+
+  const updateNavbarState = async (session: any) => {
+    if (session) {
+      const currentToken = localStorage.getItem("camcod_session_token");
+      const hasValidToken = currentToken && (
+        currentToken === session.access_token ||
+        currentToken === "admin-bypass-token" ||
+        currentToken === "dev-bypass-token"
+      );
+
+      if (hasValidToken) {
         setIsAuthenticated(true);
         if (session.user && (session.user.email === "veereshhp2004@gmail.com" || session.user.email === "veereshhp04@gmail.com")) {
           setIsAdmin(true);
         } else {
           setIsAdmin(false);
         }
-        // Update avatar from localStorage or Google
+        // Load avatar: prefer localStorage override, then Google avatar
         const userId = session.user.id;
         const savedAvatar = localStorage.getItem(`profile_avatar_${userId}`);
         const googleAvatar = session.user.user_metadata?.avatar_url || null;
         setNavAvatar(savedAvatar || googleAvatar);
+        // Build initials
         const name = session.user.user_metadata?.full_name ||
                      session.user.user_metadata?.name ||
                      session.user.email?.split("@")[0] || "";
         setNavInitials(name.split(" ").map((n: string) => n[0]).join("").substring(0, 2).toUpperCase());
-      } else {
-        const stillBypassed = 
-          localStorage.getItem("camcod_session_token") === "admin-bypass-token" ||
-          localStorage.getItem("camcod_admin_user") === "true";
-        setIsAuthenticated(stillBypassed);
-        setIsAdmin(stillBypassed);
-        if (!stillBypassed) {
-          setNavAvatar(null);
-          setNavInitials("");
-        }
+        return;
       }
-    });
+    }
 
-    return () => {
-      clearTimeout(timer);
-      subscription.unsubscribe();
-      window.removeEventListener("storage", handleStorageChange);
-    };
-  }, []);
+    // If no valid session or token, check if we're in admin bypass
+    const stillBypassed =
+      localStorage.getItem("camcod_session_token") === "admin-bypass-token" ||
+      localStorage.getItem("camcod_admin_user") === "true";
+
+    setIsAuthenticated(stillBypassed);
+    setIsAdmin(stillBypassed);
+    if (stillBypassed) {
+      const savedAvatar = localStorage.getItem("profile_avatar_sandbox-admin-001");
+      if (savedAvatar) setNavAvatar(savedAvatar);
+      setNavInitials("VH");
+    } else {
+      setNavAvatar(null);
+      setNavInitials("");
+    }
+  };
 
   const handleSignOut = async () => {
     try {
