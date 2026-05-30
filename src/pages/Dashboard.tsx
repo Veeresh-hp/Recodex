@@ -88,9 +88,9 @@ export default function Dashboard() {
     checkAdminAccess();
   }, []);
 
-  // System telemetry metrics
+  // Real user count from DB (not fake)
   const [revenue] = useState(0);
-  const [activeDevs, setActiveDevs] = useState(1250);
+  const [activeDevs, setActiveDevs] = useState(0);
 
   // Recycle bin states
   const [softDeletedUserIds, setSoftDeletedUserIds] = useState<string[]>(() => {
@@ -226,35 +226,110 @@ export default function Dashboard() {
     return session?.access_token || "";
   };
 
-  const fetchProjects = () => {
+  // Fetch real users directly from Supabase (works on Vercel — no localhost needed)
+  const fetchUsers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("User")
+        .select("*")
+        .order("createdAt", { ascending: false });
+      if (error) throw error;
+      setDbUsers(data || []);
+      setActiveDevs((data || []).length);
+    } catch (err) {
+      console.warn("[Dashboard] Supabase user fetch failed, trying backend:", err);
+      // Fallback to backend API
+      getUsers().then((data) => {
+        const real = data.filter((u: any) => !u.id.startsWith("usr-"));
+        setDbUsers(real.length > 0 ? real : data);
+        setActiveDevs(real.length > 0 ? real.length : data.length);
+      }).catch(console.error);
+    }
+  };
+
+  // Fetch real projects directly from Supabase
+  const fetchProjects = async () => {
     setProjectsLoading(true);
-    getProjects().then((data) => {
-      setDbProjects(data);
+    try {
+      const { data, error } = await supabase
+        .from("Project")
+        .select("*")
+        .order("createdAt", { ascending: false });
+      if (error) throw error;
+      setDbProjects(data || []);
+    } catch (err) {
+      console.warn("[Dashboard] Supabase project fetch failed, trying backend:", err);
+      getProjects().then((data) => {
+        setDbProjects(data);
+      }).catch(console.error);
+    } finally {
       setProjectsLoading(false);
-    }).catch((err) => {
-      console.error("Error fetching projects:", err);
-      setProjectsLoading(false);
-    });
+    }
   };
 
-  const fetchUsers = () => {
-    getUsers().then((data) => {
-      setDbUsers(data);
-    }).catch((err) => {
-      console.error("Error fetching users:", err);
-    });
-  };
-
-  // Fetch live projects and users
+  // Initial fetch + real-time subscription for new user signups
   useEffect(() => {
     fetchProjects();
     fetchUsers();
+
+    // Real-time: re-fetch users whenever a new user is inserted in the DB
+    const userChannel = supabase
+      .channel("dashboard-users-realtime")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "User" },
+        (payload) => {
+          console.log("[Dashboard] New user joined:", payload.new);
+          setDbUsers((prev) => [payload.new, ...prev]);
+          setActiveDevs((prev) => prev + 1);
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "User" },
+        (payload) => {
+          setDbUsers((prev) => prev.filter((u) => u.id !== payload.old.id));
+          setActiveDevs((prev) => Math.max(0, prev - 1));
+        }
+      )
+      .subscribe();
+
+    // Real-time: re-fetch projects on insert/delete
+    const projectChannel = supabase
+      .channel("dashboard-projects-realtime")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "Project" },
+        (payload) => {
+          setDbProjects((prev) => [payload.new, ...prev]);
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "Project" },
+        (payload) => {
+          setDbProjects((prev) => prev.filter((p) => p.id !== payload.old.id));
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(userChannel);
+      supabase.removeChannel(projectChannel);
+    };
+  }, []);
+
+  // Re-fetch when sidebar tab changes
+  useEffect(() => {
+    if (activeSidebarTab === "Users") fetchUsers();
+    if (activeSidebarTab === "Projects") fetchProjects();
   }, [activeSidebarTab]);
+
 
   // Real-time telemetry load shifts
   useEffect(() => {
     const statsInterval = setInterval(() => {
-      setActiveDevs((prev) => prev + (Math.random() > 0.5 ? 1 : -1));
+      // activeDevs is now real — driven by Supabase real-time, not faked
       
       setSysHealth((prev) => {
         const change = (Math.random() - 0.5) * 0.01;
