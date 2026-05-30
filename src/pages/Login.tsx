@@ -119,11 +119,21 @@ export default function Login() {
 
             {/* Error Message */}
             {error && (
-              <div className="mb-6 p-3.5 bg-red-500/10 border border-red-500/20 rounded-lg text-xs font-mono text-red-400 flex items-center gap-2">
-                <AlertTriangle size={14} className="shrink-0 text-red-400" />
-                <span>{error}</span>
-              </div>
-            )}
+               <div className="mb-6 p-3.5 bg-red-500/10 border border-red-500/20 rounded-lg text-xs font-mono text-red-400 space-y-3">
+                 <div className="flex items-center gap-2">
+                   <AlertTriangle size={14} className="shrink-0 text-red-400" />
+                   <span>{error}</span>
+                 </div>
+                 {error.includes("not found") && (
+                   <Link
+                     to="/signup"
+                     className="block w-full py-2 bg-primary/20 hover:bg-primary/30 border border-primary/30 text-center rounded-md text-[10px] font-bold uppercase tracking-wider text-primary transition-all font-mono"
+                   >
+                     Create Account (Sign Up)
+                   </Link>
+                 )}
+               </div>
+             )}
  
             {/* Form */}
             <form onSubmit={handleSubmit} className="space-y-5">

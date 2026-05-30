@@ -422,11 +422,17 @@ export default function Signup() {
                       </span>
                       <h3 className="text-xl font-bold text-foreground dark:text-white">Enter Verification Code</h3>
                       <p className="text-xs text-zinc-500 leading-relaxed font-medium">
-                        A 6-digit cryptographic verification code has been dispatched to:
+                        A verification code or confirmation link has been dispatched to:
                         <span className="block text-primary dark:text-[#00d1ff] font-mono font-bold mt-1 text-sm">
                           {signupChannel === "email" ? formData.email : phone}
                         </span>
+                        {signupChannel === "email" && (
+                          <span className="block mt-2.5 text-[10px] text-zinc-500 dark:text-[#94a3b8] leading-normal font-sans italic bg-[#00d1ff]/5 dark:bg-[#00d1ff]/5 p-3 rounded-lg border border-[#00d1ff]/15">
+                            💡 <strong>Check your Gmail inbox!</strong> If you received a <strong>confirmation link</strong> in your email, click the link to activate your account and log in automatically. If you received a 6-digit code, enter it below.
+                          </span>
+                        )}
                       </p>
+
                     </div>
 
                     <div className="space-y-2 select-text">
