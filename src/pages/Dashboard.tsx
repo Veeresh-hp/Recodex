@@ -238,15 +238,28 @@ export default function Dashboard() {
         .select("*")
         .order("created_at", { ascending: false });
       if (error) throw error;
-      setDbUsers(data || []);
-      setActiveDevs((data || []).length);
+      const mapped = (data || []).map((u) => {
+        if (u.email === "veereshhp2004@gmail.com" || u.email === "veereshhp04@gmail.com") {
+          return { ...u, role: "admin" };
+        }
+        return u;
+      });
+      setDbUsers(mapped);
+      setActiveDevs(mapped.length);
     } catch (err) {
       console.warn("[Dashboard] Supabase user fetch failed, trying backend:", err);
       // Fallback to backend API
       getUsers().then((data) => {
         const real = data.filter((u: any) => !u.id.startsWith("usr-"));
-        setDbUsers(real.length > 0 ? real : data);
-        setActiveDevs(real.length > 0 ? real.length : data.length);
+        const targetData = real.length > 0 ? real : data;
+        const mapped = targetData.map((u: any) => {
+          if (u.email === "veereshhp2004@gmail.com" || u.email === "veereshhp04@gmail.com") {
+            return { ...u, role: "admin" };
+          }
+          return u;
+        });
+        setDbUsers(mapped);
+        setActiveDevs(mapped.length);
       }).catch(console.error);
     }
   };
@@ -284,7 +297,11 @@ export default function Dashboard() {
         { event: "INSERT", schema: "public", table: "users" },
         (payload) => {
           console.log("[Dashboard] New user joined:", payload.new);
-          setDbUsers((prev) => [payload.new, ...prev]);
+          const newUser = payload.new;
+          if (newUser.email === "veereshhp2004@gmail.com" || newUser.email === "veereshhp04@gmail.com") {
+            newUser.role = "admin";
+          }
+          setDbUsers((prev) => [newUser, ...prev]);
           setActiveDevs((prev) => prev + 1);
         }
       )
@@ -528,6 +545,38 @@ export default function Dashboard() {
       console.error("Failed to modify user status:", error);
     }
   };
+  
+  const handleToggleUserAdmin = async (userId: string, makeAdmin: boolean) => {
+    const userToModify = dbUsers.find((u) => u.id === userId);
+    if (userToModify && !makeAdmin && (userToModify.email === "veereshhp2004@gmail.com" || userToModify.email === "veereshhp04@gmail.com")) {
+      alert("Demoting root administrator accounts is prohibited to maintain security clearance.");
+      return;
+    }
+    
+    const targetRole = makeAdmin ? "admin" : "developer";
+    try {
+      // 1. Try Supabase direct update (works on Vercel)
+      const { error: sbError } = await supabase.from("users").update({ role: targetRole }).eq("id", userId);
+      if (sbError) throw sbError;
+
+      // Update local state instantly and refetch
+      setDbUsers((prev) => prev.map((u) => u.id === userId ? { ...u, role: targetRole } : u));
+      fetchUsers();
+    } catch (error) {
+      console.warn("Supabase admin role update failed, trying backend:", error);
+      try {
+        const token = await getAuthToken();
+        const userToModify = dbUsers.find((u) => u.id === userId);
+        if (!userToModify) return;
+        await updateUser(userId, { name: userToModify.name, role: targetRole }, token);
+        setDbUsers((prev) => prev.map((u) => u.id === userId ? { ...u, role: targetRole } : u));
+        fetchUsers();
+      } catch (err) {
+        console.error("Failed to modify user admin status:", err);
+      }
+    }
+  };
+
 
   const handleRemoveUser = (userId: string) => {
     const userToRecycle = dbUsers.find((u) => u.id === userId);
@@ -859,18 +908,19 @@ export default function Dashboard() {
                 <tbody className="divide-y divide-black/5 dark:divide-zinc-900">
                   {filteredUsers.map((user) => {
                     const isUserSuspended = user.role === "suspended";
+                    const isUserAdmin = user.role === "admin" || user.email === "veereshhp2004@gmail.com" || user.email === "veereshhp04@gmail.com";
                     return (
                       <tr key={user.id} className="h-14 hover:bg-black/5 dark:hover:bg-[#07090e]/25 transition-colors">
-                        <td onClick={() => setSelectedUserDetails(user)} className="text-foreground dark:text-white font-extrabold cursor-pointer hover:text-primary transition-colors">{user.name}</td>
+                        <td onClick={() => setSelectedUserDetails({ ...user, role: isUserAdmin ? "admin" : user.role })} className="text-foreground dark:text-white font-extrabold cursor-pointer hover:text-primary transition-colors">{user.name}</td>
                         <td className="text-zinc-500 dark:text-zinc-400 font-mono">{user.email}</td>
                         <td>
                            <span className={`px-2 py-0.5 rounded text-[8px] font-mono font-black uppercase border ${
-                            user.role === "admin" ? "bg-purple-500/10 border-purple-500/25 text-purple-600 dark:text-purple-400" :
+                            isUserAdmin ? "bg-purple-500/10 border-purple-500/25 text-purple-600 dark:text-purple-400" :
                             user.role === "developer" ? "bg-cyan-500/10 border-cyan-500/25 text-[#00d1ff]" :
                             user.role === "suspended" ? "bg-red-500/10 border-red-500/25 text-red-500" :
                             "bg-black/5 border-black/10 dark:bg-zinc-800 dark:border-zinc-900 text-zinc-500 dark:text-zinc-400"
                           }`}>
-                            {user.role === "developer" ? "STUDENT" : user.role === "suspended" ? `SUSPENDED (${localStorage.getItem(`suspension_duration_${user.id}`) || "Permanent"})` : user.role}
+                            {isUserAdmin ? "ADMIN" : user.role === "developer" ? "STUDENT" : user.role === "suspended" ? `SUSPENDED (${localStorage.getItem(`suspension_duration_${user.id}`) || "Permanent"})` : user.role}
                           </span>
                         </td>
                         <td>
@@ -882,6 +932,14 @@ export default function Dashboard() {
                         </td>
                         <td className="py-2 text-right">
                           <div className="flex justify-end gap-1.5">
+                            <button
+                              onClick={() => handleToggleUserAdmin(user.id, !isUserAdmin)}
+                              className={`px-2 py-1 rounded text-[8px] font-mono uppercase tracking-wider font-bold transition-all border ${
+                                isUserAdmin ? "bg-purple-500/10 border-purple-500/25 text-purple-600 dark:text-purple-400 hover:bg-purple-500/20" : "bg-cyan-500/10 border-cyan-500/25 text-cyan-500 hover:bg-cyan-500/20"
+                              }`}
+                            >
+                              {isUserAdmin ? "Remove Admin" : "Make Admin"}
+                            </button>
                             <button
                               onClick={() => handleModifyUserStatus(user.id, isUserSuspended ? "Active" : "Suspended")}
                               className={`px-2 py-1 rounded text-[8px] font-mono uppercase tracking-wider font-bold transition-all border ${
