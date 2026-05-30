@@ -218,6 +218,16 @@ export default function Dashboard() {
   const [newAnnTitle, setNewAnnTitle] = useState("");
   const [newAnnMessage, setNewAnnMessage] = useState("");
   const [newAnnType, setNewAnnType] = useState("New Feature");
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "warning" } | null>(null);
+
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => {
+        setToast(null);
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
 
   // Admin Profile settings states
   const [adminName, setAdminName] = useState("Veeresh H P");
@@ -565,7 +575,10 @@ export default function Dashboard() {
   const handleToggleUserAdmin = async (userId: string, makeAdmin: boolean) => {
     const userToModify = dbUsers.find((u) => u.id === userId);
     if (userToModify && !makeAdmin && (userToModify.email === "veereshhp2004@gmail.com" || userToModify.email === "veereshhp04@gmail.com")) {
-      alert("Demoting root administrator accounts is prohibited to maintain security clearance.");
+      setToast({
+        message: "Demoting root administrator accounts is prohibited to maintain security clearance.",
+        type: "warning",
+      });
       return;
     }
     
@@ -1744,7 +1757,40 @@ export default function Dashboard() {
             <span className="hover:text-primary cursor-default transition-colors">Documentation</span>
           </div>
         </div>
-      </footer>
+      </footer>      {/* Premium Glassmorphic Toast Notification Overlay */}
+      {toast && (
+        <div className="fixed bottom-6 right-6 z-[150] max-w-sm w-full bg-white/70 dark:bg-[#07090e]/80 backdrop-blur-xl border border-black/10 dark:border-zinc-800 rounded-xl p-4 shadow-[0_10px_30px_rgba(0,0,0,0.1)] dark:shadow-[0_10px_30px_rgba(0,0,0,0.5)] flex items-start gap-3 animate-in fade-in slide-in-from-bottom-4 duration-300 select-text">
+          <div className={`p-1.5 rounded-lg shrink-0 ${
+            toast.type === "success" ? "bg-green-500/10 text-green-500 border border-green-500/20" :
+            toast.type === "error" ? "bg-red-500/10 text-red-500 border border-red-500/20" :
+            "bg-amber-500/10 text-amber-500 border border-amber-500/20"
+          }`}>
+            {toast.type === "success" ? <CheckCircle size={16} /> :
+             toast.type === "error" ? <XCircle size={16} /> :
+             <AlertTriangle size={16} />}
+          </div>
+          <div className="space-y-1">
+            <h4 className={`text-[10px] font-mono font-bold uppercase tracking-wider ${
+              toast.type === "success" ? "text-green-500" :
+              toast.type === "error" ? "text-red-500" :
+              "text-amber-500"
+            }`}>
+              {toast.type === "success" ? "Operation Successful" :
+               toast.type === "error" ? "Security Halt" :
+               "Ecosystem Alert"}
+            </h4>
+            <p className="text-xs text-zinc-650 dark:text-[#94a3b8] leading-relaxed font-medium">
+              {toast.message}
+            </p>
+          </div>
+          <button 
+            onClick={() => setToast(null)}
+            className="text-zinc-400 hover:text-zinc-500 dark:hover:text-zinc-350 ml-auto p-0.5 rounded hover:bg-black/5 dark:hover:bg-white/5 transition-all cursor-pointer"
+          >
+            <XCircle size={14} className="shrink-0" />
+          </button>
+        </div>
+      )}
 
     </div>
   );
