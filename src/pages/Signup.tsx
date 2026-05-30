@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
-import { User, AtSign, Lock, SquareTerminal, Building2, Shield, CheckCircle2, AlertTriangle, Eye, EyeOff, Phone } from "lucide-react";
+import { User, AtSign, Lock, SquareTerminal, Building2, Shield, CheckCircle2, AlertTriangle, Eye, EyeOff, Phone, Mail } from "lucide-react";
+
 import { supabase } from "@/lib/supabase";
 import { syncUser } from "@/services/api";
 
@@ -19,6 +20,8 @@ export default function Signup() {
   const [otpCode, setOtpCode] = useState("");
   const [countdown, setCountdown] = useState(0);
   const [resendActive, setResendActive] = useState(false);
+  const [emailVerificationSent, setEmailVerificationSent] = useState(false);
+
 
   // Resend Countdown Timer effect
   useEffect(() => {
@@ -187,9 +190,14 @@ export default function Signup() {
       }
 
       // Switch to Code Entry Verification Step dynamically
-      setVerificationStep(true);
-      setCountdown(60);
+      if (signupChannel === "email") {
+        setEmailVerificationSent(true);
+      } else {
+        setVerificationStep(true);
+        setCountdown(60);
+      }
       setLoading(false);
+
       
       // Store session details directly if returned automatically (e.g. email confirmations disabled)
       if (data.session) {
@@ -413,8 +421,54 @@ export default function Signup() {
                     <span>{error}</span>
                   </div>
                 )}
+                {emailVerificationSent ? (
+                  <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
+                    <div className="text-center space-y-4 py-4 select-text">
+                      <div className="mx-auto w-16 h-16 rounded-full bg-[#00d1ff]/10 border border-[#00d1ff]/20 flex items-center justify-center text-[#00d1ff] animate-pulse">
+                        <Mail size={32} />
+                      </div>
+                      <div className="space-y-2">
+                        <span className="text-[10px] font-mono tracking-widest text-[#00d1ff] font-bold block">
+                          VERIFICATION LINK SENT
+                        </span>
+                        <h3 className="text-2xl font-black tracking-tight text-foreground dark:text-white">Check Your Gmail</h3>
+                        <p className="text-xs text-zinc-600 dark:text-[#94a3b8] leading-relaxed max-w-sm mx-auto font-medium">
+                          A confirmation link has been dispatched to:
+                          <span className="block text-[#00d1ff] font-mono font-bold mt-2.5 text-sm bg-black/5 dark:bg-[#03060c]/60 p-2.5 rounded-lg border border-black/10 dark:border-zinc-800/80 break-all select-all">
+                            {formData.email}
+                          </span>
+                        </p>
+                      </div>
 
-                {verificationStep ? (
+                      <div className="block mt-4 text-[10px] text-zinc-500 dark:text-[#94a3b8] leading-normal font-sans italic bg-[#00d1ff]/5 p-4 rounded-xl border border-[#00d1ff]/15 text-left max-w-sm mx-auto">
+                        💡 <strong>How to activate your account:</strong>
+                        <ol className="list-decimal pl-4 mt-2 space-y-1">
+                          <li>Open your <strong>Gmail / Google Mail</strong> inbox.</li>
+                          <li>Find the message from <strong>Supabase Auth</strong> or <strong>RECODEX</strong>.</li>
+                          <li>Click the <strong>"Confirm email address"</strong> or verification link.</li>
+                          <li>Once clicked, you will be verified and can log in!</li>
+                        </ol>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <Link
+                        to="/login"
+                        className="w-full py-3.5 bg-primary dark:bg-[#00d1ff] text-on-primary dark:text-black font-extrabold rounded-lg text-xs tracking-wider uppercase transition-all duration-300 hover:bg-primary-container dark:hover:bg-[#3ce5ff] hover:shadow-[0_0_30px_rgba(0,209,255,0.45)] active:scale-[0.98] font-sans flex items-center justify-center cursor-pointer"
+                      >
+                        PROCEED TO LOGIN
+                      </Link>
+
+                      <button
+                        type="button"
+                        onClick={() => setEmailVerificationSent(false)}
+                        className="w-full py-2 bg-transparent text-zinc-500 dark:text-zinc-400 hover:text-foreground dark:hover:text-white font-mono text-[10px] tracking-wider uppercase transition-all duration-300 cursor-pointer text-center font-bold"
+                      >
+                        ← BACK TO SIGNUP
+                      </button>
+                    </div>
+                  </div>
+                ) : verificationStep ? (
                   <form onSubmit={handleVerifyOTP} className="space-y-6">
                     <div className="text-center space-y-2 mb-2 select-text">
                       <span className="text-[10px] font-mono tracking-widest text-[#00d1ff] font-bold block">
