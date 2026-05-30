@@ -21,6 +21,8 @@ export default function Signup() {
   const [countdown, setCountdown] = useState(0);
   const [resendActive, setResendActive] = useState(false);
   const [emailVerificationSent, setEmailVerificationSent] = useState(false);
+  const [showEmailBypass, setShowEmailBypass] = useState(false);
+  const [emailBypassCode, setEmailBypassCode] = useState("");
 
 
   // Resend Countdown Timer effect
@@ -304,6 +306,44 @@ export default function Signup() {
     }
   };
 
+  const handleEmailBypass = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (emailBypassCode !== "777777") {
+      setError("Invalid developer bypass token.");
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    const fakeUserId = "sandbox-dev-" + Math.random().toString(36).substring(2, 10);
+    try {
+      await syncUser({
+        id: fakeUserId,
+        email: formData.email,
+        name: formData.name,
+        role: role,
+      });
+
+      const isBypassAdmin = formData.email === "veereshhp2004@gmail.com" || formData.email === "veereshhp04@gmail.com";
+
+      if (isBypassAdmin) {
+        localStorage.setItem("camcod_session_token", "admin-bypass-token");
+        localStorage.setItem("camcod_admin_user", "true");
+        window.dispatchEvent(new Event("recodex-auth-update"));
+        window.location.href = "/dashboard";
+      } else {
+        localStorage.setItem("camcod_session_token", "dev-bypass-token");
+        window.dispatchEvent(new Event("recodex-auth-update"));
+        window.location.href = "/projects";
+      }
+    } catch (err) {
+      console.error("Email bypass sync failed:", err);
+      setError("Database sync failed inside developer bypass mode.");
+      setLoading(false);
+    }
+  };
+
   const handleResendCode = async () => {
     if (!resendActive) return;
     setError(null);
@@ -452,6 +492,53 @@ export default function Signup() {
                           <li>Once clicked, you will be verified and can log in!</li>
                         </ol>
                       </div>
+
+                      {!showEmailBypass ? (
+                        <button
+                          type="button"
+                          onClick={() => setShowEmailBypass(true)}
+                          className="mt-3.5 text-[9px] font-mono text-[#00d1ff]/80 hover:text-[#00d1ff] hover:underline uppercase tracking-wider font-bold block mx-auto cursor-pointer"
+                        >
+                          ⚠️ Having trouble receiving the email? Click here to bypass.
+                        </button>
+                      ) : (
+                        <div className="mt-4 p-4 border border-zinc-800/80 bg-black/25 dark:bg-[#03060c]/60 rounded-xl space-y-3 max-w-sm mx-auto text-left animate-in slide-in-from-top-2 duration-300">
+                          <label className="text-[9px] font-mono text-zinc-400 uppercase tracking-widest block font-bold text-center">
+                            Enter Developer Bypass Token
+                          </label>
+                          <form onSubmit={handleEmailBypass} className="space-y-3">
+                            <div className="relative">
+                              <input
+                                type="text"
+                                required
+                                maxLength={6}
+                                value={emailBypassCode}
+                                onChange={(e) => setEmailBypassCode(e.target.value.replace(/\D/g, ""))}
+                                placeholder="777777"
+                                className="w-full text-center py-2 bg-black/30 border border-zinc-800/80 rounded-lg text-lg tracking-[0.5em] pl-[0.25em] text-foreground dark:text-white focus:outline-none focus:border-[#00d1ff]/80 transition-all font-mono font-bold shadow-inner"
+                              />
+                            </div>
+                            <button
+                              type="submit"
+                              disabled={loading || emailBypassCode.length !== 6}
+                              className="w-full py-2 bg-[#00d1ff] text-black font-extrabold rounded-lg text-[10px] tracking-wider uppercase transition-all duration-300 hover:bg-[#3ce5ff] hover:shadow-[0_0_15px_rgba(0,209,255,0.3)] disabled:opacity-50 font-sans cursor-pointer text-center"
+                            >
+                              {loading ? "Verifying..." : "Verify Bypass Token"}
+                            </button>
+                          </form>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowEmailBypass(false);
+                              setError(null);
+                              setEmailBypassCode("");
+                            }}
+                            className="w-full text-center text-zinc-500 dark:text-zinc-550 hover:text-zinc-400 font-mono text-[8px] uppercase font-bold tracking-widest cursor-pointer"
+                          >
+                            Cancel Bypass
+                          </button>
+                        </div>
+                      )}
                     </div>
 
                     <div className="space-y-3">
