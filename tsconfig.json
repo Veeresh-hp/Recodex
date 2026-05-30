@@ -17,9 +17,10 @@
     }
   },
   "include": [
-    "**/*.ts",
-    "**/*.tsx",
-    "**/*.mts"
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "src/**/*.mts",
+    "vite.config.ts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": ["node_modules", "backend"]
 }
