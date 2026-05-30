@@ -1,4 +1,6 @@
 import { Project, MOCK_PROJECTS } from "@/data/mockData";
+import { supabase } from "../lib/supabase";
+
 
 const API_BASE_URL = 
   (typeof import.meta !== "undefined" && import.meta.env && (import.meta.env.VITE_API_URL || import.meta.env.NEXT_PUBLIC_API_URL)) || 
@@ -125,24 +127,45 @@ export async function syncUser(userData: {
   profileImage?: string;
 }): Promise<any> {
   try {
-    const response = await fetch(`${API_BASE_URL}/users/sync`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(userData),
-    });
+    // 1. Try Supabase direct upsert (works on Vercel)
+    const { data, error } = await supabase
+      .from("users")
+      .upsert({
+        id: userData.id,
+        email: userData.email,
+        name: userData.name,
+        role: userData.role || "developer",
+        profileImage: userData.profileImage || null,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "id" })
+      .select()
+      .single();
 
-    if (!response.ok) {
-      throw new Error(`Authentication Sync failed: status ${response.status}`);
-    }
-
-    return await response.json();
+    if (error) throw error;
+    return data;
   } catch (error) {
-    console.error("[RECODEX API] User identity sync failed to reach backend node:", error);
-    return null;
+    console.warn("[RECODEX API] Supabase user sync failed, trying backend fallback:", error);
+    try {
+      const response = await fetch(`${API_BASE_URL}/users/sync`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(userData),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Authentication Sync failed: status ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (backendError) {
+      console.error("[RECODEX API] User identity sync completely failed:", backendError);
+      return null;
+    }
   }
 }
+
 
 /**
  * Retrieves the database profile details for the authenticated user session.
@@ -233,22 +256,41 @@ export async function getUsers(): Promise<any[]> {
  */
 export async function updateUser(userId: string, userData: any, token: string): Promise<any> {
   try {
-    const response = await fetch(`${API_BASE_URL}/users/${userId}`, {
-      method: "PUT",
-      headers: {
-        "Authorization": `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(userData),
-    });
+    // 1. Try Supabase direct update (works on Vercel)
+    const { data, error } = await supabase
+      .from("users")
+      .update({
+        name: userData.name,
+        role: userData.role,
+        profileImage: userData.profileImage || undefined,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", userId)
+      .select()
+      .single();
 
-    if (!response.ok) {
-      throw new Error(`Failed to update user: ${response.status}`);
-    }
-    return await response.json();
+    if (error) throw error;
+    return data;
   } catch (error) {
-    console.error("[RECODEX API] Update user profile error:", error);
-    throw error;
+    console.warn("[RECODEX API] Supabase update user failed, trying backend:", error);
+    try {
+      const response = await fetch(`${API_BASE_URL}/users/${userId}`, {
+        method: "PUT",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(userData),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to update user: ${response.status}`);
+      }
+      return await response.json();
+    } catch (backendError) {
+      console.error("[RECODEX API] Update user profile completely failed:", backendError);
+      throw backendError;
+    }
   }
 }
 
@@ -257,22 +299,37 @@ export async function updateUser(userId: string, userData: any, token: string): 
  */
 export async function deleteUser(userId: string, token: string): Promise<any> {
   try {
-    const response = await fetch(`${API_BASE_URL}/users/${userId}`, {
-      method: "DELETE",
-      headers: {
-        "Authorization": `Bearer ${token}`,
-      },
-    });
+    // 1. Try Supabase direct delete (works on Vercel)
+    const { data, error } = await supabase
+      .from("users")
+      .delete()
+      .eq("id", userId)
+      .select()
+      .single();
 
-    if (!response.ok) {
-      throw new Error(`Failed to delete user: ${response.status}`);
-    }
-    return await response.json();
+    if (error) throw error;
+    return data;
   } catch (error) {
-    console.error("[RECODEX API] Delete user profile error:", error);
-    throw error;
+    console.warn("[RECODEX API] Supabase user delete failed, trying backend:", error);
+    try {
+      const response = await fetch(`${API_BASE_URL}/users/${userId}`, {
+        method: "DELETE",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to delete user: ${response.status}`);
+      }
+      return await response.json();
+    } catch (backendError) {
+      console.error("[RECODEX API] Delete user completely failed:", backendError);
+      throw backendError;
+    }
   }
 }
+
 
 /**
  * Updates a project listing in the database.
