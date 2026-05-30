@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import Footer from "@/components/Footer";
 import { supabase } from "@/lib/supabase";
@@ -105,7 +105,8 @@ export default function Profile() {
             email: user.email || "No email linked",
             phone: user.phone || "No phone linked",
             avatar: resolvedAvatar,
-            role: user.email === "veereshhp2004@gmail.com" ? "admin" : (user.user_metadata?.role || "developer"),
+            role: (user.email === "veereshhp2004@gmail.com" || user.email === "veereshhp04@gmail.com") ? "admin" : (user.user_metadata?.role || "developer"),
+
             isGoogleUser: !!isGoogle,
           };
           setProfile(p);

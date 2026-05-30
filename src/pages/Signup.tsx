@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { User, AtSign, Lock, SquareTerminal, Building2, Shield, CheckCircle2, AlertTriangle, Eye, EyeOff, Phone } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -224,7 +224,7 @@ export default function Signup() {
         });
 
         const bypassEmail = signupChannel === "email" ? formData.email : "";
-        const isBypassAdmin = bypassEmail === "veereshhp2004@gmail.com";
+        const isBypassAdmin = bypassEmail === "veereshhp2004@gmail.com" || bypassEmail === "veereshhp04@gmail.com";
 
         if (isBypassAdmin) {
           localStorage.setItem("camcod_session_token", "admin-bypass-token");
@@ -278,7 +278,7 @@ export default function Signup() {
       }
 
       // Redirect to dashboard if admin, otherwise to projects page
-      const isAdmin = data.user?.email === "veereshhp2004@gmail.com";
+      const isAdmin = data.user?.email === "veereshhp2004@gmail.com" || data.user?.email === "veereshhp04@gmail.com";
       if (isAdmin) {
         localStorage.setItem("camcod_admin_user", "true");
         window.location.href = "/dashboard";

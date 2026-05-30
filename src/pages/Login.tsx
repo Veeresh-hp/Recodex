@@ -1,4 +1,4 @@
-﻿import React, { useState } from "react";
+import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import Footer from "@/components/Footer";
 import { Lock, Mail, ArrowRight, ShieldCheck, AlertTriangle, Eye, EyeOff } from "lucide-react";
@@ -20,7 +20,7 @@ export default function Login() {
 
     // Enforce administrative credential bypass to avoid "Email not confirmed" blocks in dev environment
     if (
-      (inputVal === "veereshhp2004@gmail.com" || inputVal === "veereshhp2004") &&
+      (inputVal === "veereshhp2004@gmail.com" || inputVal === "veereshhp2004" || inputVal === "veereshhp04@gmail.com" || inputVal === "veereshhp04") &&
       formData.password === "Veereshhp04@"
     ) {
       localStorage.setItem("camcod_session_token", "admin-bypass-token");
@@ -51,7 +51,7 @@ export default function Login() {
       }
 
       // Redirect to dashboard if admin, otherwise to projects page
-      const isAdmin = data.user?.email === "veereshhp2004@gmail.com";
+      const isAdmin = data.user?.email === "veereshhp2004@gmail.com" || data.user?.email === "veereshhp04@gmail.com";
       if (isAdmin) {
         localStorage.setItem("camcod_admin_user", "true");
         window.location.href = "/dashboard";

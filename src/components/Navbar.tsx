@@ -41,7 +41,7 @@ export default function Navbar() {
         const { data: { session } } = await supabase.auth.getSession();
         if (session) {
           setIsAuthenticated(true);
-          if (session.user && session.user.email === "veereshhp2004@gmail.com") {
+          if (session.user && (session.user.email === "veereshhp2004@gmail.com" || session.user.email === "veereshhp04@gmail.com")) {
             setIsAdmin(true);
           }
           // Load avatar: prefer localStorage override, then Google avatar
@@ -71,7 +71,7 @@ export default function Navbar() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session) {
         setIsAuthenticated(true);
-        if (session.user && session.user.email === "veereshhp2004@gmail.com") {
+        if (session.user && (session.user.email === "veereshhp2004@gmail.com" || session.user.email === "veereshhp04@gmail.com")) {
           setIsAdmin(true);
         } else {
           setIsAdmin(false);

@@ -69,9 +69,13 @@ export default function Dashboard() {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
           isAuthenticatedUser = true;
-          if (user.email === "veereshhp2004@gmail.com") {
+          if (user.email === "veereshhp2004@gmail.com" || user.email === "veereshhp04@gmail.com") {
             localStorage.setItem("camcod_admin_user", "true");
+            setAdminEmail(user.email || "");
+            const displayName = user.user_metadata?.full_name || user.user_metadata?.name;
+            if (displayName) setAdminName(displayName);
             return;
+
           }
         }
       } catch (err) {
@@ -230,9 +234,9 @@ export default function Dashboard() {
   const fetchUsers = async () => {
     try {
       const { data, error } = await supabase
-        .from("User")
+        .from("users")
         .select("*")
-        .order("createdAt", { ascending: false });
+        .order("created_at", { ascending: false });
       if (error) throw error;
       setDbUsers(data || []);
       setActiveDevs((data || []).length);
@@ -252,9 +256,9 @@ export default function Dashboard() {
     setProjectsLoading(true);
     try {
       const { data, error } = await supabase
-        .from("Project")
+        .from("projects")
         .select("*")
-        .order("createdAt", { ascending: false });
+        .order("created_at", { ascending: false });
       if (error) throw error;
       setDbProjects(data || []);
     } catch (err) {
@@ -277,7 +281,7 @@ export default function Dashboard() {
       .channel("dashboard-users-realtime")
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "User" },
+        { event: "INSERT", schema: "public", table: "users" },
         (payload) => {
           console.log("[Dashboard] New user joined:", payload.new);
           setDbUsers((prev) => [payload.new, ...prev]);
@@ -286,7 +290,7 @@ export default function Dashboard() {
       )
       .on(
         "postgres_changes",
-        { event: "DELETE", schema: "public", table: "User" },
+        { event: "DELETE", schema: "public", table: "users" },
         (payload) => {
           setDbUsers((prev) => prev.filter((u) => u.id !== payload.old.id));
           setActiveDevs((prev) => Math.max(0, prev - 1));
@@ -299,14 +303,14 @@ export default function Dashboard() {
       .channel("dashboard-projects-realtime")
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "Project" },
+        { event: "INSERT", schema: "public", table: "projects" },
         (payload) => {
           setDbProjects((prev) => [payload.new, ...prev]);
         }
       )
       .on(
         "postgres_changes",
-        { event: "DELETE", schema: "public", table: "Project" },
+        { event: "DELETE", schema: "public", table: "projects" },
         (payload) => {
           setDbProjects((prev) => prev.filter((p) => p.id !== payload.old.id));
         }
