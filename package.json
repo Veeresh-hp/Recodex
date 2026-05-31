@@ -1,27 +1,16 @@
 {
-  "name": "camcod",
-  "version": "0.1.0",
-  "private": true,
+  "name": "recodex-workspace",
+  "version": "1.0.0",
+  "description": "RecodeX Fullstack Workspace",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
-    "preview": "vite preview"
-  },
-  "dependencies": {
-    "@supabase/supabase-js": "^2.106.2",
-    "lucide-react": "^1.16.0",
-    "react": "19.2.4",
-    "react-dom": "19.2.4",
-    "react-router-dom": "^7.1.5"
+    "install:all": "npm install && npm install --prefix frontend && npm install --prefix backend",
+    "dev:frontend": "npm run dev --prefix frontend",
+    "dev:backend": "npm run dev --prefix backend",
+    "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
+    "build:frontend": "npm run build --prefix frontend",
+    "build:backend": "npm run build --prefix backend"
   },
   "devDependencies": {
-    "@tailwindcss/vite": "^4.0.0",
-    "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "@vitejs/plugin-react": "^5.2.0",
-    "tailwindcss": "^4.0.0",
-    "typescript": "^5",
-    "vite": "^6.0.11"
+    "concurrently": "^8.2.2"
   }
 }
