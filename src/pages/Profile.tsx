@@ -99,13 +99,14 @@ export default function Profile() {
           // Google users auto-get their google avatar unless they've picked a different one
           const resolvedAvatar = savedAvatar || user.user_metadata?.avatar_url || null;
 
+          const isUserAdmin = user.email === "veereshhp2004@gmail.com" || localStorage.getItem("camcod_admin_user") === "true";
           const p: UserProfile = {
             id: user.id,
             name: fullName,
             email: user.email || "No email linked",
             phone: user.phone || "No phone linked",
             avatar: resolvedAvatar,
-            role: (user.email === "veereshhp2004@gmail.com" || user.email === "veereshhp04@gmail.com") ? "admin" : (user.user_metadata?.role || "developer"),
+            role: isUserAdmin ? "admin" : (user.user_metadata?.role || "developer"),
 
             isGoogleUser: !!isGoogle,
           };

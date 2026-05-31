@@ -83,7 +83,9 @@ export default function Navbar() {
 
       if (hasValidToken) {
         setIsAuthenticated(true);
-        if (session.user && (session.user.email === "veereshhp2004@gmail.com" || session.user.email === "veereshhp04@gmail.com")) {
+        const isRootAdmin = session.user && session.user.email === "veereshhp2004@gmail.com";
+        const isStoredAdmin = localStorage.getItem("camcod_admin_user") === "true";
+        if (isRootAdmin || isStoredAdmin) {
           setIsAdmin(true);
         } else {
           setIsAdmin(false);

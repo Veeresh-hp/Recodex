@@ -82,19 +82,25 @@ export default function LoginModal() {
       }
 
       if (data.user) {
-        const isAdmin = data.user.email === "veereshhp2004@gmail.com" || data.user.email === "veereshhp04@gmail.com";
-        if (!isAdmin) {
-          // Verify if user exists in the public users table
-          const { data: dbUser, error: checkError } = await supabase
-            .from("users")
-            .select("id")
-            .eq("id", data.user.id)
-            .maybeSingle();
+        const isRootAdmin = data.user.email === "veereshhp2004@gmail.com";
+        
+        // Fetch role and verification from public users table
+        const { data: dbUser, error: checkError } = await supabase
+          .from("users")
+          .select("id, role")
+          .eq("id", data.user.id)
+          .maybeSingle();
 
-          if (!dbUser || checkError) {
-            await supabase.auth.signOut();
-            throw new Error("User record not found in our database. Please sign up first!");
-          }
+        if (!isRootAdmin && (!dbUser || checkError)) {
+          await supabase.auth.signOut();
+          throw new Error("User record not found in our database. Please sign up first!");
+        }
+
+        const isUserAdmin = isRootAdmin || (dbUser && dbUser.role === "admin");
+        if (isUserAdmin) {
+          localStorage.setItem("camcod_admin_user", "true");
+        } else {
+          localStorage.removeItem("camcod_admin_user");
         }
       }
 
@@ -106,9 +112,8 @@ export default function LoginModal() {
 
       // Close modal and redirect based on role
       closeLogin();
-      const isAdmin = data.user?.email === "veereshhp2004@gmail.com" || data.user?.email === "veereshhp04@gmail.com";
+      const isAdmin = localStorage.getItem("camcod_admin_user") === "true";
       if (isAdmin) {
-        localStorage.setItem("camcod_admin_user", "true");
         window.location.href = "/dashboard";
       } else {
         window.location.href = "/projects";

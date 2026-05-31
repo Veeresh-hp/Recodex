@@ -69,29 +69,38 @@ export default function Dashboard() {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
           isAuthenticatedUser = true;
-          if (user.email === "veereshhp2004@gmail.com" || user.email === "veereshhp04@gmail.com") {
+          
+          // 1. Root admin check
+          if (user.email === "veereshhp2004@gmail.com") {
             localStorage.setItem("camcod_admin_user", "true");
             setAdminEmail(user.email || "");
             const displayName = user.user_metadata?.full_name || user.user_metadata?.name;
             if (displayName) setAdminName(displayName);
             return;
-          } else {
-            // Verify if user exists in the public.users table
-            const { data: dbUser } = await supabase
-              .from("users")
-              .select("id")
-              .eq("id", user.id)
-              .maybeSingle();
+          }
 
-            if (!dbUser) {
-              // Unregistered user! Purge session immediately and redirect to login
-              await supabase.auth.signOut();
-              localStorage.removeItem("camcod_session_token");
-              localStorage.removeItem("camcod_admin_user");
-              localStorage.removeItem("recodex_auth_intent");
-              window.location.href = "/login?error=user_not_found";
-              return;
-            }
+          // 2. Non-root user: check database table 'users' for role === 'admin'
+          const { data: dbUser } = await supabase
+            .from("users")
+            .select("id, role, name")
+            .eq("id", user.id)
+            .maybeSingle();
+
+          if (!dbUser) {
+            // Unregistered user! Purge session immediately and redirect to login
+            await supabase.auth.signOut();
+            localStorage.removeItem("camcod_session_token");
+            localStorage.removeItem("camcod_admin_user");
+            localStorage.removeItem("recodex_auth_intent");
+            window.location.href = "/login?error=user_not_found";
+            return;
+          }
+
+          if (dbUser.role === "admin") {
+            localStorage.setItem("camcod_admin_user", "true");
+            setAdminEmail(user.email || "");
+            setAdminName(dbUser.name || user.user_metadata?.full_name || user.user_metadata?.name || "Admin");
+            return;
           }
         }
       } catch (err) {
@@ -265,7 +274,7 @@ export default function Dashboard() {
         .order("created_at", { ascending: false });
       if (error) throw error;
       const mapped = (data || []).map((u) => {
-        if (u.email === "veereshhp2004@gmail.com" || u.email === "veereshhp04@gmail.com") {
+        if (u.email === "veereshhp2004@gmail.com") {
           return { ...u, role: "admin" };
         }
         return u;
@@ -279,7 +288,7 @@ export default function Dashboard() {
         const real = data.filter((u: any) => !u.id.startsWith("usr-"));
         const targetData = real.length > 0 ? real : data;
         const mapped = targetData.map((u: any) => {
-          if (u.email === "veereshhp2004@gmail.com" || u.email === "veereshhp04@gmail.com") {
+          if (u.email === "veereshhp2004@gmail.com") {
             return { ...u, role: "admin" };
           }
           return u;
@@ -324,7 +333,7 @@ export default function Dashboard() {
         (payload) => {
           console.log("[Dashboard] New user joined:", payload.new);
           const newUser = payload.new;
-          if (newUser.email === "veereshhp2004@gmail.com" || newUser.email === "veereshhp04@gmail.com") {
+          if (newUser.email === "veereshhp2004@gmail.com") {
             newUser.role = "admin";
           }
           setDbUsers((prev) => [newUser, ...prev]);
@@ -574,7 +583,7 @@ export default function Dashboard() {
   
   const handleToggleUserAdmin = async (userId: string, makeAdmin: boolean) => {
     const userToModify = dbUsers.find((u) => u.id === userId);
-    if (userToModify && !makeAdmin && (userToModify.email === "veereshhp2004@gmail.com" || userToModify.email === "veereshhp04@gmail.com")) {
+    if (userToModify && !makeAdmin && userToModify.email === "veereshhp2004@gmail.com") {
       setToast({
         message: "Demoting root administrator accounts is prohibited to maintain security clearance.",
         type: "warning",
@@ -937,7 +946,7 @@ export default function Dashboard() {
                 <tbody className="divide-y divide-black/5 dark:divide-zinc-900">
                   {filteredUsers.map((user) => {
                     const isUserSuspended = user.role === "suspended";
-                    const isUserAdmin = user.role === "admin" || user.email === "veereshhp2004@gmail.com" || user.email === "veereshhp04@gmail.com";
+                    const isUserAdmin = user.role === "admin" || user.email === "veereshhp2004@gmail.com";
                     return (
                       <tr key={user.id} className="h-14 hover:bg-black/5 dark:hover:bg-[#07090e]/25 transition-colors">
                         <td onClick={() => setSelectedUserDetails({ ...user, role: isUserAdmin ? "admin" : user.role })} className="text-foreground dark:text-white font-extrabold cursor-pointer hover:text-primary transition-colors">{user.name}</td>
@@ -1531,12 +1540,34 @@ export default function Dashboard() {
       case "Recycle Bin":
         return (
           <div className="bg-white dark:bg-[#0b0e14] border border-black/10 dark:border-zinc-900 rounded-2xl p-8 space-y-6 shadow-lg transition-colors duration-300">
-            <div>
-              <h3 className="text-lg font-bold text-foreground dark:text-white font-sans font-extrabold uppercase flex items-center gap-2">
-                <Trash2 size={20} className="text-[#00d1ff]" />
-                Recycle Bin Console
-              </h3>
-              <p className="text-xs text-zinc-400 dark:text-zinc-500">Safely recover or permanently purge deleted categories, users, and project nodes.</p>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-bold text-foreground dark:text-white font-sans font-extrabold uppercase flex items-center gap-2">
+                  <Trash2 size={20} className="text-[#00d1ff]" />
+                  Recycle Bin Console
+                </h3>
+                <p className="text-xs text-zinc-400 dark:text-zinc-500">Safely recover or permanently purge deleted categories, users, and project nodes.</p>
+              </div>
+              <button
+                onClick={() => {
+                  if (window.confirm("Are you sure you want to restore all soft-deleted items and reset your browser filters? This will immediately display all database projects and users.")) {
+                    localStorage.removeItem("recodex_soft_deleted_users");
+                    localStorage.removeItem("recodex_soft_deleted_projects");
+                    localStorage.removeItem("recodex_recycle_bin");
+                    setSoftDeletedUserIds([]);
+                    setSoftDeletedProjectIds([]);
+                    setRecycleBin([]);
+                    setToast({
+                      message: "All soft-delete filters cleared successfully! Dynamic stats are restored.",
+                      type: "success"
+                    });
+                    setTimeout(() => window.location.reload(), 1000);
+                  }
+                }}
+                className="px-3.5 py-1.5 bg-cyan-500/10 border border-cyan-500/25 text-[#00d1ff] hover:bg-cyan-500/20 rounded-lg text-[9px] font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shadow-sm select-none"
+              >
+                RESET_SOFT_DELETES_FILTER
+              </button>
             </div>
 
             {recycleBin.length === 0 ? (
