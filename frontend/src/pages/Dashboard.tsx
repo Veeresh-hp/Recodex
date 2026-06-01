@@ -332,55 +332,7 @@ export default function Dashboard() {
     fetchProjects();
     fetchUsers();
 
-    // Real-time: re-fetch users whenever a new user is inserted in the DB
-    const userChannel = supabase
-      .channel("dashboard-users-realtime")
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "users" },
-        (payload) => {
-          console.log("[Dashboard] New user joined:", payload.new);
-          const newUser = payload.new;
-          if (newUser.email === "veereshhp2004@gmail.com") {
-            newUser.role = "admin";
-          }
-          setDbUsers((prev) => [newUser, ...prev]);
-          setActiveDevs((prev) => prev + 1);
-        }
-      )
-      .on(
-        "postgres_changes",
-        { event: "DELETE", schema: "public", table: "users" },
-        (payload) => {
-          setDbUsers((prev) => prev.filter((u) => u.id !== payload.old.id));
-          setActiveDevs((prev) => Math.max(0, prev - 1));
-        }
-      )
-      .subscribe();
-
-    // Real-time: re-fetch projects on insert/delete
-    const projectChannel = supabase
-      .channel("dashboard-projects-realtime")
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "projects" },
-        (payload) => {
-          setDbProjects((prev) => [payload.new, ...prev]);
-        }
-      )
-      .on(
-        "postgres_changes",
-        { event: "DELETE", schema: "public", table: "projects" },
-        (payload) => {
-          setDbProjects((prev) => prev.filter((p) => p.id !== payload.old.id));
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(userChannel);
-      supabase.removeChannel(projectChannel);
-    };
+    return () => {};
   }, []);
 
   // Re-fetch when sidebar tab changes
