@@ -283,7 +283,7 @@ export default function Dashboard() {
       setDbUsers(mapped);
       setActiveDevs(mapped.length);
     } catch (err) {
-      console.warn("[Dashboard] Supabase user fetch failed, trying backend:", err);
+      console.log("[RECODEX ERROR] Supabase user fetch failed, trying backend:", err);
       // Fallback to backend API
       getUsers().then((data) => {
         const real = data.filter((u: any) => !u.id.startsWith("usr-"));
@@ -312,7 +312,7 @@ export default function Dashboard() {
       if (error) throw error;
       setDbProjects(data || []);
     } catch (err) {
-      console.warn("[Dashboard] Supabase project fetch failed, trying backend:", err);
+      console.log("[RECODEX ERROR] Supabase project fetch failed, trying backend:", err);
       getProjects().then((data) => {
         setDbProjects(data);
       }).catch(console.error);
