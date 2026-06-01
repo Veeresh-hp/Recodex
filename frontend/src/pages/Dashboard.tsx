@@ -323,6 +323,12 @@ export default function Dashboard() {
 
   // Initial fetch + real-time subscription for new user signups
   useEffect(() => {
+    console.log("[RECODEX DEBUG] Active Supabase Client Configuration URL:", supabase ? (supabase as any).supabaseUrl : "undefined");
+    console.log("[RECODEX DEBUG] Raw Import Meta Env:", {
+      VITE_SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL,
+      VITE_API_URL: import.meta.env.VITE_API_URL
+    });
+
     fetchProjects();
     fetchUsers();
 
