@@ -272,6 +272,7 @@ export default function Dashboard() {
         .from("users")
         .select("*")
         .order("created_at", { ascending: false });
+      console.log("[RECODEX DEBUG] Supabase fetchUsers response:", { data, error });
       if (error) throw error;
       const mapped = (data || []).map((u) => {
         if (u.email === "veereshhp2004@gmail.com") {
@@ -307,6 +308,7 @@ export default function Dashboard() {
         .from("projects")
         .select("*")
         .order("created_at", { ascending: false });
+      console.log("[RECODEX DEBUG] Supabase fetchProjects response:", { data, error });
       if (error) throw error;
       setDbProjects(data || []);
     } catch (err) {
