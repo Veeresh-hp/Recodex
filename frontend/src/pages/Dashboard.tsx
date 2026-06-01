@@ -479,9 +479,10 @@ export default function Dashboard() {
     return () => cancelAnimationFrame(animationFrameId);
   }, [activeSidebarTab, theme]);
 
-  const handleSignOut = async () => {
+  const handleSignOut = () => {
+    // Trigger Supabase signout in the background without blocking the UI
     try {
-      await supabase.auth.signOut();
+      supabase.auth.signOut().catch(err => console.warn("Supabase background signout warning:", err));
     } catch (err) {
       console.warn("Supabase sign out error:", err);
     }

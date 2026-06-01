@@ -121,19 +121,20 @@ export default function Navbar() {
     }
   };
 
-  const handleSignOut = async () => {
+  const handleSignOut = () => {
+    // Trigger Supabase signout in the background without blocking the UI
     try {
-      await supabase.auth.signOut();
+      supabase.auth.signOut().catch(err => console.warn("Supabase background signout warning:", err));
     } catch (err) {
       console.warn("Supabase sign out error:", err);
     }
     
-    // Clear all bypass tokens
+    // Instantly purge local state and session tokens
     localStorage.removeItem("camcod_session_token");
     localStorage.removeItem("camcod_admin_user");
     setIsAuthenticated(false);
     
-    // Redirect to home page
+    // Immediately redirect to clear the UI
     window.location.href = "/";
   };
 
