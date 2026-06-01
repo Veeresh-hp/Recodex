@@ -154,6 +154,7 @@ export default function Dashboard() {
   const [dbProjects, setDbProjects] = useState<any[]>([]);
   const [projectsLoading, setProjectsLoading] = useState(true);
   const [dbUsers, setDbUsers] = useState<any[]>([]);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const [deploymentsCount, setDeploymentsCount] = useState(340);
   const [sysHealth, setSysHealth] = useState(99.98);
@@ -321,6 +322,22 @@ export default function Dashboard() {
     }
   };
 
+  // In-app premium telemetry synchronization function
+  const handleRefreshSystem = async () => {
+    setIsRefreshing(true);
+    try {
+      await Promise.all([fetchUsers(), fetchProjects()]);
+      setToast({ message: "Ecosystem control metrics synchronized successfully.", type: "success" });
+    } catch (err) {
+      console.error("[RECODEX ERROR] Sync failed:", err);
+      setToast({ message: "System telemetry synchronization failed.", type: "error" });
+    } finally {
+      setTimeout(() => {
+        setIsRefreshing(false);
+      }, 700);
+    }
+  };
+
   // Initial fetch + real-time subscription for new user signups
   useEffect(() => {
     console.log("[RECODEX DEBUG] Active Supabase Client Configuration URL:", supabase ? (supabase as any).supabaseUrl : "undefined");
@@ -329,10 +346,17 @@ export default function Dashboard() {
       VITE_API_URL: import.meta.env.VITE_API_URL
     });
 
-    fetchProjects();
-    fetchUsers();
+    // Listen for auth state events to align fetches with the loaded session
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log("[RECODEX DEBUG] onAuthStateChange event triggered:", event, session ? "Session active" : "No session");
+      // Fetch both projects and users once the session state has loaded
+      fetchProjects();
+      fetchUsers();
+    });
 
-    return () => {};
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   // Re-fetch when sidebar tab changes
@@ -1712,8 +1736,8 @@ export default function Dashboard() {
                 <button onClick={handleExportJSON} className="px-4 py-2 bg-black/5 dark:bg-zinc-950/40 border border-black/10 dark:border-zinc-800 rounded-lg text-[10px] font-mono font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-450 hover:text-foreground dark:hover:text-white hover:border-black/20 dark:hover:border-zinc-700 transition-all cursor-pointer">
                   EXPORT_TELEMETRY
                 </button>
-                <button onClick={() => window.location.reload()} className="px-4 py-2 bg-primary dark:bg-[#00d1ff] text-on-primary dark:text-black rounded-lg text-[10px] font-mono font-bold uppercase tracking-wider hover:brightness-110 hover:shadow-[0_0_20px_rgba(0,209,255,0.4)] transition-all cursor-pointer flex items-center gap-1.5">
-                  <RefreshCw size={10} className="animate-spin" /> REFRESH_SYSTEM
+                <button onClick={handleRefreshSystem} disabled={isRefreshing} className="px-4 py-2 bg-primary dark:bg-[#00d1ff] text-on-primary dark:text-black rounded-lg text-[10px] font-mono font-bold uppercase tracking-wider hover:brightness-110 hover:shadow-[0_0_20px_rgba(0,209,255,0.4)] transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed">
+                  <RefreshCw size={10} className={isRefreshing ? "animate-spin" : ""} /> REFRESH_SYSTEM
                 </button>
               </div>
             )}

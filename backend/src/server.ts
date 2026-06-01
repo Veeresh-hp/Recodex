@@ -54,11 +54,15 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   });
 });
 
-// Boot Server
-app.listen(PORT, () => {
-  console.log("====================================================");
-  console.log(`⚡️ CAMCOD BACKEND API CORE BOOTED SUCCESSFULLY ⚡️`);
-  console.log(`📡 Server active on: http://localhost:${PORT}`);
-  console.log(`🌐 Frontend Allowed Origin: ${process.env.FRONTEND_URL || "http://localhost:3000"}`);
-  console.log("====================================================");
-});
+// Boot Server (only in non-serverless environments)
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log("====================================================");
+    console.log(`⚡️ CAMCOD BACKEND API CORE BOOTED SUCCESSFULLY ⚡️`);
+    console.log(`📡 Server active on: http://localhost:${PORT}`);
+    console.log(`🌐 Frontend Allowed Origin: ${process.env.FRONTEND_URL || "http://localhost:3000"}`);
+    console.log("====================================================");
+  });
+}
+
+export default app;
