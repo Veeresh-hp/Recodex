@@ -6,7 +6,7 @@ import {
   LogOut, User, ExternalLink, Play,
   Settings as SettingsIcon, Users, BarChart3, 
   Trash2, Plus, Edit3, Lock, Globe,
-  AlertTriangle, Search, FileText, CheckCircle, Award, XCircle, RefreshCw, Send, Check
+  AlertTriangle, Search, FileText, CheckCircle, Award, XCircle, RefreshCw, Send, Check, Menu, X
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { getProjects, getUsers, updateUser, deleteUser, updateProject, deleteProject } from "../services/api";
@@ -52,6 +52,7 @@ export default function Dashboard() {
   const { theme, toggleTheme } = useTheme();
   const [activeSidebarTab, setActiveSidebarTab] = useState("Dashboard");
   const [activeTimeline, setActiveTimeline] = useState<"7D" | "30D">("30D");
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Admin access validation
   useEffect(() => {
@@ -1611,7 +1612,15 @@ export default function Dashboard() {
       
       {/* 1. Brand Header */}
       <header className="border-b border-black/5 dark:border-zinc-900 bg-white/90 dark:bg-[#06080c]/90 backdrop-blur-md sticky top-0 z-50 px-6 py-4 flex items-center justify-between select-text transition-colors duration-300 print:hidden">
-        <div className="flex items-center gap-12">
+        <div className="flex items-center gap-4 md:gap-12">
+          {/* Mobile Menu Hamburger Button */}
+          <button
+            onClick={() => setIsMobileMenuOpen(true)}
+            className="md:hidden p-1.5 text-zinc-500 hover:text-foreground dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 rounded-lg flex items-center justify-center cursor-pointer transition-colors"
+          >
+            <Menu size={18} />
+          </button>
+
           {/* Logo split color */}
           <Link to="/" className="text-xl font-black tracking-tight font-sans flex items-center gap-0.5">
             <span className="text-foreground dark:text-white">Recode</span>
@@ -1662,8 +1671,8 @@ export default function Dashboard() {
       {/* 2. Admin Workspace Grid */}
       <div className="flex-grow flex flex-col md:flex-row relative z-10 w-full max-w-[1440px] mx-auto px-6 md:px-8 py-8 gap-8">
         
-        {/* Sidebar Panel */}
-        <aside className="w-full md:w-60 flex flex-col justify-between gap-12 select-none">
+        {/* Sidebar Panel - Hidden on mobile viewports */}
+        <aside className="hidden md:flex w-60 shrink-0 flex-col justify-between gap-12 select-none">
           <div className="space-y-1">
             {navItems.map((item) => {
               const isActive = activeSidebarTab === item.label;
@@ -1783,6 +1792,70 @@ export default function Dashboard() {
           >
             <XCircle size={14} className="shrink-0" />
           </button>
+        </div>
+      )}
+
+      {/* 3. Mobile Sidebar Drawer Overlay */}
+      {isMobileMenuOpen && (
+        <div className="fixed inset-0 z-[100] md:hidden">
+          {/* Backdrop glass blur */}
+          <div 
+            onClick={() => setIsMobileMenuOpen(false)}
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300"
+          />
+          
+          {/* Drawer Panel */}
+          <div className="absolute inset-y-0 left-0 w-[280px] bg-white dark:bg-[#07090e] border-r border-black/10 dark:border-zinc-900 p-6 flex flex-col justify-between select-none shadow-2xl animate-in slide-in-from-left duration-300">
+            <div className="space-y-6">
+              {/* Header inside drawer */}
+              <div className="flex items-center justify-between border-b border-black/5 dark:border-zinc-900 pb-4">
+                <Link to="/" className="text-lg font-black tracking-tight uppercase">
+                  <span className="text-foreground dark:text-white">Recode</span>
+                  <span className="text-primary dark:text-[#00d1ff]">X</span>
+                </Link>
+                <button 
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="p-1.5 text-zinc-500 hover:text-foreground dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 rounded-lg flex items-center justify-center cursor-pointer"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* Navigation items in drawer */}
+              <div className="space-y-1 overflow-y-auto max-h-[60vh] pr-1">
+                {navItems.map((item) => {
+                  const isActive = activeSidebarTab === item.label;
+                  return (
+                    <button
+                      key={item.label}
+                      onClick={() => {
+                        setActiveSidebarTab(item.label);
+                        setIsMobileMenuOpen(false); // Auto close on select
+                      }}
+                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-bold tracking-wider font-mono uppercase transition-all border cursor-pointer ${
+                        isActive
+                          ? "bg-primary text-white dark:bg-[#0b101c] border-primary dark:border-[#00d1ff]/25"
+                          : "bg-transparent border-transparent text-zinc-500 hover:text-foreground dark:hover:text-zinc-300 hover:bg-black/5 dark:hover:bg-zinc-900/20"
+                      }`}
+                    >
+                      <item.icon size={14} className={isActive ? "text-white dark:text-[#00d1ff]" : "text-zinc-500"} />
+                      {item.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Node Status Capsule inside drawer */}
+            <div className="border border-black/10 dark:border-zinc-900 bg-black/5 dark:bg-zinc-950/20 rounded-xl p-4 flex items-center justify-between shadow-inner">
+              <div className="space-y-1">
+                <span className="text-[8px] font-mono tracking-widest text-zinc-500 dark:text-zinc-600 uppercase font-bold block">Node Status</span>
+                <span className="text-[10px] font-mono font-bold text-primary dark:text-[#00d1ff] block">v1.0.0-mvp</span>
+                <span className="text-[9px] font-mono text-zinc-600 dark:text-zinc-500 block">up 99.98% uptime</span>
+              </div>
+              <span className="w-2 h-2 rounded-full bg-primary dark:bg-[#00d1ff] animate-pulse shadow-[0_0_10px_rgba(0,209,255,0.7)]"></span>
+            </div>
+          </div>
         </div>
       )}
 
