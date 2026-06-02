@@ -47,6 +47,49 @@ function PersistentLayout() {
 
 export default function App() {
   React.useEffect(() => {
+    // Dynamically load Google Identity Service script for One Tap login
+    const script = document.createElement("script");
+    script.src = "https://accounts.google.com/gsi/client";
+    script.async = true;
+    script.defer = true;
+    script.onload = () => {
+      const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || "1028308691515-m3u34d0qfef2lqffn55s9a9m9c9q9o9u.apps.googleusercontent.com";
+      if (!googleClientId || googleClientId.includes("YOUR_")) return;
+
+      try {
+        const { google } = window as any;
+        if (!google?.accounts?.id) return;
+
+        google.accounts.id.initialize({
+          client_id: googleClientId,
+          callback: async (response: any) => {
+            console.log("[RECODEX AUTH] Google One Tap Token Received");
+            const { data, error } = await supabase.auth.signInWithIdToken({
+              provider: "google",
+              token: response.credential,
+            });
+
+            if (error) {
+              console.error("[RECODEX AUTH] Google One Tap Auth failed:", error.message);
+            } else {
+              console.log("[RECODEX AUTH] Google One Tap Sign-In successful!", data);
+            }
+          },
+          auto_select: false,
+          itp_support: true,
+        });
+
+        // Only prompt if the user is not authenticated
+        const currentToken = localStorage.getItem("recodex_session_token");
+        if (!currentToken) {
+          google.accounts.id.prompt();
+        }
+      } catch (err) {
+        console.warn("[RECODEX AUTH] Google One Tap initialization warning:", err);
+      }
+    };
+    document.body.appendChild(script);
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log(`[RECODEX AUTH] Event: ${event}`, session);
 
@@ -68,8 +111,8 @@ export default function App() {
             
             // Sign out completely
             await supabase.auth.signOut();
-            localStorage.removeItem("camcod_session_token");
-            localStorage.removeItem("camcod_admin_user");
+            localStorage.removeItem("recodex_session_token");
+            localStorage.removeItem("recodex_admin_user");
             localStorage.removeItem("recodex_auth_intent");
             window.dispatchEvent(new Event("recodex-auth-update"));
             
@@ -80,7 +123,7 @@ export default function App() {
         }
 
         // Standard user sync (for signups or valid logins)
-        localStorage.setItem("camcod_session_token", session.access_token);
+        localStorage.setItem("recodex_session_token", session.access_token);
         localStorage.removeItem("recodex_auth_intent");
         window.dispatchEvent(new Event("recodex-auth-update"));
 
@@ -104,7 +147,7 @@ export default function App() {
           if (isAuthPage) {
             const isAdmin = session.user.email === "veereshhp2004@gmail.com" || session.user.email === "veereshhp04@gmail.com";
             if (isAdmin) {
-              localStorage.setItem("camcod_admin_user", "true");
+              localStorage.setItem("recodex_admin_user", "true");
               window.dispatchEvent(new Event("recodex-auth-update"));
               window.location.href = "/dashboard";
             } else {
@@ -114,10 +157,10 @@ export default function App() {
           }
         }
       } else {
-        const currentToken = localStorage.getItem("camcod_session_token");
+        const currentToken = localStorage.getItem("recodex_session_token");
         if (currentToken && currentToken !== "admin-bypass-token") {
-          localStorage.removeItem("camcod_session_token");
-          localStorage.removeItem("camcod_admin_user");
+          localStorage.removeItem("recodex_session_token");
+          localStorage.removeItem("recodex_admin_user");
           window.dispatchEvent(new Event("recodex-auth-update"));
         }
       }

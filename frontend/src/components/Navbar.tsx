@@ -23,8 +23,8 @@ export default function Navbar() {
 
     // Check if the user is authenticated via local bypass
     const isBypassAdmin =
-      localStorage.getItem("camcod_session_token") === "admin-bypass-token" ||
-      localStorage.getItem("camcod_admin_user") === "true";
+      localStorage.getItem("recodex_session_token") === "admin-bypass-token" ||
+      localStorage.getItem("recodex_admin_user") === "true";
 
     if (isBypassAdmin) {
       setTimeout(() => {
@@ -74,7 +74,7 @@ export default function Navbar() {
 
   const updateNavbarState = async (session: any) => {
     if (session) {
-      const currentToken = localStorage.getItem("camcod_session_token");
+      const currentToken = localStorage.getItem("recodex_session_token");
       const hasValidToken = currentToken && (
         currentToken === session.access_token ||
         currentToken === "admin-bypass-token" ||
@@ -84,7 +84,7 @@ export default function Navbar() {
       if (hasValidToken) {
         setIsAuthenticated(true);
         const isRootAdmin = session.user && session.user.email === "veereshhp2004@gmail.com";
-        const isStoredAdmin = localStorage.getItem("camcod_admin_user") === "true";
+        const isStoredAdmin = localStorage.getItem("recodex_admin_user") === "true";
         if (isRootAdmin || isStoredAdmin) {
           setIsAdmin(true);
         } else {
@@ -106,8 +106,8 @@ export default function Navbar() {
 
     // If no valid session or token, check if we're in admin bypass
     const stillBypassed =
-      localStorage.getItem("camcod_session_token") === "admin-bypass-token" ||
-      localStorage.getItem("camcod_admin_user") === "true";
+      localStorage.getItem("recodex_session_token") === "admin-bypass-token" ||
+      localStorage.getItem("recodex_admin_user") === "true";
 
     setIsAuthenticated(stillBypassed);
     setIsAdmin(stillBypassed);
@@ -130,8 +130,8 @@ export default function Navbar() {
     }
     
     // Instantly purge local state and session tokens
-    localStorage.removeItem("camcod_session_token");
-    localStorage.removeItem("camcod_admin_user");
+    localStorage.removeItem("recodex_session_token");
+    localStorage.removeItem("recodex_admin_user");
     setIsAuthenticated(false);
     
     // Immediately redirect to clear the UI

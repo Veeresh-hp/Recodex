@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { Download, Check, Shield, CheckCircle2, Image as ImageIcon, Scale, ArrowLeft } from "lucide-react";
 import SubNavbar from "../components/SubNavbar";
@@ -141,7 +141,7 @@ export default function TermsAndConditions() {
       <div className="absolute top-[25%] left-[-15%] w-[600px] h-[600px] bg-cyan-955/5 rounded-full blur-[160px] pointer-events-none z-0 print:hidden"></div>
       <div className="absolute bottom-[20%] right-[-10%] w-[500px] h-[500px] bg-zinc-900/5 rounded-full blur-[140px] pointer-events-none z-0 print:hidden"></div>
 
-      {/* 1. Header with CamCod branding */}
+      {/* 1. Header with RecodeX branding */}
       <SubNavbar />
 
       {/* 2. Main Page Grid */}

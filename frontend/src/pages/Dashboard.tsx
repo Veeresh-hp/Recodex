@@ -58,8 +58,8 @@ export default function Dashboard() {
   useEffect(() => {
     const checkAdminAccess = async () => {
       const isBypassAdmin = 
-        localStorage.getItem("camcod_session_token") === "admin-bypass-token" ||
-        localStorage.getItem("camcod_admin_user") === "true";
+        localStorage.getItem("recodex_session_token") === "admin-bypass-token" ||
+        localStorage.getItem("recodex_admin_user") === "true";
 
       if (isBypassAdmin) {
         return;
@@ -73,7 +73,7 @@ export default function Dashboard() {
           
           // 1. Root admin check
           if (user.email === "veereshhp2004@gmail.com") {
-            localStorage.setItem("camcod_admin_user", "true");
+            localStorage.setItem("recodex_admin_user", "true");
             setAdminEmail(user.email || "");
             const displayName = user.user_metadata?.full_name || user.user_metadata?.name;
             if (displayName) setAdminName(displayName);
@@ -90,15 +90,15 @@ export default function Dashboard() {
           if (!dbUser) {
             // Unregistered user! Purge session immediately and redirect to login
             await supabase.auth.signOut();
-            localStorage.removeItem("camcod_session_token");
-            localStorage.removeItem("camcod_admin_user");
+            localStorage.removeItem("recodex_session_token");
+            localStorage.removeItem("recodex_admin_user");
             localStorage.removeItem("recodex_auth_intent");
             window.location.href = "/login?error=user_not_found";
             return;
           }
 
           if (dbUser.role === "admin") {
-            localStorage.setItem("camcod_admin_user", "true");
+            localStorage.setItem("recodex_admin_user", "true");
             setAdminEmail(user.email || "");
             setAdminName(dbUser.name || user.user_metadata?.full_name || user.user_metadata?.name || "Admin");
             return;
@@ -259,7 +259,7 @@ export default function Dashboard() {
   const waveOffsetRef = useRef(0);
 
   const getAuthToken = async () => {
-    const localBypass = localStorage.getItem("camcod_session_token");
+    const localBypass = localStorage.getItem("recodex_session_token");
     if (localBypass === "admin-bypass-token") {
       return "admin-bypass-token";
     }
@@ -449,8 +449,8 @@ export default function Dashboard() {
     } catch (err) {
       console.warn("Supabase sign out error:", err);
     }
-    localStorage.removeItem("camcod_session_token");
-    localStorage.removeItem("camcod_admin_user");
+    localStorage.removeItem("recodex_session_token");
+    localStorage.removeItem("recodex_admin_user");
     window.location.href = "/";
   };
 
@@ -460,7 +460,7 @@ export default function Dashboard() {
     );
     const downloadAnchor = document.createElement("a");
     downloadAnchor.setAttribute("href", dataStr);
-    downloadAnchor.setAttribute("download", `camcod_system_overview_${Date.now()}.json`);
+    downloadAnchor.setAttribute("download", `recodex_system_overview_${Date.now()}.json`);
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     downloadAnchor.remove();

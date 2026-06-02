@@ -66,13 +66,13 @@ export default function AdminDashboard() {
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col justify-between font-sans select-none">
       
-      {/* 1. Brand CamCod Header */}
+      {/* 1. Brand RecodeX Header */}
       <header className="border-b border-black/5 dark:border-zinc-900 bg-white/90 dark:bg-[#06080c]/90 backdrop-blur-md sticky top-0 z-50 px-6 py-4 flex items-center justify-between select-text transition-colors duration-300">
         <div className="flex items-center gap-12">
           {/* Logo split color */}
           <Link to="/" className="text-xl font-black tracking-tight font-sans">
-            <span className="text-primary dark:text-[#00d1ff]">Cam</span>
-            <span className="text-foreground dark:text-white">Cod</span>
+            <span className="text-primary dark:text-[#00d1ff]">Recode</span>
+            <span className="text-foreground dark:text-white">X</span>
           </Link>
           
           {/* Navigation Links */}

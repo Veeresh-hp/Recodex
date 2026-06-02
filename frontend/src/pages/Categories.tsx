@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { 
   Terminal, 
@@ -20,7 +20,8 @@ import {
   CheckCircle2,
   TrendingUp,
   ChevronDown,
-  Box
+  Box,
+  X
 } from "lucide-react";
 import { useTheme } from "@/context/ThemeContext";
 import SubNavbar from "@/components/SubNavbar";
@@ -32,6 +33,7 @@ export default function Categories() {
   const [requestModalOpen, setRequestModalOpen] = useState(false);
   const [requestStack, setRequestStack] = useState("");
   const [requestSubmitted, setRequestSubmitted] = useState(false);
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const { theme } = useTheme();
 
@@ -273,7 +275,7 @@ export default function Categories() {
       <div className="absolute top-[25%] left-[-15%] w-[600px] h-[600px] bg-primary/5 rounded-full blur-[160px] pointer-events-none z-0"></div>
       <div className="absolute bottom-[20%] right-[-10%] w-[500px] h-[500px] bg-secondary-container/5 rounded-full blur-[140px] pointer-events-none z-0"></div>
 
-      {/* Brand split CamCod navbar */}
+      {/* Brand split RecodeX navbar */}
 
       {/* Sub-Navigation Mini Navbar */}
       <SubNavbar />
@@ -282,8 +284,8 @@ export default function Categories() {
       <main className="relative z-10 flex-grow max-w-7xl mx-auto w-full px-6 md:px-12 xl:px-24 pt-4 pb-12 md:pb-20 select-text">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           
-          {/* Left Column: Stack Navigation Sidebar */}
-          <div className="lg:col-span-3 space-y-8 lg:sticky lg:top-32 select-none">
+          {/* Left Column: Stack Navigation Sidebar (Desktop View Only) */}
+          <div className="hidden lg:block lg:col-span-3 space-y-8 lg:sticky lg:top-32 select-none">
             
             {/* Stack Navigation list */}
             <div className="space-y-4">
@@ -629,6 +631,91 @@ export default function Categories() {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Mobile Navigation Drawer Trigger (Floating Action Button) */}
+      <div className="lg:hidden fixed bottom-6 right-6 z-[90] print:hidden">
+        <button
+          onClick={() => setMobileDrawerOpen(true)}
+          className="w-14 h-14 rounded-full bg-primary hover:brightness-110 dark:bg-[#00d1ff] text-white dark:text-black flex items-center justify-center shadow-[0_0_20px_rgba(0,209,255,0.3)] hover:shadow-[0_0_30px_rgba(0,209,255,0.5)] active:scale-95 transition-all duration-300 group cursor-pointer border border-primary/20 dark:border-[#00d1ff]/20"
+          title="Select Category Stack"
+        >
+          <Sliders className="w-5 h-5 transition-transform duration-300 group-hover:rotate-90" />
+        </button>
+      </div>
+
+      {/* Mobile Sidebar Navigation Drawer Overlay */}
+      {mobileDrawerOpen && (
+        <div className="lg:hidden fixed inset-0 z-[100] flex justify-start">
+          {/* Backdrop blur overlay */}
+          <div 
+            onClick={() => setMobileDrawerOpen(false)}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300"
+          />
+
+          {/* Drawer Panel Container */}
+          <div className="relative w-72 max-w-[80vw] h-full bg-white/90 dark:bg-[#07090e]/95 backdrop-blur-2xl border-r border-black/10 dark:border-zinc-900 p-6 flex flex-col justify-between shadow-2xl select-none animate-in slide-in-from-left duration-300">
+            <div className="space-y-6">
+              {/* Header inside mobile drawer */}
+              <div className="flex items-center justify-between border-b border-black/5 dark:border-zinc-900 pb-4">
+                <span className="text-[10px] font-mono tracking-widest text-primary dark:text-[#00d1ff] font-bold">
+                  STACK NAVIGATION
+                </span>
+                <button 
+                  onClick={() => setMobileDrawerOpen(false)}
+                  className="p-1.5 text-zinc-550 dark:text-zinc-400 hover:text-foreground dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 rounded-lg flex items-center justify-center cursor-pointer transition-all"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+
+              {/* Navigation items list in mobile drawer */}
+              <div className="space-y-1 overflow-y-auto max-h-[65vh] pr-1">
+                {sidebarItems.map((item) => {
+                  const isActive = activeTab === item;
+                  return (
+                    <button
+                      key={item}
+                      onClick={() => {
+                        setActiveTab(item);
+                        setMobileDrawerOpen(false); // Auto-close drawer on select for seamless user experience
+                      }}
+                      className={`w-full text-left py-2.5 px-3.5 text-xs font-bold tracking-wider font-mono uppercase rounded-lg border transition-all flex items-center relative cursor-pointer ${
+                        isActive
+                          ? "bg-primary/5 dark:bg-[#0b101c] border-primary/20 text-foreground"
+                          : "bg-transparent border-transparent text-gray-500 hover:text-foreground hover:bg-black/5 dark:hover:bg-zinc-900/10"
+                      }`}
+                    >
+                      {isActive && (
+                        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-3 bg-primary rounded-r"></span>
+                      )}
+                      <span className={isActive ? "pl-2" : ""}>{item}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Request Add Box inside mobile drawer */}
+            <div className="border border-black/5 dark:border-zinc-900 bg-black/5 dark:bg-zinc-950/20 p-5 rounded-xl space-y-3">
+              <span className="text-[10px] text-gray-500 dark:text-zinc-500 font-sans block leading-relaxed font-semibold">
+                Can&apos;t find a stack?
+              </span>
+              <button
+                onClick={() => { 
+                  setMobileDrawerOpen(false); // Close drawer first
+                  setRequestSubmitted(false); 
+                  setRequestStack(""); 
+                  setRequestModalOpen(true); 
+                }}
+                className="w-full py-2.5 border border-black/10 dark:border-outline-variant rounded-lg text-[9px] font-mono font-bold uppercase tracking-widest text-gray-500 dark:text-zinc-400 hover:bg-primary/5 hover:text-foreground hover:border-primary/20 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <Plus size={11} />
+                Request Add
+              </button>
+            </div>
           </div>
         </div>
       )}

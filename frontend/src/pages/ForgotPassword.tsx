@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { AtSign, ArrowLeft, SquareTerminal, Shield, CheckCircle2 } from "lucide-react";
 
@@ -217,7 +217,7 @@ export default function ForgotPassword() {
             </div>
           </div>
 
-          {/* Right Column (CamCod Reset Form) */}
+          {/* Right Column (RecodeX Reset Form) */}
           <div className="lg:col-span-6 w-full flex flex-col items-end gap-6 justify-between min-h-[460px]">
             
             {/* Branded Header */}

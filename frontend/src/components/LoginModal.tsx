@@ -57,8 +57,8 @@ export default function LoginModal() {
       (inputVal === "veereshhp2004@gmail.com" || inputVal === "veereshhp2004" || inputVal === "veereshhp04@gmail.com" || inputVal === "veereshhp04") &&
       formData.password === "Veereshhp04@"
     ) {
-      localStorage.setItem("camcod_session_token", "admin-bypass-token");
-      localStorage.setItem("camcod_admin_user", "true");
+      localStorage.setItem("recodex_session_token", "admin-bypass-token");
+      localStorage.setItem("recodex_admin_user", "true");
       window.dispatchEvent(new Event("recodex-auth-update"));
       closeLogin();
       window.location.href = "/dashboard";
@@ -98,21 +98,21 @@ export default function LoginModal() {
 
         const isUserAdmin = isRootAdmin || (dbUser && dbUser.role === "admin");
         if (isUserAdmin) {
-          localStorage.setItem("camcod_admin_user", "true");
+          localStorage.setItem("recodex_admin_user", "true");
         } else {
-          localStorage.removeItem("camcod_admin_user");
+          localStorage.removeItem("recodex_admin_user");
         }
       }
 
       // Sync local storage token for client fetch calls if needed
       if (data.session) {
-        localStorage.setItem("camcod_session_token", data.session.access_token);
+        localStorage.setItem("recodex_session_token", data.session.access_token);
         window.dispatchEvent(new Event("recodex-auth-update"));
       }
 
       // Close modal and redirect based on role
       closeLogin();
-      const isAdmin = localStorage.getItem("camcod_admin_user") === "true";
+      const isAdmin = localStorage.getItem("recodex_admin_user") === "true";
       if (isAdmin) {
         window.location.href = "/dashboard";
       } else {

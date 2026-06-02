@@ -45,7 +45,7 @@ export default function Profile() {
     const fetchUserProfile = async () => {
       setLoading(true);
 
-      const sessionToken = localStorage.getItem("camcod_session_token");
+      const sessionToken = localStorage.getItem("recodex_session_token");
       const isAdminBypass = sessionToken === "admin-bypass-token";
       const isDevBypass = sessionToken === "dev-bypass-token";
 
@@ -99,7 +99,7 @@ export default function Profile() {
           // Google users auto-get their google avatar unless they've picked a different one
           const resolvedAvatar = savedAvatar || user.user_metadata?.avatar_url || null;
 
-          const isUserAdmin = user.email === "veereshhp2004@gmail.com" || localStorage.getItem("camcod_admin_user") === "true";
+          const isUserAdmin = user.email === "veereshhp2004@gmail.com" || localStorage.getItem("recodex_admin_user") === "true";
           const p: UserProfile = {
             id: user.id,
             name: fullName,

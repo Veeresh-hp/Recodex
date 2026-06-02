@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { syncUser } from "@/services/api";
 
 export default function Signup() {
-  const [role, setRole] = useState<"developer" | "client">("developer");
+  const [role, setRole] = useState<"developer" | "client">("client");
   const [formData, setFormData] = useState({ name: "", email: "", password: "" });
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -203,7 +203,7 @@ export default function Signup() {
       
       // Store session details directly if returned automatically (e.g. email confirmations disabled)
       if (data.session) {
-        localStorage.setItem("camcod_session_token", data.session.access_token);
+        localStorage.setItem("recodex_session_token", data.session.access_token);
       }
     } catch (err) {
       const errorVal = err as Error;
@@ -237,12 +237,12 @@ export default function Signup() {
         const isBypassAdmin = bypassEmail === "veereshhp2004@gmail.com";
 
         if (isBypassAdmin) {
-          localStorage.setItem("camcod_session_token", "admin-bypass-token");
-          localStorage.setItem("camcod_admin_user", "true");
+          localStorage.setItem("recodex_session_token", "admin-bypass-token");
+          localStorage.setItem("recodex_admin_user", "true");
           window.dispatchEvent(new Event("recodex-auth-update"));
           window.location.href = "/dashboard";
         } else {
-          localStorage.setItem("camcod_session_token", "dev-bypass-token");
+          localStorage.setItem("recodex_session_token", "dev-bypass-token");
           window.dispatchEvent(new Event("recodex-auth-update"));
           window.location.href = "/projects";
         }
@@ -286,14 +286,14 @@ export default function Signup() {
 
       // 3. Store active session token
       if (data.session) {
-        localStorage.setItem("camcod_session_token", data.session.access_token);
+        localStorage.setItem("recodex_session_token", data.session.access_token);
         window.dispatchEvent(new Event("recodex-auth-update"));
       }
 
       // Redirect to dashboard if admin, otherwise to projects page
       const isAdmin = data.user?.email === "veereshhp2004@gmail.com";
       if (isAdmin) {
-        localStorage.setItem("camcod_admin_user", "true");
+        localStorage.setItem("recodex_admin_user", "true");
         window.location.href = "/dashboard";
       } else {
         window.location.href = "/projects";
@@ -328,12 +328,12 @@ export default function Signup() {
       const isBypassAdmin = formData.email === "veereshhp2004@gmail.com" || formData.email === "veereshhp04@gmail.com";
 
       if (isBypassAdmin) {
-        localStorage.setItem("camcod_session_token", "admin-bypass-token");
-        localStorage.setItem("camcod_admin_user", "true");
+        localStorage.setItem("recodex_session_token", "admin-bypass-token");
+        localStorage.setItem("recodex_admin_user", "true");
         window.dispatchEvent(new Event("recodex-auth-update"));
         window.location.href = "/dashboard";
       } else {
-        localStorage.setItem("camcod_session_token", "dev-bypass-token");
+        localStorage.setItem("recodex_session_token", "dev-bypass-token");
         window.dispatchEvent(new Event("recodex-auth-update"));
         window.location.href = "/projects";
       }
@@ -675,46 +675,10 @@ export default function Signup() {
                       </div>
                     </div>
 
-                    {/* Step 02: Signup Channel */}
-                    <div className="space-y-3">
-                      <span className="text-[10px] font-mono tracking-widest text-primary dark:text-[#00d1ff] font-bold block">
-                        02 / SIGNUP CHANNEL
-                      </span>
-                      <div className="grid grid-cols-2 gap-3 select-none">
-                        {/* Email Protocol */}
-                        <button
-                          type="button"
-                          onClick={() => setSignupChannel("email")}
-                          className={`flex items-center justify-center gap-2 py-2.5 rounded-lg border text-center transition-all duration-300 font-mono text-xs font-bold cursor-pointer ${
-                            signupChannel === "email"
-                              ? "bg-primary text-white dark:bg-[#0b101d] border-primary dark:border-[#00d1ff]/50 shadow-[0_0_15px_rgba(0,209,255,0.05)]"
-                              : "bg-black/5 dark:bg-[#04060a]/40 border-black/10 dark:border-zinc-900 text-zinc-500 hover:text-foreground dark:hover:text-zinc-300"
-                          }`}
-                        >
-                          <AtSign size={13} />
-                          Email Address
-                        </button>
-
-                        {/* Phone SMS */}
-                        <button
-                          type="button"
-                          onClick={() => setSignupChannel("phone")}
-                          className={`flex items-center justify-center gap-2 py-2.5 rounded-lg border text-center transition-all duration-300 font-mono text-xs font-bold cursor-pointer ${
-                            signupChannel === "phone"
-                              ? "bg-primary text-white dark:bg-[#0b101d] border-primary dark:border-[#00d1ff]/50 shadow-[0_0_15px_rgba(0,209,255,0.05)]"
-                              : "bg-black/5 dark:bg-[#04060a]/40 border-black/10 dark:border-zinc-900 text-zinc-500 hover:text-foreground dark:hover:text-zinc-300"
-                          }`}
-                        >
-                          <Phone size={13} />
-                          Phone SMS
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Step 03: Identity */}
+                    {/* Step 02: Identity */}
                     <div className="space-y-4">
                       <span className="text-[10px] font-mono tracking-widest text-primary dark:text-[#00d1ff] font-bold block">
-                        03 / IDENTITY
+                        02 / IDENTITY
                       </span>
 
                       {/* Full Name Input */}
@@ -806,9 +770,54 @@ export default function Signup() {
                             {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                           </button>
                         </div>
-                        <span className="text-[8px] font-mono text-zinc-400 dark:text-[#475569] tracking-widest uppercase block mt-1 font-bold">
-                          Min 12 chars + special symbols
-                        </span>
+                        {/* Password Requirements Indicator */}
+                        <div className="mt-2.5 space-y-1.5 p-3 rounded-lg border border-black/5 dark:border-zinc-900 bg-black/5 dark:bg-zinc-950/20 select-none">
+                          <span className="text-[9px] font-mono text-zinc-550 dark:text-zinc-500 tracking-wider uppercase block font-bold mb-1">
+                            Security Key Requirements
+                          </span>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className={`flex items-center gap-1.5 text-[9px] font-mono tracking-wider transition-all duration-300 ${
+                              formData.password.length >= 12 
+                                ? "text-emerald-500 dark:text-emerald-400 font-bold" 
+                                : "text-zinc-500 dark:text-zinc-650"
+                            }`}>
+                              <CheckCircle2 size={10} className={`shrink-0 transition-all ${
+                                formData.password.length >= 12 ? "text-emerald-500 scale-110 drop-shadow-[0_0_4px_rgba(16,185,129,0.3)]" : "text-zinc-500 dark:text-zinc-700"
+                              }`} />
+                              <span>12+ CHARACTERS</span>
+                            </div>
+                            <div className={`flex items-center gap-1.5 text-[9px] font-mono tracking-wider transition-all duration-300 ${
+                              /[A-Z]/.test(formData.password) 
+                                ? "text-emerald-500 dark:text-emerald-400 font-bold" 
+                                : "text-zinc-500 dark:text-zinc-650"
+                            }`}>
+                              <CheckCircle2 size={10} className={`shrink-0 transition-all ${
+                                /[A-Z]/.test(formData.password) ? "text-emerald-500 scale-110 drop-shadow-[0_0_4px_rgba(16,185,129,0.3)]" : "text-zinc-500 dark:text-zinc-700"
+                              }`} />
+                              <span>UPPERCASE LETTER</span>
+                            </div>
+                            <div className={`flex items-center gap-1.5 text-[9px] font-mono tracking-wider transition-all duration-300 ${
+                              /[0-9]/.test(formData.password) 
+                                ? "text-emerald-500 dark:text-emerald-400 font-bold" 
+                                : "text-zinc-500 dark:text-zinc-650"
+                            }`}>
+                              <CheckCircle2 size={10} className={`shrink-0 transition-all ${
+                                /[0-9]/.test(formData.password) ? "text-emerald-500 scale-110 drop-shadow-[0_0_4px_rgba(16,185,129,0.3)]" : "text-zinc-500 dark:text-zinc-700"
+                              }`} />
+                              <span>ONE NUMBER</span>
+                            </div>
+                            <div className={`flex items-center gap-1.5 text-[9px] font-mono tracking-wider transition-all duration-300 ${
+                              /[!@#$%^&*(),.?":{}|<>_]/.test(formData.password) 
+                                ? "text-emerald-500 dark:text-emerald-400 font-bold" 
+                                : "text-zinc-500 dark:text-zinc-650"
+                            }`}>
+                              <CheckCircle2 size={10} className={`shrink-0 transition-all ${
+                                /[!@#$%^&*(),.?":{}|<>_]/.test(formData.password) ? "text-emerald-500 scale-110 drop-shadow-[0_0_4px_rgba(16,185,129,0.3)]" : "text-zinc-500 dark:text-zinc-700"
+                              }`} />
+                              <span>SPECIAL SYMBOL</span>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </div>
 

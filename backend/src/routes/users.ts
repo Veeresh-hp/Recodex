@@ -131,7 +131,7 @@ router.put(
       // Handle avatar file upload
       if (req.file) {
         try {
-          const uploadResult = await uploadToCloudinary(req.file.buffer, "camcod_avatars");
+          const uploadResult = await uploadToCloudinary(req.file.buffer, "recodex_avatars");
           updateData.profileImage = uploadResult.secure_url;
         } catch (uploadError) {
           console.error("Avatar upload failed:", uploadError);

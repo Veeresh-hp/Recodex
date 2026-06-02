@@ -17,7 +17,7 @@ cloudinary.config({
  */
 export const uploadToCloudinary = (
   fileBuffer: Buffer,
-  folder: string = "camcod"
+  folder: string = "recodex"
 ): Promise<{ secure_url: string; public_id: string; [key: string]: any }> => {
   return new Promise((resolve, reject) => {
     const uploadStream = cloudinary.uploader.upload_stream(

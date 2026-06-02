@@ -36,7 +36,7 @@ app.use("/api/users", userRoutes);
 app.get("/health", (_req: Request, res: Response) => {
   res.json({
     status: "online",
-    system: "CAMCOD DevMarket Core Server",
+    system: "RECODEX DevMarket Core Server",
     timestamp: new Date().toISOString(),
   });
 });
@@ -58,7 +58,7 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
 if (!process.env.VERCEL) {
   app.listen(PORT, () => {
     console.log("====================================================");
-    console.log(`⚡️ CAMCOD BACKEND API CORE BOOTED SUCCESSFULLY ⚡️`);
+    console.log(`⚡️ RECODEX BACKEND API CORE BOOTED SUCCESSFULLY ⚡️`);
     console.log(`📡 Server active on: http://localhost:${PORT}`);
     console.log(`🌐 Frontend Allowed Origin: ${process.env.FRONTEND_URL || "http://localhost:3000"}`);
     console.log("====================================================");

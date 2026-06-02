@@ -119,7 +119,7 @@ router.post(
       let imageUrl = "https://images.unsplash.com/photo-1555066931-4365d14bab8c?q=80&w=600"; // Default image fallback
       if (req.file) {
         try {
-          const uploadResult = await uploadToCloudinary(req.file.buffer, "camcod_projects");
+          const uploadResult = await uploadToCloudinary(req.file.buffer, "recodex_projects");
           imageUrl = uploadResult.secure_url;
         } catch (uploadError) {
           console.error("Cloudinary upload failed, falling back to default image:", uploadError);
@@ -215,7 +215,7 @@ router.put(
       if (category) updateData.category = category;
 
       if (req.file) {
-        const uploadResult = await uploadToCloudinary(req.file.buffer, "camcod_projects");
+        const uploadResult = await uploadToCloudinary(req.file.buffer, "recodex_projects");
         updateData.imageUrl = uploadResult.secure_url;
       }
 
