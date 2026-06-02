@@ -191,6 +191,9 @@ export async function syncUser(userData: {
  * @param token - JWT access token string from Supabase Auth
  */
 export async function getUserProfile(token: string): Promise<any> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 5000);
+
   try {
     const response = await fetch(`${API_BASE_URL}/users/profile`, {
       method: "GET",
@@ -198,7 +201,10 @@ export async function getUserProfile(token: string): Promise<any> {
         "Authorization": `Bearer ${token}`,
         "Accept": "application/json",
       },
+      signal: controller.signal,
     });
+
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       throw new Error(`Fetch profile failed: status ${response.status}`);
@@ -206,6 +212,7 @@ export async function getUserProfile(token: string): Promise<any> {
 
     return await response.json();
   } catch (error) {
+    clearTimeout(timeoutId);
     console.error("[RECODEX API] Fetch user profile error:", error);
     throw error;
   }
