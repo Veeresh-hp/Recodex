@@ -266,16 +266,14 @@ export default function Dashboard() {
     return session?.access_token || "";
   };
 
-  // Fetch real users directly from Supabase (works on Vercel — no localhost needed)
+  // Fetch real users directly from backend API
   const fetchUsers = async () => {
     try {
-      const { data, error } = await supabase
-        .from("users")
-        .select("*")
-        .order("created_at", { ascending: false });
-      console.log("[RECODEX DEBUG] Supabase fetchUsers response:", { data, error });
-      if (error) throw error;
-      const mapped = (data || []).map((u) => {
+      const data = await getUsers();
+      console.log("[RECODEX DEBUG] Backend fetchUsers response:", data);
+      const real = data.filter((u: any) => !u.id.startsWith("usr-"));
+      const targetData = real.length > 0 ? real : data;
+      const mapped = targetData.map((u: any) => {
         if (u.email === "veereshhp2004@gmail.com") {
           return { ...u, role: "admin" };
         }
@@ -284,39 +282,19 @@ export default function Dashboard() {
       setDbUsers(mapped);
       setActiveDevs(mapped.length);
     } catch (err) {
-      console.log("[RECODEX ERROR] Supabase user fetch failed, trying backend:", err);
-      // Fallback to backend API
-      getUsers().then((data) => {
-        const real = data.filter((u: any) => !u.id.startsWith("usr-"));
-        const targetData = real.length > 0 ? real : data;
-        const mapped = targetData.map((u: any) => {
-          if (u.email === "veereshhp2004@gmail.com") {
-            return { ...u, role: "admin" };
-          }
-          return u;
-        });
-        setDbUsers(mapped);
-        setActiveDevs(mapped.length);
-      }).catch(console.error);
+      console.log("[RECODEX ERROR] Backend user fetch failed:", err);
     }
   };
 
-  // Fetch real projects directly from Supabase
+  // Fetch real projects directly from backend API
   const fetchProjects = async () => {
     setProjectsLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("projects")
-        .select("*")
-        .order("created_at", { ascending: false });
-      console.log("[RECODEX DEBUG] Supabase fetchProjects response:", { data, error });
-      if (error) throw error;
-      setDbProjects(data || []);
+      const data = await getProjects();
+      console.log("[RECODEX DEBUG] Backend fetchProjects response:", data);
+      setDbProjects(data);
     } catch (err) {
-      console.log("[RECODEX ERROR] Supabase project fetch failed, trying backend:", err);
-      getProjects().then((data) => {
-        setDbProjects(data);
-      }).catch(console.error);
+      console.log("[RECODEX ERROR] Backend project fetch failed:", err);
     } finally {
       setProjectsLoading(false);
     }
