@@ -241,6 +241,10 @@ export default function Signup() {
           localStorage.setItem("recodex_admin_user", "true");
           window.dispatchEvent(new Event("recodex-auth-update"));
           window.location.href = "/dashboard";
+        } else if (role === "client") {
+          localStorage.setItem("recodex_session_token", "client-bypass-token");
+          window.dispatchEvent(new Event("recodex-auth-update"));
+          window.location.href = "/profile";
         } else {
           localStorage.setItem("recodex_session_token", "dev-bypass-token");
           window.dispatchEvent(new Event("recodex-auth-update"));
@@ -332,6 +336,10 @@ export default function Signup() {
         localStorage.setItem("recodex_admin_user", "true");
         window.dispatchEvent(new Event("recodex-auth-update"));
         window.location.href = "/dashboard";
+      } else if (role === "client") {
+        localStorage.setItem("recodex_session_token", "client-bypass-token");
+        window.dispatchEvent(new Event("recodex-auth-update"));
+        window.location.href = "/profile";
       } else {
         localStorage.setItem("recodex_session_token", "dev-bypass-token");
         window.dispatchEvent(new Event("recodex-auth-update"));

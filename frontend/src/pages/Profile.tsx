@@ -51,6 +51,7 @@ export default function Profile() {
       const sessionToken = localStorage.getItem("recodex_session_token");
       const isAdminBypass = sessionToken === "admin-bypass-token";
       const isDevBypass = sessionToken === "dev-bypass-token";
+      const isClientBypass = sessionToken === "client-bypass-token";
 
       if (isAdminBypass) {
         const savedAvatar = localStorage.getItem("profile_avatar_sandbox-admin-001");
@@ -81,6 +82,51 @@ export default function Profile() {
           role: "developer",
           isGoogleUser: false,
           projects: []
+        };
+        setProfile(p);
+        setCurrentAvatar(savedAvatar || null);
+        setLoading(false);
+        return;
+      }
+
+      if (isClientBypass) {
+        const savedAvatar = localStorage.getItem("profile_avatar_sandbox-client-003");
+        const p: UserProfile = {
+          id: "sandbox-client-003",
+          name: "Veeresh H P (Client)",
+          email: "veereshhp_client@gmail.com",
+          phone: "+1 (555) 999-2026",
+          avatar: savedAvatar || null,
+          role: "client",
+          isGoogleUser: false,
+          projects: [
+            {
+              id: "recodex-sandbox-demo-project",
+              title: "Enterprise Custom Portal Implementation",
+              description: "Interactive visual metrics interface aligned to custom API synchronization modules.",
+              category: "Web Systems",
+              status: "Active",
+              completion: 72,
+              cost: "$14,500 USD",
+              startDate: "May 12, 2026",
+              daysRemaining: "12 days remaining (Expected: June 18, 2026)",
+              paymentStatus: "Partially Paid (Escrow Secured: 70%)",
+              milestones: [
+                { title: "Milestone 1: Core Architecture & Database Setup", completed: true },
+                { title: "Milestone 2: API Gateway Integration & Auth Handshake", completed: true },
+                { title: "Milestone 3: Client Dashboard Panel & Visual Telemetry", completed: false, inProgress: true },
+                { title: "Milestone 4: Final QA Audits & Vercel Cloud Deployment", completed: false }
+              ],
+              updates: [
+                { date: "June 1, 2026", msg: "Core database sync has been successfully migrated to Supabase serverless. Milestone 3 is 85% complete." },
+                { date: "May 24, 2026", msg: "Milestone 2 successfully validated by QA team. All OAuth channels active." }
+              ],
+              chatHistory: [
+                { sender: "RecodeX Support", date: "June 1, 2026 10:30 AM", msg: "Milestone 3 is progressing ahead of schedule. Let us know if you need to review the staging dashboard." },
+                { sender: "You (Client)", date: "May 28, 2026 04:15 PM", msg: "Looks amazing, thank you for the rapid turnaround on database sync." }
+              ]
+            }
+          ]
         };
         setProfile(p);
         setCurrentAvatar(savedAvatar || null);
