@@ -48,6 +48,42 @@ interface Announcement {
   date: string;
 }
 
+const formatRelativeTime = (timestampStr: string): string => {
+  if (!timestampStr) return "";
+  if (timestampStr.includes("ago") || timestampStr.toLowerCase() === "just now") {
+    return timestampStr;
+  }
+  const date = new Date(timestampStr);
+  if (isNaN(date.getTime())) return timestampStr;
+  
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffSec = Math.floor(diffMs / 1000);
+  const diffMin = Math.floor(diffSec / 60);
+  const diffHour = Math.floor(diffMin / 60);
+  const diffDay = Math.floor(diffHour / 24);
+
+  if (diffSec < 60) return "Just now";
+  if (diffMin < 60) return `${diffMin}m ago`;
+  if (diffHour < 24) return `${diffHour}h ago`;
+  return `${diffDay}d ago`;
+};
+
+const getAnnouncementMessage = (ann: Announcement): string => {
+  if (ann.id === "ann-02") {
+    const date = new Date(ann.date);
+    if (!isNaN(date.getTime())) {
+      const monthStr = date.toLocaleString("en-US", { month: "long" });
+      const dayNum = date.getDate();
+      if (ann.message.includes("[DATE]")) {
+        return ann.message.replace("[DATE]", `${monthStr} ${dayNum}`);
+      }
+      return ann.message.replace(/updates on [A-Za-z]+ \d+/, `updates on ${monthStr} ${dayNum}`);
+    }
+  }
+  return ann.message;
+};
+
 export default function Dashboard() {
   const { theme, toggleTheme } = useTheme();
   const [activeSidebarTab, setActiveSidebarTab] = useState("Dashboard");
@@ -205,10 +241,23 @@ export default function Dashboard() {
 
   const [announcements, setAnnouncements] = useState<Announcement[]>(() => {
     const stored = localStorage.getItem("recodex_global_announcements");
-    return stored ? JSON.parse(stored) : [
-      { id: "ann-01", title: "RecodeX v1.0.0 Mainnet Beta", message: "Global deployment orchestration active across all categories. Synchronize your developer keys now.", type: "New Feature", date: "3h ago" },
-      { id: "ann-02", title: "Server Maintenance Schedule", message: "Decentralized database nodes will undergo updates on May 30 at 04:00 UTC. Uptime SLA will be maintained at 99.9%.", type: "Maintenance Notice", date: "1d ago" }
+    if (stored) return JSON.parse(stored);
+
+    const now = new Date();
+    const betaDate = new Date(now.getTime() - 3 * 60 * 60 * 1000).toISOString();
+    const maintenanceDate = new Date(now.getTime() - 4 * 24 * 60 * 60 * 1000).toISOString();
+    const maintenanceDateObj = new Date(maintenanceDate);
+    const maintenanceMonth = maintenanceDateObj.toLocaleString("en-US", { month: "long" });
+    const maintenanceDay = maintenanceDateObj.getDate();
+    const maintenanceString = `${maintenanceMonth} ${maintenanceDay}`;
+
+    const initialAnnouncements = [
+      { id: "ann-01", title: "RecodeX v1.0.0 Mainnet Beta", message: "Global deployment orchestration active across all categories. Synchronize your developer keys now.", type: "New Feature", date: betaDate },
+      { id: "ann-02", title: "Server Maintenance Schedule", message: `Decentralized database nodes will undergo updates on ${maintenanceString} at 04:00 UTC. Uptime SLA will be maintained at 99.9%.`, type: "Maintenance Notice", date: maintenanceDate }
     ];
+
+    localStorage.setItem("recodex_global_announcements", JSON.stringify(initialAnnouncements));
+    return initialAnnouncements;
   });
 
   useEffect(() => {
@@ -475,7 +524,7 @@ export default function Dashboard() {
       title: newAnnTitle,
       message: newAnnMessage,
       type: newAnnType,
-      date: "Just now"
+      date: new Date().toISOString()
     };
     setAnnouncements([newAnn, ...announcements]);
     setNewAnnTitle("");
@@ -792,10 +841,10 @@ export default function Dashboard() {
                       <div key={ann.id} className="p-3 border border-black/5 dark:border-zinc-900 bg-black/5 dark:bg-zinc-950/40 rounded-lg space-y-1">
                         <div className="flex justify-between items-center">
                           <span className="text-[7px] font-mono px-1.5 py-0.5 rounded bg-primary/10 border border-primary/20 text-[#00d1ff] font-bold uppercase">{ann.type}</span>
-                          <span className="text-[8px] font-mono text-zinc-500">{ann.date}</span>
+                          <span className="text-[8px] font-mono text-zinc-500">{formatRelativeTime(ann.date)}</span>
                         </div>
                         <h4 className="text-[10px] font-extrabold text-foreground dark:text-white leading-tight">{ann.title}</h4>
-                        <p className="text-[9px] text-zinc-500 leading-normal line-clamp-2">{ann.message}</p>
+                        <p className="text-[9px] text-zinc-500 leading-normal line-clamp-2">{getAnnouncementMessage(ann)}</p>
                       </div>
                     ))}
                   </div>
@@ -1383,10 +1432,10 @@ export default function Dashboard() {
                     <div className="space-y-2">
                       <div className="flex justify-between items-center gap-2 select-none">
                         <span className="text-[7px] font-mono px-1.5 py-0.5 rounded bg-primary/10 border border-primary/20 text-[#00d1ff] font-bold uppercase">{ann.type}</span>
-                        <span className="text-[8px] font-mono text-zinc-500">{ann.date}</span>
+                        <span className="text-[8px] font-mono text-zinc-500">{formatRelativeTime(ann.date)}</span>
                       </div>
                       <h4 className="text-xs font-extrabold text-foreground dark:text-white leading-tight">{ann.title}</h4>
-                      <p className="text-[10px] text-zinc-600 dark:text-zinc-400 leading-relaxed font-sans">{ann.message}</p>
+                      <p className="text-[10px] text-zinc-600 dark:text-zinc-400 leading-relaxed font-sans">{getAnnouncementMessage(ann)}</p>
                     </div>
 
                     <button onClick={() => handleRemoveAnnouncement(ann.id)} className="w-full py-1.5 bg-red-500/5 hover:bg-red-500/10 border border-red-500/10 text-red-400 hover:text-red-300 rounded text-[8px] font-mono font-bold uppercase tracking-wider select-none transition-colors">

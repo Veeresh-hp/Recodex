@@ -34,6 +34,145 @@ const PRESET_AVATARS = [
   "https://api.dicebear.com/7.x/pixel-art/svg?seed=recodex10&backgroundColor=1e293b",
 ];
 
+const getDynamicProjectData = (projectId: string, title: string, category: string) => {
+  const now = new Date();
+  
+  const startKey = `recodex_project_start_${projectId}`;
+  const expectedKey = `recodex_project_expected_${projectId}`;
+
+  let startDateStr = localStorage.getItem(startKey);
+  let expectedDateStr = localStorage.getItem(expectedKey);
+
+  if (!startDateStr) {
+    // Start date is exactly 22 days ago from the moment this project is first generated
+    const startObj = new Date(now.getTime() - 22 * 24 * 60 * 60 * 1000);
+    startDateStr = startObj.toISOString();
+    localStorage.setItem(startKey, startDateStr);
+  }
+
+  if (!expectedDateStr) {
+    // Expected completion date is exactly 15 days in the future from the moment this project is first generated
+    const expectedObj = new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000);
+    expectedDateStr = expectedObj.toISOString();
+    localStorage.setItem(expectedKey, expectedDateStr);
+  }
+
+  const startDateObj = new Date(startDateStr);
+  const expectedDateObj = new Date(expectedDateStr);
+
+  const startDateFormat = startDateObj.toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric"
+  });
+
+  const expectedDateFormat = expectedDateObj.toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric"
+  });
+
+  // Calculate dynamic days remaining
+  const timeDiff = expectedDateObj.getTime() - now.getTime();
+  const daysDiff = Math.ceil(timeDiff / (24 * 60 * 60 * 1000));
+
+  let daysRemainingText = "";
+  let statusText = "Active";
+  let completionPct = 72;
+
+  // Milestone tracking states
+  let milestone1Completed = true;
+  let milestone2Completed = true;
+  let milestone3Completed = false;
+  let milestone3InProgress = true;
+  let milestone4Completed = false;
+
+  if (daysDiff > 0) {
+    daysRemainingText = `${daysDiff} days remaining (Expected: ${expectedDateFormat})`;
+    
+    // Dynamic completion percentage based on progress from start to expected completion
+    const totalDuration = expectedDateObj.getTime() - startDateObj.getTime();
+    const elapsed = now.getTime() - startDateObj.getTime();
+    const progressRatio = Math.max(0, Math.min(1, elapsed / totalDuration));
+    
+    // Scale progress so it matches visual cues (e.g. starts at 60% and goes to 99%)
+    completionPct = Math.floor(60 + progressRatio * 39);
+
+    if (completionPct >= 85) {
+      milestone3Completed = true;
+      milestone3InProgress = false;
+    }
+  } else if (daysDiff === 0) {
+    daysRemainingText = `Due today (Expected: ${expectedDateFormat})`;
+    completionPct = 99;
+    milestone3Completed = true;
+    milestone3InProgress = false;
+  } else {
+    daysRemainingText = `Completed (Expected completion: ${expectedDateFormat})`;
+    statusText = "Completed";
+    completionPct = 100;
+    milestone3Completed = true;
+    milestone3InProgress = false;
+    milestone4Completed = true;
+  }
+
+  // Live updates dates (derived from start date to be statically anchored in history)
+  const update1Date = new Date(startDateObj.getTime() + 20 * 24 * 60 * 60 * 1000).toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric"
+  });
+  const update2Date = new Date(startDateObj.getTime() + 12 * 24 * 60 * 60 * 1000).toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric"
+  });
+
+  // Chat dates (derived from start date to be statically anchored in history)
+  const chat1DateObj = new Date(startDateObj.getTime() + 20 * 24 * 60 * 60 * 1000);
+  chat1DateObj.setHours(10, 30, 0, 0);
+  const chat1Format = chat1DateObj.toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric"
+  }) + " 10:30 AM";
+
+  const chat2DateObj = new Date(startDateObj.getTime() + 16 * 24 * 60 * 60 * 1000);
+  chat2DateObj.setHours(16, 15, 0, 0);
+  const chat2Format = chat2DateObj.toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric"
+  }) + " 04:15 PM";
+
+  return {
+    id: projectId,
+    title,
+    description: "Interactive visual metrics interface aligned to custom API synchronization modules.",
+    category,
+    status: statusText,
+    completion: completionPct,
+    cost: "$14,500 USD",
+    startDate: startDateFormat,
+    daysRemaining: daysRemainingText,
+    paymentStatus: completionPct === 100 ? "Fully Paid (Escrow Cleared: 100%)" : "Partially Paid (Escrow Secured: 70%)",
+    milestones: [
+      { title: "Milestone 1: Core Architecture & Database Setup", completed: milestone1Completed },
+      { title: "Milestone 2: API Gateway Integration & Auth Handshake", completed: milestone2Completed },
+      { title: "Milestone 3: Client Dashboard Panel & Visual Telemetry", completed: milestone3Completed, inProgress: milestone3InProgress },
+      { title: "Milestone 4: Final QA Audits & Vercel Cloud Deployment", completed: milestone4Completed }
+    ],
+    updates: [
+      { date: update1Date, msg: `Core database sync has been successfully migrated to Supabase serverless. Milestone 3 is ${Math.min(95, Math.floor(completionPct * 1.15))}% complete.` },
+      { date: update2Date, msg: "Milestone 2 successfully validated by QA team. All OAuth channels active." }
+    ],
+    chatHistory: [
+      { sender: "RecodeX Support", date: chat1Format, msg: "Milestone 3 is progressing ahead of schedule. Let us know if you need to review the staging dashboard." },
+      { sender: "You (Client)", date: chat2Format, msg: "Looks amazing, thank you for the rapid turnaround on database sync." }
+    ]
+  };
+};
+
 export default function Profile() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -100,32 +239,7 @@ export default function Profile() {
           role: "client",
           isGoogleUser: false,
           projects: [
-            {
-              id: "recodex-sandbox-demo-project",
-              title: "Enterprise Custom Portal Implementation",
-              description: "Interactive visual metrics interface aligned to custom API synchronization modules.",
-              category: "Web Systems",
-              status: "Active",
-              completion: 72,
-              cost: "$14,500 USD",
-              startDate: "May 12, 2026",
-              daysRemaining: "12 days remaining (Expected: June 18, 2026)",
-              paymentStatus: "Partially Paid (Escrow Secured: 70%)",
-              milestones: [
-                { title: "Milestone 1: Core Architecture & Database Setup", completed: true },
-                { title: "Milestone 2: API Gateway Integration & Auth Handshake", completed: true },
-                { title: "Milestone 3: Client Dashboard Panel & Visual Telemetry", completed: false, inProgress: true },
-                { title: "Milestone 4: Final QA Audits & Vercel Cloud Deployment", completed: false }
-              ],
-              updates: [
-                { date: "June 1, 2026", msg: "Core database sync has been successfully migrated to Supabase serverless. Milestone 3 is 85% complete." },
-                { date: "May 24, 2026", msg: "Milestone 2 successfully validated by QA team. All OAuth channels active." }
-              ],
-              chatHistory: [
-                { sender: "RecodeX Support", date: "June 1, 2026 10:30 AM", msg: "Milestone 3 is progressing ahead of schedule. Let us know if you need to review the staging dashboard." },
-                { sender: "You (Client)", date: "May 28, 2026 04:15 PM", msg: "Looks amazing, thank you for the rapid turnaround on database sync." }
-              ]
-            }
+            getDynamicProjectData("recodex-sandbox-demo-project", "Enterprise Custom Portal Implementation", "Web Systems")
           ]
         };
         setProfile(p);
@@ -149,61 +263,13 @@ export default function Profile() {
             const resolvedAvatar = savedAvatar || dbProfile.profileImage || session.user.user_metadata?.avatar_url || null;
             
             // Enrich project arrays with realistic tracking telemetry for customers
-            const enrichedProjects = (dbProfile.projects || []).map((proj: any) => ({
-              id: proj.id,
-              title: proj.title,
-              description: proj.description,
-              category: proj.category,
-              status: proj.status || "Active",
-              completion: 72,
-              cost: "$14,500 USD",
-              startDate: "May 12, 2026",
-              daysRemaining: "12 days remaining (Expected: June 18, 2026)",
-              paymentStatus: "Partially Paid (Escrow Secured: 70%)",
-              milestones: [
-                { title: "Milestone 1: Core Architecture & Database Setup", completed: true },
-                { title: "Milestone 2: API Gateway Integration & Auth Handshake", completed: true },
-                { title: "Milestone 3: Client Dashboard Panel & Visual Telemetry", completed: false, inProgress: true },
-                { title: "Milestone 4: Final QA Audits & Vercel Cloud Deployment", completed: false }
-              ],
-              updates: [
-                { date: "June 1, 2026", msg: "Core database sync has been successfully migrated to Supabase serverless. Milestone 3 is 85% complete." },
-                { date: "May 24, 2026", msg: "Milestone 2 successfully validated by QA team. All OAuth channels active." }
-              ],
-              chatHistory: [
-                { sender: "RecodeX Support", date: "June 1, 2026 10:30 AM", msg: "Milestone 3 is progressing ahead of schedule. Let us know if you need to review the staging dashboard." },
-                { sender: "You (Client)", date: "May 28, 2026 04:15 PM", msg: "Looks amazing, thank you for the rapid turnaround on database sync." }
-              ]
-            }));
+            const enrichedProjects = (dbProfile.projects || []).map((proj: any) => 
+              getDynamicProjectData(proj.id, proj.title, proj.category)
+            );
 
             // Force dynamic mock project for clients for robust demo presentation
             const projectsList = dbProfile.role === "client" && enrichedProjects.length === 0 ? [
-              {
-                id: "recodex-live-demo-project",
-                title: "Enterprise Custom Portal Implementation",
-                description: "Interactive visual metrics interface aligned to custom API synchronization modules.",
-                category: "Web Systems",
-                status: "Active",
-                completion: 72,
-                cost: "$14,500 USD",
-                startDate: "May 12, 2026",
-                daysRemaining: "12 days remaining (Expected: June 18, 2026)",
-                paymentStatus: "Partially Paid (Escrow Secured: 70%)",
-                milestones: [
-                  { title: "Milestone 1: Core Architecture & Database Setup", completed: true },
-                  { title: "Milestone 2: API Gateway Integration & Auth Handshake", completed: true },
-                  { title: "Milestone 3: Client Dashboard Panel & Visual Telemetry", completed: false, inProgress: true },
-                  { title: "Milestone 4: Final QA Audits & Vercel Cloud Deployment", completed: false }
-                ],
-                updates: [
-                  { date: "June 1, 2026", msg: "Core database sync has been successfully migrated to Supabase serverless. Milestone 3 is 85% complete." },
-                  { date: "May 24, 2026", msg: "Milestone 2 successfully validated by QA team. All OAuth channels active." }
-                ],
-                chatHistory: [
-                  { sender: "RecodeX Support", date: "June 1, 2026 10:30 AM", msg: "Milestone 3 is progressing ahead of schedule. Let us know if you need to review the staging dashboard." },
-                  { sender: "You (Client)", date: "May 28, 2026 04:15 PM", msg: "Looks amazing, thank you for the rapid turnaround on database sync." }
-                ]
-              }
+              getDynamicProjectData("recodex-live-demo-project", "Enterprise Custom Portal Implementation", "Web Systems")
             ] : enrichedProjects;
 
             const p: UserProfile = {
@@ -229,32 +295,7 @@ export default function Profile() {
             
             // Default demo projects for client profiles on backend fallback
             const demoProjects = !isUserAdmin ? [
-              {
-                id: "recodex-fallback-demo",
-                title: "RecodeX Unified Core Integration",
-                description: "Interactive visual metrics interface aligned to custom API synchronization modules.",
-                category: "Web Systems",
-                status: "Active",
-                completion: 72,
-                cost: "$14,500 USD",
-                startDate: "May 12, 2026",
-                daysRemaining: "12 days remaining (Expected: June 18, 2026)",
-                paymentStatus: "Partially Paid (Escrow Secured: 70%)",
-                milestones: [
-                  { title: "Milestone 1: Core Architecture & Database Setup", completed: true },
-                  { title: "Milestone 2: API Gateway Integration & Auth Handshake", completed: true },
-                  { title: "Milestone 3: Client Dashboard Panel & Visual Telemetry", completed: false, inProgress: true },
-                  { title: "Milestone 4: Final QA Audits & Vercel Cloud Deployment", completed: false }
-                ],
-                updates: [
-                  { date: "June 1, 2026", msg: "Core database sync has been successfully migrated to Supabase serverless. Milestone 3 is 85% complete." },
-                  { date: "May 24, 2026", msg: "Milestone 2 successfully validated by QA team. All OAuth channels active." }
-                ],
-                chatHistory: [
-                  { sender: "RecodeX Support", date: "June 1, 2026 10:30 AM", msg: "Milestone 3 is progressing ahead of schedule. Let us know if you need to review the staging dashboard." },
-                  { sender: "You (Client)", date: "May 28, 2026 04:15 PM", msg: "Looks amazing, thank you for the rapid turnaround on database sync." }
-                ]
-              }
+              getDynamicProjectData("recodex-fallback-demo", "RecodeX Unified Core Integration", "Web Systems")
             ] : [];
 
             const p: UserProfile = {
