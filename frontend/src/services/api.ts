@@ -401,3 +401,59 @@ export async function deleteProject(projectId: string, token: string): Promise<a
     throw error;
   }
 }
+
+/**
+ * Submits a new contact inquiry to the backend.
+ */
+export async function submitInquiry(inquiryData: {
+  name: string;
+  email: string;
+  type: string;
+  message: string;
+}): Promise<any> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/contacts`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+      },
+      body: JSON.stringify(inquiryData),
+    });
+
+    if (!response.ok) {
+      const errData = await response.json();
+      throw new Error(errData.error || `Submit inquiry failed: status ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("[RECODEX API] Submit inquiry error:", error);
+    throw error;
+  }
+}
+
+/**
+ * Fetches all contact inquiries from the backend (admin only).
+ */
+export async function getInquiries(token: string): Promise<any[]> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/contacts`, {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Accept": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      const errData = await response.json();
+      throw new Error(errData.error || `Fetch inquiries failed: status ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("[RECODEX API] Fetch inquiries error:", error);
+    throw error;
+  }
+}

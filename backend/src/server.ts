@@ -3,6 +3,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import projectRoutes from "./routes/projects";
 import userRoutes from "./routes/users";
+import contactRoutes from "./routes/contacts";
 
 // Initialize environment variables from .env
 dotenv.config();
@@ -31,6 +32,7 @@ app.use((req: Request, _res: Response, next: NextFunction) => {
 // Register API Routes
 app.use("/api/projects", projectRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/contacts", contactRoutes);
 
 // Basic Health Check Endpoint
 app.get("/health", (_req: Request, res: Response) => {

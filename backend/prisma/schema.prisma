@@ -50,3 +50,14 @@ model ProjectDev {
   @@id([projectId, userId])
   @@map("project_devs")
 }
+
+model Inquiry {
+  id        String   @id @default(uuid())
+  name      String
+  email     String
+  type      String
+  message   String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("inquiries")
+}

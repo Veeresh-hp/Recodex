@@ -1,4 +1,4 @@
-﻿import React, { useState } from "react";
+import React, { useState } from "react";
 import Footer from "@/components/Footer";
 import { Link } from "react-router-dom";
 import { 
@@ -11,6 +11,7 @@ import {
   CheckCircle2, 
   Play 
 } from "lucide-react";
+import { submitInquiry } from "@/services/api";
 
 export default function Contact() {
   const [formData, setFormData] = useState({
@@ -22,6 +23,7 @@ export default function Contact() {
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   
   // Accordion state
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
@@ -30,16 +32,21 @@ export default function Contact() {
     setActiveFaq(activeFaq === index ? null : index);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name || !formData.email || !formData.message) return;
 
     setIsSubmitting(true);
+    setError(null);
 
-    setTimeout(() => {
-      setIsSubmitting(false);
+    try {
+      await submitInquiry(formData);
       setIsSubmitted(true);
-    }, 1500);
+    } catch (err: any) {
+      setError(err.message || "Failed to submit message to database.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const faqData = [
@@ -87,6 +94,11 @@ export default function Contact() {
             <div className="md:col-span-7 bg-white dark:bg-[#050505] border border-zinc-200 dark:border-white/5 p-8 rounded-xl shadow-xl dark:shadow-2xl relative">
               {!isSubmitted ? (
                 <form onSubmit={handleSubmit} className="space-y-6">
+                  {error && (
+                    <div className="p-3.5 bg-red-500/10 border border-red-500/20 rounded-lg text-red-500 text-xs font-mono font-bold uppercase tracking-wider">
+                      {error}
+                    </div>
+                  )}
                   
                   {/* Name & Email side-by-side */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -165,6 +177,7 @@ export default function Contact() {
                     onClick={() => {
                       setIsSubmitted(false);
                       setFormData({ name: "", email: "", type: "", message: "" });
+                      setError(null);
                     }}
                     className="px-6 py-2 border border-zinc-200 dark:border-white/10 rounded-lg text-xs font-semibold text-zinc-700 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/5 transition-colors font-mono cursor-pointer"
                   >
