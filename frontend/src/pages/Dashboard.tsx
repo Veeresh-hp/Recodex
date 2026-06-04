@@ -630,6 +630,9 @@ export default function Dashboard() {
 
 
   const handleRemoveUser = (userId: string) => {
+    if (!window.confirm("Are you sure you want to delete this user? They will be moved to the Recycle Bin.")) {
+      return;
+    }
     const userToRecycle = dbUsers.find((u) => u.id === userId);
     if (!userToRecycle) return;
 
@@ -1031,7 +1034,7 @@ const handleDeleteUser = async (userId: string) => {
                               {isUserSuspended ? "Activate" : "Suspend"}
                             </button>
                             <button
-                              onClick={() => handleDeleteUser(user.id)}
+                              onClick={() => handleRemoveUser(user.id)}
                               className="px-2 py-1 bg-red-500/10 border border-red-500/20 text-red-500 hover:bg-red-500/20 rounded text-[8px] font-mono uppercase tracking-wider font-bold"
                             >
                               Delete
