@@ -717,21 +717,27 @@ const handleDeleteUser = async (userId: string) => {
     try {
       const token = await getAuthToken();
       if (item.type === "User") {
-        try {
-          await deleteUser(item.originalData.id, token);
-        } catch (apiErr) {
-          console.warn("API user deletion failed, cleaning up local state anyway:", apiErr);
+        const userId = item.originalData?.id;
+        if (userId) {
+          try {
+            await deleteUser(userId, token);
+          } catch (apiErr) {
+            console.warn("API user deletion failed, cleaning up local state anyway:", apiErr);
+          }
+          setSoftDeletedUserIds((prev) => prev.filter((id) => id !== userId));
+          fetchUsers();
         }
-        setSoftDeletedUserIds((prev) => prev.filter((id) => id !== item.originalData.id));
-        fetchUsers();
       } else if (item.type === "Project") {
-        try {
-          await deleteProject(item.originalData.id, token);
-        } catch (apiErr) {
-          console.warn("API project deletion failed, cleaning up local state anyway:", apiErr);
+        const projId = item.originalData?.id;
+        if (projId) {
+          try {
+            await deleteProject(projId, token);
+          } catch (apiErr) {
+            console.warn("API project deletion failed, cleaning up local state anyway:", apiErr);
+          }
+          setSoftDeletedProjectIds((prev) => prev.filter((id) => id !== projId));
+          fetchProjects();
         }
-        setSoftDeletedProjectIds((prev) => prev.filter((id) => id !== item.originalData.id));
-        fetchProjects();
       }
     } catch (error) {
       console.error("Failed to delete permanently:", error);
