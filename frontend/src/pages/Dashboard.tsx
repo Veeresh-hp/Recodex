@@ -644,6 +644,23 @@ export default function Dashboard() {
     setRecycleBin((prev) => [recycled, ...prev]);
   };
 
+// Permanently delete a user with confirmation
+const handleDeleteUser = async (userId: string) => {
+  if (!window.confirm(`Are you absolutely sure you want to permanently delete this user? This action is irreversible.`)) {
+    return;
+  }
+  try {
+    const token = await getAuthToken();
+    await deleteUser(userId, token);
+    // Update local state
+    setDbUsers((prev) => prev.filter((u) => u.id !== userId));
+    setSoftDeletedUserIds((prev) => prev.filter((id) => id !== userId));
+    fetchUsers();
+  } catch (error) {
+    console.error("Failed to delete user permanently:", error);
+  }
+};
+
   const handleModifyProjectStatus = async (projId: string, nextStatus: string) => {
     try {
       const token = await getAuthToken();
@@ -1000,7 +1017,7 @@ export default function Dashboard() {
                               {isUserSuspended ? "Activate" : "Suspend"}
                             </button>
                             <button
-                              onClick={() => handleRemoveUser(user.id)}
+                              onClick={() => handleDeleteUser(user.id)}
                               className="px-2 py-1 bg-red-500/10 border border-red-500/20 text-red-500 hover:bg-red-500/20 rounded text-[8px] font-mono uppercase tracking-wider font-bold"
                             >
                               Delete
