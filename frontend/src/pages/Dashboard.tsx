@@ -651,7 +651,11 @@ const handleDeleteUser = async (userId: string) => {
   }
   try {
     const token = await getAuthToken();
-    await deleteUser(userId, token);
+    try {
+      await deleteUser(userId, token);
+    } catch (apiErr) {
+      console.warn("API user deletion failed, cleaning up local state anyway:", apiErr);
+    }
     // Update local state
     setDbUsers((prev) => prev.filter((u) => u.id !== userId));
     setSoftDeletedUserIds((prev) => prev.filter((id) => id !== userId));

@@ -251,6 +251,9 @@ router.delete("/:id", requireAuth, async (req: AuthenticatedRequest, res: Respon
     await prisma.user.delete({ where: { id } });
     return res.json({ message: "User profile deleted successfully from database." });
   } catch (error: any) {
+    if (error.code === "P2025") {
+      return res.json({ message: "User profile already deleted or does not exist." });
+    }
     console.error(`Error deleting user ${id} inside database:`, error);
     return res.status(500).json({ error: "Failed to delete user profile from database." });
   }

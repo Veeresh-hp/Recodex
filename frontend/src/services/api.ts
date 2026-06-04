@@ -33,7 +33,7 @@ const API_BASE_URL = getApiBaseUrl();
  */
 export async function getProjects(category?: string, search?: string): Promise<Project[]> {
   try {
-    const url = new URL(`${API_BASE_URL}/projects`);
+    const url = new URL(`${API_BASE_URL}/projects`, typeof window !== "undefined" ? window.location.origin : undefined);
     if (category) {
       url.searchParams.append("category", category);
     }
