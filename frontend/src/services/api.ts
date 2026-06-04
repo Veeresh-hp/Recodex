@@ -324,34 +324,21 @@ export async function updateUser(userId: string, userData: any, token: string): 
  */
 export async function deleteUser(userId: string, token: string): Promise<any> {
   try {
-    // 1. Try Supabase direct delete (works on Vercel)
-    const { data, error } = await supabase
-      .from("users")
-      .delete()
-      .eq("id", userId)
-      .select()
-      .single();
+    const response = await fetch(`${API_BASE_URL}/users/${userId}`, {
+      method: "DELETE",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Accept": "application/json",
+      },
+    });
 
-    if (error) throw error;
-    return data;
-  } catch (error) {
-    console.warn("[RECODEX API] Supabase user delete failed, trying backend:", error);
-    try {
-      const response = await fetch(`${API_BASE_URL}/users/${userId}`, {
-        method: "DELETE",
-        headers: {
-          "Authorization": `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to delete user: ${response.status}`);
-      }
-      return await response.json();
-    } catch (backendError) {
-      console.error("[RECODEX API] Delete user completely failed:", backendError);
-      throw backendError;
+    if (!response.ok) {
+      throw new Error(`Failed to delete user: ${response.status}`);
     }
+    return await response.json();
+  } catch (error) {
+    console.error("[RECODEX API] Delete user error:", error);
+    throw error;
   }
 }
 
