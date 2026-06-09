@@ -15,5 +15,18 @@ export default defineConfig({
     port: 3000,
     host: true,
     open: true,
+    allowedHosts: [
+      ".ngrok-free.dev",
+      ".ngrok-free.app",
+      ".ngrok.io",
+      ".localtunnel.me"
+    ],
+    proxy: {
+      "/api": {
+        target: "http://localhost:5000",
+        changeOrigin: true,
+        secure: false,
+      },
+    },
   },
 });

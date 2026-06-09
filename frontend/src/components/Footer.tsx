@@ -15,7 +15,7 @@ export default function Footer() {
             Connecting elite engineers with world-class opportunities. The technical directory for the next generation of digital builders.
           </p>
           <p className="text-xs text-zinc-600 font-mono mt-2">
-            © 2024 RecodeX. Engineered for Performance.
+            © 2026 RecodeX. Engineered for Performance.
           </p>
         </div>
 

@@ -980,7 +980,7 @@ export default function Signup() {
           {/* Bottom Bar: Copyright & Security Icons */}
           <div className="border-t border-black/5 dark:border-zinc-900 pt-6 flex flex-col md:flex-row items-center justify-between gap-4">
             <span className="text-[9px] font-mono text-zinc-500 dark:text-zinc-600 tracking-wider uppercase font-bold">
-              Â© 2024 RECODEX GLOBAL OPERATING SYSTEM
+              Â© 2026 RECODEX GLOBAL OPERATING SYSTEM
             </span>
             <div className="flex items-center gap-3">
               <div className="w-7 h-7 rounded-full bg-black/5 dark:bg-zinc-900/30 border border-black/5 dark:border-zinc-800 flex items-center justify-center text-zinc-500" title="Secure Environment">

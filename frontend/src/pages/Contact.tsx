@@ -17,6 +17,7 @@ export default function Contact() {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
+    phone: "",
     type: "",
     message: ""
   });
@@ -34,7 +35,7 @@ export default function Contact() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name || !formData.email || !formData.message) return;
+    if (!formData.name || !formData.email || !formData.phone || !formData.message) return;
 
     setIsSubmitting(true);
     setError(null);
@@ -120,24 +121,34 @@ export default function Contact() {
                     />
                   </div>
 
-                  {/* Inquiry Dropdown */}
-                  <div className="relative">
-                    <select
-                      value={formData.type}
+                  {/* Phone & Inquiry Dropdown side-by-side */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <input
+                      type="tel"
                       required
-                      onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                      className="w-full px-4 py-3.5 bg-zinc-50 dark:bg-[#0a0a0a] border border-zinc-200 dark:border-white/5 rounded-lg text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-primary/50 transition-all font-sans appearance-none"
-                    >
-                      <option value="" disabled>Select a Project Tier / Inquiry Type</option>
-                      <option value="mini">Mini Projects</option>
-                      <option value="major">Major Projects</option>
-                      <option value="frontend">Frontend Projects</option>
-                      <option value="spec-build">Idea Your Project Build by Us</option>
-                      <option value="concept-asset">Product & Idea Both From Us</option>
-                      <option value="others">Others</option>
-                    </select>
-                    <div className="absolute inset-y-0 right-4 flex items-center pointer-events-none text-zinc-400 dark:text-gray-400">
-                      <ChevronDown size={16} />
+                      value={formData.phone}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      placeholder="Phone Number"
+                      className="w-full px-4 py-3.5 bg-zinc-50 dark:bg-[#0a0a0a] border border-zinc-200 dark:border-white/5 rounded-lg text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-primary/50 transition-all font-sans"
+                    />
+                    <div className="relative">
+                      <select
+                        value={formData.type}
+                        required
+                        onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                        className="w-full px-4 py-3.5 bg-zinc-50 dark:bg-[#0a0a0a] border border-zinc-200 dark:border-white/5 rounded-lg text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-primary/50 transition-all font-sans appearance-none"
+                      >
+                        <option value="" disabled>Select a Project Tier / Inquiry Type</option>
+                        <option value="mini">Mini Projects</option>
+                        <option value="major">Major Projects</option>
+                        <option value="frontend">Frontend Projects</option>
+                        <option value="spec-build">Idea Your Project Build by Us</option>
+                        <option value="concept-asset">Product & Idea Both From Us</option>
+                        <option value="others">Others</option>
+                      </select>
+                      <div className="absolute inset-y-0 right-4 flex items-center pointer-events-none text-zinc-400 dark:text-gray-400">
+                        <ChevronDown size={16} />
+                      </div>
                     </div>
                   </div>
 
@@ -176,7 +187,7 @@ export default function Contact() {
                   <button
                     onClick={() => {
                       setIsSubmitted(false);
-                      setFormData({ name: "", email: "", type: "", message: "" });
+                      setFormData({ name: "", email: "", phone: "", type: "", message: "" });
                       setError(null);
                     }}
                     className="px-6 py-2 border border-zinc-200 dark:border-white/10 rounded-lg text-xs font-semibold text-zinc-700 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/5 transition-colors font-mono cursor-pointer"
@@ -203,27 +214,27 @@ export default function Contact() {
                       <MapPin size={18} />
                     </div>
                     <div>
-                      <h4 className="text-sm font-bold text-zinc-900 dark:text-white">San Francisco</h4>
+                      <h4 className="text-sm font-bold text-zinc-900 dark:text-white">BENGALURU</h4>
                       <p className="text-xs text-zinc-600 dark:text-gray-400 mt-1 leading-normal font-sans">
-                        123 Market St, Suite 455<br />
-                        San Francisco, CA 94106
+                        Bengaluru,<br />
+                        Karnataka, 560061
                       </p>
                     </div>
                   </div>
                   
                   {/* London Office */}
-                  <div className="flex gap-4">
+                  {/* <div className="flex gap-4">
                     <div className="w-10 h-10 rounded-lg bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 flex items-center justify-center text-zinc-500 dark:text-gray-400 shrink-0">
                       <MapPin size={18} />
-                    </div>
-                    <div>
+                    </div> */}
+                    {/* <div>
                       <h4 className="text-sm font-bold text-zinc-900 dark:text-white">London</h4>
                       <p className="text-xs text-zinc-600 dark:text-gray-400 mt-1 leading-normal font-sans">
                         88 Kingsway, Holborn<br />
                         London WC2B 6AA, UK
                       </p>
-                    </div>
-                  </div>
+                    </div> */}
+                  {/* </div> */}
                 </div>
               </div>
 

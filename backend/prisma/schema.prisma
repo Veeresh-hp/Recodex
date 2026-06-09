@@ -55,8 +55,10 @@ model Inquiry {
   id        String   @id @default(uuid())
   name      String
   email     String
+  phone     String   @default("")
   type      String
   message   String
+  reply     String?
   createdAt DateTime @default(now()) @map("created_at")
 
   @@map("inquiries")

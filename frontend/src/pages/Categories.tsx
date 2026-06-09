@@ -506,7 +506,7 @@ export default function Categories() {
           </div>
           <div className="border-t border-black/5 dark:border-zinc-900 pt-6 flex flex-col md:flex-row items-center justify-between gap-4">
             <span className="text-[9px] font-mono text-gray-400 dark:text-zinc-600 tracking-wider uppercase font-bold">
-              Â© 2024 RecodeX. Engineering the future of work.
+              Â© 2026 RecodeX. Engineering the future of work.
             </span>
             <div className="flex items-center gap-3">
               <div className="w-7 h-7 rounded-full bg-black/5 dark:bg-zinc-900/30 border border-black/5 dark:border-zinc-800 flex items-center justify-center text-gray-500">

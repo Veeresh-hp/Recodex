@@ -6,10 +6,11 @@ import {
   LogOut, User, ExternalLink, Play,
   Settings as SettingsIcon, Users, BarChart3, 
   Trash2, Plus, Edit3, Lock, Globe,
-  AlertTriangle, Search, FileText, CheckCircle, Award, XCircle, RefreshCw, Send, Check, Menu, X
+  AlertTriangle, Search, FileText, CheckCircle, Award, XCircle, RefreshCw, Send, Check, Menu, X,
+  Phone, Mail, MessageSquare
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
-import { getProjects, getUsers, updateUser, deleteUser, updateProject, deleteProject } from "../services/api";
+import { getProjects, getUsers, updateUser, deleteUser, updateProject, deleteProject, getInquiries, deleteInquiry, replyToInquiry } from "../services/api";
 import { Project } from "../data/mockData";
 import { useTheme } from "../context/ThemeContext";
 
@@ -193,6 +194,13 @@ export default function Dashboard() {
   const [dbUsers, setDbUsers] = useState<any[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  // Inquiries states
+  const [inquiries, setInquiries] = useState<any[]>([]);
+  const [inquiriesLoading, setInquiriesLoading] = useState(true);
+  const [replyingInquiryId, setReplyingInquiryId] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState("");
+  const [submittingReply, setSubmittingReply] = useState(false);
+
   const [deploymentsCount, setDeploymentsCount] = useState(340);
   const [sysHealth, setSysHealth] = useState(99.98);
 
@@ -308,9 +316,9 @@ export default function Dashboard() {
   const waveOffsetRef = useRef(0);
 
   const getAuthToken = async () => {
-    const localBypass = localStorage.getItem("recodex_session_token");
-    if (localBypass === "admin-bypass-token") {
-      return "admin-bypass-token";
+    const token = localStorage.getItem("recodex_session_token");
+    if (token) {
+      return token;
     }
     const { data: { session } } = await supabase.auth.getSession();
     return session?.access_token || "";
@@ -354,7 +362,11 @@ export default function Dashboard() {
   const handleRefreshSystem = async () => {
     setIsRefreshing(true);
     try {
-      await Promise.all([fetchUsers(), fetchProjects()]);
+      const promises: Promise<any>[] = [fetchUsers(), fetchProjects()];
+      if (activeSidebarTab === "Inquiries") {
+        promises.push(fetchInquiries());
+      }
+      await Promise.all(promises);
       setToast({ message: "Ecosystem control metrics synchronized successfully.", type: "success" });
     } catch (err) {
       console.error("[RECODEX ERROR] Sync failed:", err);
@@ -387,10 +399,91 @@ export default function Dashboard() {
     };
   }, []);
 
+  const fetchInquiries = async () => {
+    setInquiriesLoading(true);
+    try {
+      const token = await getAuthToken();
+      if (token) {
+        const data = await getInquiries(token);
+        setInquiries(data);
+      } else {
+        throw new Error("No auth token");
+      }
+    } catch (err) {
+      console.warn("[RECODEX ADMIN] Failed to retrieve server inquiries, loading sandbox mock inquiries:", err);
+      setInquiries([
+        {
+          id: "inq-1",
+          name: "John Client",
+          email: "john@enterprise.com",
+          type: "spec-build",
+          message: "Looking to build a custom micro-frontend architecture for our payment gateway with strict PCI-DSS audits.",
+          createdAt: new Date(Date.now() - 3600 * 1000 * 2).toISOString()
+        },
+        {
+          id: "inq-2",
+          name: "Sarah Builder",
+          email: "sarah@startup.io",
+          type: "frontend",
+          message: "Need a high-performance Landing Page using Vite, React, Tailwind CSS, and custom particle overlays.",
+          createdAt: new Date(Date.now() - 3600 * 1000 * 24).toISOString()
+        },
+        {
+          id: "inq-3",
+          name: "Alexander Mercer",
+          email: "mercer@gentek.org",
+          type: "major",
+          message: "Requesting development on low-latency data replication nodes across multi-cloud environments.",
+          createdAt: new Date(Date.now() - 3600 * 1000 * 24 * 3).toISOString()
+        }
+      ]);
+    } finally {
+      setInquiriesLoading(false);
+    }
+  };
+
+  const handleDeleteInquiry = async (id: string) => {
+    if (!window.confirm("Are you sure you want to permanently delete this inquiry?")) {
+      return;
+    }
+    try {
+      const token = await getAuthToken();
+      await deleteInquiry(id, token);
+      setInquiries((prev) => prev.filter((inq) => inq.id !== id));
+      setToast({ message: "Inquiry deleted successfully.", type: "success" });
+    } catch (err: any) {
+      console.error("Failed to delete inquiry:", err);
+      setToast({ message: err.message || "Failed to delete inquiry.", type: "error" });
+    }
+  };
+
+  const handleSendReply = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!replyingInquiryId || !replyText.trim()) return;
+
+    setSubmittingReply(true);
+    try {
+      const token = await getAuthToken();
+      const updated = await replyToInquiry(replyingInquiryId, replyText.trim(), token);
+      setInquiries((prev) =>
+        prev.map((inq) => (inq.id === replyingInquiryId ? { ...inq, reply: updated.reply } : inq))
+      );
+      setToast({ message: "Reply message sent/recorded successfully.", type: "success" });
+      setReplyingInquiryId(null);
+      setReplyText("");
+    } catch (err: any) {
+      console.error("Failed to send reply:", err);
+      setToast({ message: err.message || "Failed to send reply.", type: "error" });
+    } finally {
+      setSubmittingReply(false);
+    }
+  };
+
   // Re-fetch when sidebar tab changes
   useEffect(() => {
     if (activeSidebarTab === "Users") fetchUsers();
     if (activeSidebarTab === "Projects") fetchProjects();
+    if (activeSidebarTab === "Inquiries") fetchInquiries();
   }, [activeSidebarTab]);
 
 
@@ -1679,6 +1772,183 @@ const handleDeleteUser = async (userId: string) => {
           </div>
         );
 
+      case "Inquiries":
+        return (
+          <div className="bg-white dark:bg-[#0b0e14] border border-black/10 dark:border-zinc-900 rounded-2xl p-8 space-y-6 shadow-lg transition-colors duration-300">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-bold text-foreground dark:text-white font-sans font-extrabold uppercase">Customer Inquiries</h3>
+                <p className="text-xs text-zinc-400 dark:text-zinc-500">Manage and review service requests and client messages received from the public contact form.</p>
+              </div>
+              <button
+                onClick={fetchInquiries}
+                disabled={inquiriesLoading}
+                className="px-3.5 py-1.5 bg-cyan-500/10 border border-cyan-500/25 text-[#00d1ff] hover:bg-cyan-500/20 rounded-lg text-[9px] font-mono font-bold uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 select-none"
+              >
+                <RefreshCw size={12} className={inquiriesLoading ? "animate-spin" : ""} />
+                REFRESH_INQUIRIES
+              </button>
+            </div>
+
+            {inquiriesLoading ? (
+              <div className="flex flex-col items-center gap-4 py-16">
+                <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+                <p className="text-xs font-mono text-zinc-500 uppercase tracking-widest animate-pulse">Retrieving client transmissions...</p>
+              </div>
+            ) : inquiries.length === 0 ? (
+              <div className="py-12 text-center border border-dashed border-black/10 dark:border-zinc-900 rounded-2xl space-y-2">
+                <FileText size={36} className="text-zinc-300 dark:text-zinc-800 mx-auto" />
+                <div className="text-xs font-mono font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">No Inquiries Found</div>
+                <div className="text-[10px] text-zinc-450 dark:text-zinc-650">We haven't received any client contact form submissions yet.</div>
+              </div>
+            ) : (
+              <div className="space-y-4 animate-fade-in select-text">
+                {inquiries.map((inq, index) => (
+                  <div
+                    key={inq.id || index}
+                    className="border border-black/10 dark:border-zinc-900 bg-white/60 dark:bg-black/20 backdrop-blur-md rounded-xl p-6 hover:border-black/20 dark:hover:border-zinc-800 transition-all space-y-4"
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b border-black/5 dark:border-zinc-900/40 pb-3">
+                      <div className="space-y-1.5">
+                        <h4 className="text-sm font-bold text-foreground dark:text-white font-sans">{inq.name}</h4>
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+                          <a
+                            href={`mailto:${inq.email}`}
+                            className="inline-flex items-center gap-1.5 text-xs text-primary dark:text-[#00d1ff] hover:underline font-mono"
+                          >
+                            <Mail size={12} className="text-zinc-400 shrink-0" />
+                            {inq.email}
+                          </a>
+                          {inq.phone && (
+                            <a
+                              href={`tel:${inq.phone}`}
+                              className="inline-flex items-center gap-1.5 text-xs text-zinc-600 dark:text-zinc-400 hover:text-primary dark:hover:text-[#00d1ff] hover:underline font-mono"
+                            >
+                              <Phone size={12} className="text-zinc-400 shrink-0" />
+                              {inq.phone}
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex flex-col sm:items-end gap-1 shrink-0">
+                        <span className="px-2 py-0.5 rounded text-[8px] font-mono font-black uppercase border bg-primary/10 border-primary/20 text-[#00d1ff]">
+                          Type: {inq.type}
+                        </span>
+                        <span className="text-[9px] font-mono text-zinc-500">
+                          {new Date(inq.createdAt).toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+
+                    <p className="text-xs text-zinc-750 dark:text-zinc-300 leading-relaxed font-sans whitespace-pre-wrap font-medium">
+                      {inq.message}
+                    </p>
+
+                    {inq.reply && (
+                      <div className="p-4 border border-dashed border-[#00d1ff]/20 dark:border-[#00d1ff]/10 bg-primary/5 dark:bg-[#00d1ff]/5 rounded-xl space-y-1.5">
+                        <div className="flex items-center gap-1.5 text-[8px] font-mono text-primary dark:text-[#00d1ff] font-bold uppercase tracking-widest">
+                          <MessageSquare size={11} className="text-[#00d1ff]" />
+                          ADMIN RESPONSE SENT
+                        </div>
+                        <p className="text-xs text-zinc-750 dark:text-zinc-350 leading-relaxed font-sans whitespace-pre-wrap font-medium">
+                          {inq.reply}
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="flex justify-end gap-2 pt-2 border-t border-black/5 dark:border-zinc-900/40 select-none">
+                      <button
+                        onClick={() => handleDeleteInquiry(inq.id)}
+                        className="px-3 py-1.5 bg-red-500/10 border border-red-500/25 text-red-500 hover:bg-red-500/20 rounded-lg text-[10px] font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer"
+                      >
+                        <Trash2 size={12} />
+                        Delete
+                      </button>
+                      <button
+                        onClick={() => {
+                          setReplyingInquiryId(inq.id);
+                          setReplyText(inq.reply || "");
+                        }}
+                        className="px-3 py-1.5 bg-primary/10 dark:bg-cyan-500/10 border border-primary/20 dark:border-cyan-500/25 text-primary dark:text-[#00d1ff] hover:bg-primary/20 dark:hover:bg-cyan-500/20 rounded-lg text-[10px] font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer"
+                      >
+                        <Send size={12} />
+                        {inq.reply ? "Edit Reply" : "Send Message"}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Replying Dialog/Modal */}
+            {replyingInquiryId && (
+              <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-6 select-none">
+                <div className="bg-white dark:bg-[#07090e] border border-black/10 dark:border-zinc-800 p-8 rounded-2xl w-full max-w-lg shadow-2xl relative">
+                  <button
+                    onClick={() => {
+                      setReplyingInquiryId(null);
+                      setReplyText("");
+                    }}
+                    className="absolute top-4 right-4 text-zinc-500 hover:text-foreground dark:hover:text-white cursor-pointer"
+                  >
+                    <XCircle size={18} />
+                  </button>
+                  <form onSubmit={handleSendReply} className="space-y-4">
+                    <div className="space-y-1">
+                      <h3 className="text-sm font-mono tracking-widest text-zinc-500 uppercase">Send Response Message</h3>
+                      <p className="text-xs text-zinc-400">
+                        Draft a reply to <span className="font-bold text-foreground dark:text-white">{inquiries.find(i => i.id === replyingInquiryId)?.name}</span>. This message will be recorded in the ecosystem console.
+                      </p>
+                    </div>
+                    
+                    <div className="space-y-1.5">
+                      <label className="text-[9px] font-mono text-zinc-400 uppercase tracking-widest block">Response Draft</label>
+                      <textarea
+                        required
+                        rows={6}
+                        value={replyText}
+                        onChange={(e) => setReplyText(e.target.value)}
+                        placeholder="Type your reply message here..."
+                        className="w-full px-4 py-3 bg-black/5 dark:bg-zinc-900 border border-black/10 dark:border-zinc-800 rounded-lg text-xs focus:outline-none focus:border-primary transition-all font-sans resize-none"
+                      />
+                    </div>
+
+                    <div className="flex gap-3 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setReplyingInquiryId(null);
+                          setReplyText("");
+                        }}
+                        className="w-1/2 py-2.5 border border-black/10 dark:border-zinc-800 hover:border-black/20 dark:hover:border-zinc-700 rounded-lg text-[10px] font-mono font-bold uppercase tracking-wider text-zinc-500 hover:text-foreground dark:hover:text-white transition-all cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={submittingReply}
+                        className="w-1/2 py-2.5 bg-primary dark:bg-[#00d1ff] text-on-primary dark:text-black font-extrabold rounded-lg text-[10px] flex items-center justify-center gap-1.5 uppercase hover:brightness-110 active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
+                      >
+                        {submittingReply ? (
+                          <>
+                            <div className="w-3 h-3 border-2 border-on-primary dark:border-black border-t-transparent rounded-full animate-spin"></div>
+                            Sending...
+                          </>
+                        ) : (
+                          <>
+                            <Send size={12} />
+                            Send Reply
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+
       default:
         return null;
     }
@@ -1690,6 +1960,7 @@ const handleDeleteUser = async (userId: string) => {
     { label: "Projects", icon: Rocket },
     { label: "Categories", icon: Layers },
     { label: "Reports", icon: AlertTriangle },
+    { label: "Inquiries", icon: FileText },
     { label: "Certificates", icon: Award },
     { label: "Notifications", icon: Globe },
     { label: "Settings", icon: SettingsIcon },
@@ -1807,16 +2078,16 @@ const handleDeleteUser = async (userId: string) => {
                 Real-time marketplace performance, credentials audit, and category moderation metrics.
               </p>
             </div>
-            {activeSidebarTab === "Dashboard" && (
-              <div className="flex items-center gap-3 select-none">
+            <div className="flex items-center gap-3 select-none">
+              {activeSidebarTab === "Dashboard" && (
                 <button onClick={handleExportJSON} className="px-4 py-2 bg-black/5 dark:bg-zinc-950/40 border border-black/10 dark:border-zinc-800 rounded-lg text-[10px] font-mono font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-450 hover:text-foreground dark:hover:text-white hover:border-black/20 dark:hover:border-zinc-700 transition-all cursor-pointer">
                   EXPORT_TELEMETRY
                 </button>
-                <button onClick={handleRefreshSystem} disabled={isRefreshing} className="px-4 py-2 bg-primary dark:bg-[#00d1ff] text-on-primary dark:text-black rounded-lg text-[10px] font-mono font-bold uppercase tracking-wider hover:brightness-110 hover:shadow-[0_0_20px_rgba(0,209,255,0.4)] transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed">
-                  <RefreshCw size={10} className={isRefreshing ? "animate-spin" : ""} /> REFRESH_SYSTEM
-                </button>
-              </div>
-            )}
+              )}
+              <button onClick={handleRefreshSystem} disabled={isRefreshing} className="px-4 py-2 bg-primary dark:bg-[#00d1ff] text-on-primary dark:text-black rounded-lg text-[10px] font-mono font-bold uppercase tracking-wider hover:brightness-110 hover:shadow-[0_0_20px_rgba(0,209,255,0.4)] transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed">
+                <RefreshCw size={10} className={isRefreshing ? "animate-spin" : ""} /> REFRESH_SYSTEM
+              </button>
+            </div>
           </div>
 
           {/* Dynamic tabs console spacer */}

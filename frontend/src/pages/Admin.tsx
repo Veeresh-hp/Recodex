@@ -603,7 +603,7 @@ export default function AdminDashboard() {
               <span className="text-foreground dark:text-white">X</span>
             </Link>
             <span className="text-zinc-500 dark:text-zinc-600 text-[10px]">
-              © 2024 RecodeX Developer Marketplace. All rights reserved.
+              © 2026 RecodeX Developer Marketplace. All rights reserved.
             </span>
           </div>
 

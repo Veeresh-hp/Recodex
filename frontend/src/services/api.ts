@@ -17,9 +17,16 @@ const getApiBaseUrl = () => {
     return envUrl;
   }
 
-  return typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1"
-    ? "/api"
-    : "http://localhost:5000/api";
+  if (typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
+    // If accessing from a local network IP address, point to backend on the same host on port 5000
+    const isIp = /^[0-9.]+$/.test(window.location.hostname);
+    if (isIp || window.location.port === "3000") {
+      return `http://${window.location.hostname}:5000/api`;
+    }
+    return "/api";
+  }
+
+  return "http://localhost:5000/api";
 };
 
 const API_BASE_URL = getApiBaseUrl();
@@ -395,6 +402,7 @@ export async function deleteProject(projectId: string, token: string): Promise<a
 export async function submitInquiry(inquiryData: {
   name: string;
   email: string;
+  phone: string;
   type: string;
   message: string;
 }): Promise<any> {
@@ -441,6 +449,58 @@ export async function getInquiries(token: string): Promise<any[]> {
     return await response.json();
   } catch (error) {
     console.error("[RECODEX API] Fetch inquiries error:", error);
+    throw error;
+  }
+}
+
+/**
+ * Deletes a customer contact inquiry (admin only).
+ */
+export async function deleteInquiry(id: string, token: string): Promise<any> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/contacts/${id}`, {
+      method: "DELETE",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Accept": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      const errData = await response.json();
+      throw new Error(errData.error || `Delete inquiry failed: status ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("[RECODEX API] Delete inquiry error:", error);
+    throw error;
+  }
+}
+
+/**
+ * Replies to a customer contact inquiry (admin only).
+ */
+export async function replyToInquiry(id: string, reply: string, token: string): Promise<any> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/contacts/${id}/reply`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`,
+        "Accept": "application/json",
+      },
+      body: JSON.stringify({ reply }),
+    });
+
+    if (!response.ok) {
+      const errData = await response.json();
+      throw new Error(errData.error || `Reply to inquiry failed: status ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("[RECODEX API] Reply to inquiry error:", error);
     throw error;
   }
 }
