@@ -47,48 +47,7 @@ function PersistentLayout() {
 
 export default function App() {
   React.useEffect(() => {
-    // Dynamically load Google Identity Service script for One Tap login
-    const script = document.createElement("script");
-    script.src = "https://accounts.google.com/gsi/client";
-    script.async = true;
-    script.defer = true;
-    script.onload = () => {
-      const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || "1028308691515-m3u34d0qfef2lqffn55s9a9m9c9q9o9u.apps.googleusercontent.com";
-      if (!googleClientId || googleClientId.includes("YOUR_")) return;
 
-      try {
-        const { google } = window as any;
-        if (!google?.accounts?.id) return;
-
-        google.accounts.id.initialize({
-          client_id: googleClientId,
-          callback: async (response: any) => {
-            console.log("[RECODEX AUTH] Google One Tap Token Received");
-            const { data, error } = await supabase.auth.signInWithIdToken({
-              provider: "google",
-              token: response.credential,
-            });
-
-            if (error) {
-              console.error("[RECODEX AUTH] Google One Tap Auth failed:", error.message);
-            } else {
-              console.log("[RECODEX AUTH] Google One Tap Sign-In successful!", data);
-            }
-          },
-          auto_select: false,
-          itp_support: true,
-        });
-
-        // Only prompt if the user is not authenticated
-        const currentToken = localStorage.getItem("recodex_session_token");
-        if (!currentToken) {
-          google.accounts.id.prompt();
-        }
-      } catch (err) {
-        console.warn("[RECODEX AUTH] Google One Tap initialization warning:", err);
-      }
-    };
-    document.body.appendChild(script);
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log(`[RECODEX AUTH] Event: ${event}`, session);
