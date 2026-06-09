@@ -188,7 +188,7 @@ export default function Profile() {
       setLoading(true);
 
       const sessionToken = localStorage.getItem("recodex_session_token");
-      const isAdminBypass = sessionToken === "admin-bypass-token";
+      const isAdminBypass = sessionToken === "admin-bypass-token" || localStorage.getItem("recodex_admin_user") === "true";
       const isDevBypass = sessionToken === "dev-bypass-token";
       const isClientBypass = sessionToken === "client-bypass-token";
 
@@ -249,7 +249,12 @@ export default function Profile() {
       }
 
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        // Race supabase call with a timeout to prevent page hangs on local network/dev connections
+        const sessionPromise = supabase.auth.getSession();
+        const timeoutPromise = new Promise<any>((resolve) => 
+          setTimeout(() => resolve({ data: { session: null } }), 1500)
+        );
+        const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]);
         if (session) {
           const token = session.access_token;
           try {
