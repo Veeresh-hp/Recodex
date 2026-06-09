@@ -380,6 +380,11 @@ export default function Dashboard() {
 
   // Initial fetch + real-time subscription for new user signups
   useEffect(() => {
+    // Fetch all data immediately on mount
+    fetchProjects();
+    fetchUsers();
+    fetchInquiries();
+
     console.log("[RECODEX DEBUG] Active Supabase Client Configuration URL:", supabase ? (supabase as any).supabaseUrl : "undefined");
     console.log("[RECODEX DEBUG] Raw Import Meta Env:", {
       VITE_SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL,
@@ -869,7 +874,15 @@ const handleDeleteUser = async (userId: string) => {
                 </div>
                 <div className="mt-4">
                   <span className="text-2xl font-extrabold font-mono text-foreground dark:text-white block">{dbUsers.filter(u => u.role === "developer" && !softDeletedUserIds.includes(u.id)).length}</span>
-                  <span className="text-[8px] font-mono text-green-500 font-bold block mt-1">+14 new this week</span>
+                  <span className="text-[8px] font-mono text-green-500 font-bold block mt-1">
+                    +{dbUsers.filter(u => {
+                      if (softDeletedUserIds.includes(u.id)) return false;
+                      if (u.role !== "developer") return false;
+                      if (!u.createdAt) return false;
+                      const createdTime = new Date(u.createdAt).getTime();
+                      return createdTime >= Date.now() - 7 * 24 * 60 * 60 * 1000;
+                    }).length} new this week
+                  </span>
                 </div>
               </div>
 
