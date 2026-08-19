@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, Suspense } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import Footer from "../components/Footer";
 import TerminalModal from "../components/TerminalModal";
@@ -129,7 +129,7 @@ function ProjectsContent() {
             <h1 className="text-3xl sm:text-4xl font-bold text-foreground">
               RecodeX Project Gallery
             </h1>
-            <p className="text-sm sm:text-base text-gray-500 mt-2">
+            <p className="text-sm sm:text-base text-zinc-600 dark:text-zinc-400 mt-2">
               Discover verified low-latency systems, intelligence nodes, and zero-knowledge contracts.
             </p>
           </div>

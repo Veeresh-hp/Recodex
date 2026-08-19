@@ -1,4 +1,4 @@
-﻿import React from "react";
+import React from "react";
 import Footer from "@/components/Footer";
 import { Link } from "react-router-dom";
 import { Cpu, Code, Server, Shield, Sparkles, Layers } from "lucide-react";
@@ -48,7 +48,7 @@ export default function Services() {
             <h1 className="text-3xl sm:text-4xl font-bold text-foreground font-sans">
               Developer Solutions & Services
             </h1>
-            <p className="text-sm sm:text-base text-gray-500 mt-2">
+            <p className="text-sm sm:text-base text-zinc-600 dark:text-zinc-400 mt-2">
               High-performance architectural services tailored to your technical requirements.
             </p>
           </div>
@@ -65,11 +65,11 @@ export default function Services() {
                     {service.icon}
                   </div>
                   <h3 className="text-xl font-bold text-foreground">{service.title}</h3>
-                  <p className="text-sm text-gray-500 leading-relaxed min-h-[60px]">{service.description}</p>
+                  <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed min-h-[60px]">{service.description}</p>
                   
                   <hr className="border-black/5 dark:border-white/5 my-4" />
                   
-                  <ul className="space-y-2 text-xs font-mono text-gray-400">
+                  <ul className="space-y-2 text-xs font-mono text-zinc-600 dark:text-zinc-400">
                     {service.features.map((feature, idx) => (
                       <li key={idx} className="flex items-center gap-2">
                         <span className="w-1.5 h-1.5 rounded-full bg-primary pulse-glow-cyan"></span>
@@ -103,7 +103,7 @@ export default function Services() {
                   Enterprise SLA
                 </div>
                 <h3 className="text-2xl font-bold text-foreground">Need Custom Team Allocations?</h3>
-                <p className="text-sm text-gray-500 leading-relaxed">
+                <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">
                   We build cross-functional architectural engineering squads. Equipped with technical managers, senior dev leads, and security auditors, we deliver enterprise assets on guaranteed service schedules.
                 </p>
               </div>

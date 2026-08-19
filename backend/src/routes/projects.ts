@@ -82,7 +82,7 @@ router.get("/:id", async (req, res) => {
     // Format the devs relation to return user details directly
     const formattedProject = {
       ...project,
-      devs: project.devs.map((d) => d.user),
+      devs: project.devs.map((d: any) => d.user),
     };
 
     return res.json(formattedProject);

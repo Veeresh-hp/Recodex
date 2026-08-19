@@ -54,7 +54,7 @@ router.get("/", requireAuth, async (req: AuthenticatedRequest, res: Response) =>
       const user = await prisma.user.findUnique({
         where: { id: userId },
       });
-      if (user && (user.role === "admin" || user.email === "veereshhp2004@gmail.com" || user.email === "veereshhp04@gmail.com")) {
+      if (user && (user.role === "admin" || user.email === "veereshhp2004@gmail.com")) {
         isAdmin = true;
       }
     }
@@ -93,7 +93,7 @@ router.delete("/:id", requireAuth, async (req: AuthenticatedRequest, res: Respon
       const user = await prisma.user.findUnique({
         where: { id: userId },
       });
-      if (user && (user.role === "admin" || user.email === "veereshhp2004@gmail.com" || user.email === "veereshhp04@gmail.com")) {
+      if (user && (user.role === "admin" || user.email === "veereshhp2004@gmail.com")) {
         isAdmin = true;
       }
     }
@@ -138,7 +138,7 @@ router.put("/:id/reply", requireAuth, async (req: AuthenticatedRequest, res: Res
       const user = await prisma.user.findUnique({
         where: { id: userId },
       });
-      if (user && (user.role === "admin" || user.email === "veereshhp2004@gmail.com" || user.email === "veereshhp04@gmail.com")) {
+      if (user && (user.role === "admin" || user.email === "veereshhp2004@gmail.com")) {
         isAdmin = true;
       }
     }

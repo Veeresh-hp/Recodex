@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef } from "react";
 import { 
   Cpu, Shield, CheckCircle2, ShieldCheck, ArrowRight,
   Fingerprint, Lock, RefreshCw, Brain, Network, Braces, BarChart3
@@ -150,7 +150,7 @@ export default function Solutions() {
                 High-Precision <br />
                 <span className="text-primary italic">Developer Solutions</span>
               </h1>
-              <p className="text-base sm:text-lg text-gray-500 max-w-lg leading-relaxed">
+              <p className="text-base sm:text-lg text-zinc-600 dark:text-zinc-400 max-w-lg leading-relaxed">
                 Custom-engineered infrastructure, rigorous security auditing, and production-grade AI integration for organizations requiring 99.99% reliability.
               </p>
               <div className="pt-2 flex flex-wrap gap-4">
@@ -198,7 +198,7 @@ export default function Solutions() {
                 <div className="space-y-3">
                   <span className="font-mono text-[10px] text-primary tracking-widest uppercase font-bold block">Solution 01</span>
                   <h2 className="text-3xl font-black tracking-tight text-foreground">Custom Architecture</h2>
-                  <p className="text-gray-500 text-sm leading-relaxed">
+                  <p className="text-zinc-600 dark:text-zinc-400 text-sm leading-relaxed">
                     Scalable, distributed systems designed for high-concurrency workloads. We build the resilient backbone of your enterprise networks.
                   </p>
                 </div>
@@ -236,7 +236,7 @@ export default function Solutions() {
                       </span>
                     </div>
                     <h3 className="text-lg font-black tracking-tight text-foreground">Mesh Integration</h3>
-                    <p className="text-gray-500 text-xs leading-relaxed">
+                    <p className="text-zinc-600 dark:text-zinc-400 text-xs leading-relaxed">
                       Deployment of enterprise-grade service mesh for unified observability, traffic routing control, and core protocol security.
                     </p>
                   </div>
@@ -256,7 +256,7 @@ export default function Solutions() {
                       </span>
                     </div>
                     <h3 className="text-lg font-black tracking-tight text-foreground">Edge Computing</h3>
-                    <p className="text-gray-500 text-xs leading-relaxed">
+                    <p className="text-zinc-600 dark:text-zinc-400 text-xs leading-relaxed">
                       Minimizing service latency by pushing compute layers closer to end-users via our globally routed edge networking protocols.
                     </p>
                   </div>
@@ -275,7 +275,7 @@ export default function Solutions() {
             <div className="text-center space-y-3 max-w-2xl mx-auto">
               <span className="font-mono text-[10px] text-primary tracking-widest uppercase font-bold block">Solution 02</span>
               <h2 className="text-3xl font-black tracking-tight text-foreground">Security Audits</h2>
-              <p className="text-gray-500 text-sm leading-relaxed">
+              <p className="text-zinc-600 dark:text-zinc-400 text-sm leading-relaxed">
                 Hardening your software stack against sophisticated threats with our robust zero-trust pipeline methodologies and continuous code evaluations.
               </p>
             </div>
@@ -285,7 +285,7 @@ export default function Solutions() {
               <div className="md:col-span-2 glass-card p-8 rounded-2xl flex flex-col justify-between overflow-hidden relative group min-h-[340px]">
                 <div className="space-y-6 z-10 relative">
                   <h3 className="text-xl font-black tracking-tight text-foreground">Zero-Trust Framework</h3>
-                  <p className="text-gray-500 text-xs leading-relaxed max-w-md">
+                  <p className="text-zinc-600 dark:text-zinc-400 text-xs leading-relaxed max-w-md">
                     Implementation of continuous cryptographic verification for every user, device, and transactional layer within your cloud runtime clusters.
                   </p>
                   <ul className="space-y-3 font-mono text-[10px] font-semibold text-gray-500 dark:text-zinc-400 uppercase tracking-wider">

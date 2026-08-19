@@ -1,5 +1,5 @@
 datasource db {
-  provider = "postgresql"
+  provider = "mongodb"
   url      = env("DATABASE_URL")
 }
 
@@ -8,7 +8,7 @@ generator client {
 }
 
 model User {
-  id           String       @id // References Supabase Auth ID or Clerk ID
+  id           String       @id @map("_id") // References Clerk ID string
   email        String       @unique
   name         String
   role         String       @default("developer") // "developer" | "client"
@@ -21,14 +21,14 @@ model User {
 }
 
 model Project {
-  id              String       @id // E.g., "quantum-flux-core"
+  id              String       @id @map("_id") // E.g., "quantum-flux-core" string ID
   title           String
   description     String
   longDescription String       @map("long_description")
   status          String       @default("Active") // "Active" | "Maintenance" | "Beta"
   imageUrl        String       @map("image_url") // Cloudinary secure HTTPS URL
   category        String       // "Web Systems" | "AI & Intelligence" | "Blockchain & Web3" | "Low-Level Shells"
-  tags            String[]     // Postgres Text Array
+  tags            String[]
   devsCount       Int          @default(0) @map("devs_count")
   stars           Int          @default(0)
   forks           Int          @default(0)
@@ -42,17 +42,18 @@ model Project {
 
 // Joint model representing developer assignment to projects
 model ProjectDev {
-  projectId String @map("project_id")
-  userId    String @map("user_id")
+  id        String  @id @default(auto()) @map("_id") @db.ObjectId
+  projectId String  @map("project_id")
+  userId    String  @map("user_id")
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@id([projectId, userId])
+  @@unique([projectId, userId])
   @@map("project_devs")
 }
 
 model Inquiry {
-  id        String   @id @default(uuid())
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
   name      String
   email     String
   phone     String   @default("")

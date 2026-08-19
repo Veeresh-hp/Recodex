@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import Footer from "@/components/Footer";
-import { supabase } from "@/lib/supabase";
+import { useAuth, useUser } from "@clerk/clerk-react";
 import { getUserProfile } from "@/services/api";
 import {
   User as UserIcon, Shield, Mail, Phone, Cpu, ArrowLeft, ArrowRight,
@@ -174,6 +174,9 @@ const getDynamicProjectData = (projectId: string, title: string, category: strin
 };
 
 export default function Profile() {
+  const { isLoaded, userId, getToken } = useAuth();
+  const { user } = useUser();
+
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [currentAvatar, setCurrentAvatar] = useState<string | null>(null);
@@ -184,7 +187,8 @@ export default function Profile() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const fetchUserProfile = async () => {
+    const fetchUserProfileData = async () => {
+      if (!isLoaded) return;
       setLoading(true);
 
       const sessionToken = localStorage.getItem("recodex_session_token");
@@ -249,56 +253,41 @@ export default function Profile() {
       }
 
       try {
-        // Race supabase call with a timeout to prevent page hangs on local network/dev connections
-        const sessionPromise = supabase.auth.getSession();
-        const timeoutPromise = new Promise<any>((resolve) => 
-          setTimeout(() => resolve({ data: { session: null } }), 1500)
-        );
-        const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]);
-        if (session) {
-          const token = session.access_token;
+        if (userId && user) {
+          const token = await getToken();
           try {
-            // Fetch database synced profile and project mapping from serverless API
-            const dbProfile = await getUserProfile(token);
+            const dbProfile = await getUserProfile(token || sessionToken || "");
             
-            const isGoogle = session.user.app_metadata?.provider === "google" ||
-                             session.user.app_metadata?.providers?.includes("google");
-                             
             const savedAvatar = localStorage.getItem(`profile_avatar_${dbProfile.id}`);
-            const resolvedAvatar = savedAvatar || dbProfile.profileImage || session.user.user_metadata?.avatar_url || null;
+            const resolvedAvatar = savedAvatar || dbProfile.profileImage || user.imageUrl || null;
             
-            // Enrich project arrays with realistic tracking telemetry for customers
             const enrichedProjects = (dbProfile.projects || []).map((proj: any) => 
               getDynamicProjectData(proj.id, proj.title, proj.category)
             );
 
-            // Force dynamic mock project for clients for robust demo presentation
             const projectsList = dbProfile.role === "client" && enrichedProjects.length === 0 ? [
               getDynamicProjectData("recodex-live-demo-project", "Enterprise Custom Portal Implementation", "Web Systems")
             ] : enrichedProjects;
 
             const p: UserProfile = {
               id: dbProfile.id,
-              name: dbProfile.name || session.user.user_metadata?.full_name || "RecodeX Engineer",
-              email: dbProfile.email || session.user.email || "",
-              phone: session.user.phone || "No phone linked",
+              name: dbProfile.name || user.fullName || "RecodeX Engineer",
+              email: dbProfile.email || user.primaryEmailAddress?.emailAddress || "",
+              phone: user.primaryPhoneNumber?.phoneNumber || "No phone linked",
               avatar: resolvedAvatar,
               role: dbProfile.role || "client",
-              isGoogleUser: !!isGoogle,
+              isGoogleUser: user.externalAccounts.some(acc => acc.provider === "google"),
               projects: projectsList
             };
             setProfile(p);
             setCurrentAvatar(resolvedAvatar);
           } catch (backendErr) {
-            console.warn("Backend profile query failed, using Supabase auth credentials:", backendErr);
-            const user = session.user;
-            const fullName = user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split("@")[0] || "RecodeX Engineer";
-            const isGoogle = user.app_metadata?.provider === "google" || user.app_metadata?.providers?.includes("google");
+            console.warn("Backend profile query failed, using Clerk credentials:", backendErr);
+            const fullName = user.fullName || user.username || user.primaryEmailAddress?.emailAddress?.split("@")[0] || "RecodeX Engineer";
             const savedAvatar = localStorage.getItem(`profile_avatar_${user.id}`);
-            const resolvedAvatar = savedAvatar || user.user_metadata?.avatar_url || null;
-            const isUserAdmin = user.email === "veereshhp2004@gmail.com" || localStorage.getItem("recodex_admin_user") === "true";
+            const resolvedAvatar = savedAvatar || user.imageUrl || null;
+            const isUserAdmin = user.primaryEmailAddress?.emailAddress === "veereshhp2004@gmail.com" || localStorage.getItem("recodex_admin_user") === "true";
             
-            // Default demo projects for client profiles on backend fallback
             const demoProjects = !isUserAdmin ? [
               getDynamicProjectData("recodex-fallback-demo", "RecodeX Unified Core Integration", "Web Systems")
             ] : [];
@@ -306,11 +295,11 @@ export default function Profile() {
             const p: UserProfile = {
               id: user.id,
               name: fullName,
-              email: user.email || "No email linked",
-              phone: user.phone || "No phone linked",
+              email: user.primaryEmailAddress?.emailAddress || "",
+              phone: user.primaryPhoneNumber?.phoneNumber || "No phone linked",
               avatar: resolvedAvatar,
               role: isUserAdmin ? "admin" : "client",
-              isGoogleUser: !!isGoogle,
+              isGoogleUser: user.externalAccounts.some(acc => acc.provider === "google"),
               projects: demoProjects
             };
             setProfile(p);
@@ -326,8 +315,8 @@ export default function Profile() {
       }
     };
 
-    fetchUserProfile();
-  }, []);
+    fetchUserProfileData();
+  }, [isLoaded, userId, user, getToken]);
 
   const handleSelectPreset = (url: string) => {
     setPendingAvatar(url);

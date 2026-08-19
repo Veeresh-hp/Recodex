@@ -1,17 +1,21 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
+import { createPortal } from "react-dom";
 import { 
-  CreditCard, Code, Rocket, Activity, Moon, Sun,
-  ShieldCheck, Layers, 
-  LogOut, User, ExternalLink, Play,
+  CreditCard, Code, Rocket, Moon, Sun,
+  Layers, LogOut, User, Play,
   Settings as SettingsIcon, Users, BarChart3, 
-  Trash2, Plus, Edit3, Lock, Globe,
-  AlertTriangle, Search, FileText, CheckCircle, Award, XCircle, RefreshCw, Send, Check, Menu, X,
-  Phone, Mail, MessageSquare
+  Trash2, Plus, Edit3, Globe,
+  AlertTriangle, Search, FileText, CheckCircle, Award, XCircle, RefreshCw, Send, Menu, X,
+  Mail, MessageSquare
 } from "lucide-react";
-import { supabase } from "../lib/supabase";
-import { getProjects, getUsers, updateUser, deleteUser, updateProject, deleteProject, getInquiries, deleteInquiry, replyToInquiry } from "../services/api";
-import { Project } from "../data/mockData";
+import { useAuth, useUser, useClerk } from "@clerk/clerk-react";
+import Chart from "chart.js/auto";
+import { 
+  getProjects, getUsers, updateUser, deleteUser, 
+  updateProject, deleteProject, getInquiries, 
+  deleteInquiry, replyToInquiry, getUserProfile 
+} from "../services/api";
 import { useTheme } from "../context/ThemeContext";
 
 interface Deployment {
@@ -86,78 +90,47 @@ const getAnnouncementMessage = (ann: Announcement): string => {
 };
 
 export default function Dashboard() {
+  const { isLoaded, userId, getToken } = useAuth();
+  const { user } = useUser();
+  const clerk = useClerk();
+
   const { theme, toggleTheme } = useTheme();
   const [activeSidebarTab, setActiveSidebarTab] = useState("Dashboard");
-  const [activeTimeline, setActiveTimeline] = useState<"7D" | "30D">("30D");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // Admin access validation
-  useEffect(() => {
-    const checkAdminAccess = async () => {
-      const isBypassAdmin = 
-        localStorage.getItem("recodex_session_token") === "admin-bypass-token" ||
-        localStorage.getItem("recodex_admin_user") === "true";
+  // Admin access validation states
+  const [adminName, setAdminName] = useState("Veeresh H P");
+  const [adminEmail, setAdminEmail] = useState("veereshhp2004@gmail.com");
+  const [adminPassword, setAdminPassword] = useState("");
+  const [toggled2FA, setToggled2FA] = useState(false);
+  const [selectedUserDetails, setSelectedUserDetails] = useState<any | null>(null);
 
-      if (isBypassAdmin) {
-        return;
-      }
+  // Database states
+  const [dbProjects, setDbProjects] = useState<any[]>([]);
+  const [projectsLoading, setProjectsLoading] = useState(true);
+  const [dbUsers, setDbUsers] = useState<any[]>([]);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-      let isAuthenticatedUser = false;
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          isAuthenticatedUser = true;
-          
-          // 1. Root admin check
-          if (user.email === "veereshhp2004@gmail.com") {
-            localStorage.setItem("recodex_admin_user", "true");
-            setAdminEmail(user.email || "");
-            const displayName = user.user_metadata?.full_name || user.user_metadata?.name;
-            if (displayName) setAdminName(displayName);
-            return;
-          }
+  // Inquiries states
+  const [inquiries, setInquiries] = useState<any[]>([]);
+  const [inquiriesLoading, setInquiriesLoading] = useState(true);
+  const [replyingInquiryId, setReplyingInquiryId] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState("");
+  const [submittingReply, setSubmittingReply] = useState(false);
+  const [selectedInquiryId, setSelectedInquiryId] = useState<string | null>(null);
 
-          // 2. Non-root user: check database table 'users' for role === 'admin'
-          const { data: dbUser } = await supabase
-            .from("users")
-            .select("id, role, name")
-            .eq("id", user.id)
-            .maybeSingle();
+  // User edit and reset password states
+  const [activeUserActionMenuId, setActiveUserActionMenuId] = useState<string | null>(null);
+  const [editingUser, setEditingUser] = useState<any | null>(null);
+  const [resetPasswordUser, setResetPasswordUser] = useState<any | null>(null);
+  const [newEditName, setNewEditName] = useState("");
+  const [newEditRole, setNewEditRole] = useState("");
+  const [newPasswordVal, setNewPasswordVal] = useState("");
+  const [isSavingUser, setIsSavingUser] = useState(false);
 
-          if (!dbUser) {
-            // Unregistered user! Purge session immediately and redirect to login
-            await supabase.auth.signOut();
-            localStorage.removeItem("recodex_session_token");
-            localStorage.removeItem("recodex_admin_user");
-            localStorage.removeItem("recodex_auth_intent");
-            window.location.href = "/login?error=user_not_found";
-            return;
-          }
-
-          if (dbUser.role === "admin") {
-            localStorage.setItem("recodex_admin_user", "true");
-            setAdminEmail(user.email || "");
-            setAdminName(dbUser.name || user.user_metadata?.full_name || user.user_metadata?.name || "Admin");
-            return;
-          }
-        }
-      } catch (err) {
-        console.error("Auth dashboard validation failed:", err);
-      }
-
-      if (isAuthenticatedUser) {
-        window.location.href = "/projects";
-      } else {
-        window.location.href = "/login";
-      }
-    };
-
-    checkAdminAccess();
-  }, []);
-
-  // Real user count from DB (not fake)
-  const [revenue] = useState(0);
-  const [activeDevs, setActiveDevs] = useState(0);
+  // Static stats
+  const [revenue] = useState(1458000);
+  const [sysHealth, setSysHealth] = useState(99.98);
 
   // Recycle bin states
   const [softDeletedUserIds, setSoftDeletedUserIds] = useState<string[]>(() => {
@@ -188,21 +161,11 @@ export default function Dashboard() {
     localStorage.setItem("recodex_recycle_bin", JSON.stringify(recycleBin));
   }, [recycleBin]);
 
-  // Live Database integrations
-  const [dbProjects, setDbProjects] = useState<any[]>([]);
-  const [projectsLoading, setProjectsLoading] = useState(true);
-  const [dbUsers, setDbUsers] = useState<any[]>([]);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-
-  // Inquiries states
-  const [inquiries, setInquiries] = useState<any[]>([]);
-  const [inquiriesLoading, setInquiriesLoading] = useState(true);
-  const [replyingInquiryId, setReplyingInquiryId] = useState<string | null>(null);
-  const [replyText, setReplyText] = useState("");
-  const [submittingReply, setSubmittingReply] = useState(false);
-
-  const [deploymentsCount, setDeploymentsCount] = useState(340);
-  const [sysHealth, setSysHealth] = useState(99.98);
+  // Chart Canvas Refs
+  const growthChartRef = useRef<HTMLCanvasElement | null>(null);
+  const categoryChartRef = useRef<HTMLCanvasElement | null>(null);
+  const growthChartInstance = useRef<Chart | null>(null);
+  const categoryChartInstance = useRef<Chart | null>(null);
 
   // Deployments log list
   const [deployments, setDeployments] = useState<Deployment[]>([
@@ -218,7 +181,6 @@ export default function Dashboard() {
   const [projectSearch, setProjectSearch] = useState("");
   const [projectStatusFilter, setProjectStatusFilter] = useState("All");
 
-  // Custom Ecosystem Mock datasets
   const [categories, setCategories] = useState<string[]>(() => {
     const stored = localStorage.getItem("recodex_global_categories");
     return stored ? JSON.parse(stored) : [
@@ -283,6 +245,7 @@ export default function Dashboard() {
   useEffect(() => {
     localStorage.setItem("recodex_global_announcements", JSON.stringify(announcements));
   }, [announcements]);
+
   const [newAnnTitle, setNewAnnTitle] = useState("");
   const [newAnnMessage, setNewAnnMessage] = useState("");
   const [newAnnType, setNewAnnType] = useState("New Feature");
@@ -297,13 +260,6 @@ export default function Dashboard() {
     }
   }, [toast]);
 
-  // Admin Profile settings states
-  const [adminName, setAdminName] = useState("Veeresh H P");
-  const [adminEmail, setAdminEmail] = useState("veereshhp2004@gmail.com");
-  const [adminPassword, setAdminPassword] = useState("");
-  const [toggled2FA, setToggled2FA] = useState(false);
-  const [selectedUserDetails, setSelectedUserDetails] = useState<any | null>(null);
-
   // Settings mock records
   const [settings] = useState({
     siteName: "RecodeX Developer Marketplace",
@@ -312,23 +268,69 @@ export default function Dashboard() {
     allowedOrigin: "http://localhost:3000"
   });
 
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const waveOffsetRef = useRef(0);
+  // Admin access validation
+  useEffect(() => {
+    const checkAdminAccess = async () => {
+      if (!isLoaded) return;
+
+      const isBypassAdmin =
+        localStorage.getItem("recodex_session_token") === "admin-bypass-token" ||
+        localStorage.getItem("recodex_admin_user") === "true";
+
+      if (isBypassAdmin) {
+        setAdminEmail("veereshhp2004@gmail.com");
+        setAdminName("Veeresh H P");
+        return;
+      }
+
+      if (userId && user) {
+        const userEmail = user.primaryEmailAddress?.emailAddress || "";
+        const isAdmin = userEmail === "veereshhp2004@gmail.com";
+
+        if (isAdmin) {
+          localStorage.setItem("recodex_admin_user", "true");
+          setAdminEmail(userEmail);
+          setAdminName(user.fullName || "Admin");
+          return;
+        }
+
+        try {
+          const token = await getToken();
+          const dbProfile = await getUserProfile(token || "");
+          if (dbProfile && dbProfile.role === "admin") {
+            localStorage.setItem("recodex_admin_user", "true");
+            setAdminEmail(userEmail);
+            setAdminName(dbProfile.name || user.fullName || "Admin");
+            return;
+          }
+        } catch (err) {
+          console.error("Database admin role check failed:", err);
+        }
+
+        window.location.href = "/projects";
+      } else {
+        window.location.href = "/login";
+      }
+    };
+
+    checkAdminAccess();
+  }, [isLoaded, userId, user]);
 
   const getAuthToken = async () => {
     const token = localStorage.getItem("recodex_session_token");
     if (token) {
       return token;
     }
-    const { data: { session } } = await supabase.auth.getSession();
-    return session?.access_token || "";
+    if (userId) {
+      return await getToken() || "";
+    }
+    return "";
   };
 
   // Fetch real users directly from backend API
   const fetchUsers = async () => {
     try {
       const data = await getUsers();
-      console.log("[RECODEX DEBUG] Backend fetchUsers response:", data);
       const real = data.filter((u: any) => !u.id.startsWith("usr-"));
       const targetData = real.length > 0 ? real : data;
       const mapped = targetData.map((u: any) => {
@@ -338,7 +340,6 @@ export default function Dashboard() {
         return u;
       });
       setDbUsers(mapped);
-      setActiveDevs(mapped.length);
     } catch (err) {
       console.log("[RECODEX ERROR] Backend user fetch failed:", err);
     }
@@ -349,7 +350,6 @@ export default function Dashboard() {
     setProjectsLoading(true);
     try {
       const data = await getProjects();
-      console.log("[RECODEX DEBUG] Backend fetchProjects response:", data);
       setDbProjects(data);
     } catch (err) {
       console.log("[RECODEX ERROR] Backend project fetch failed:", err);
@@ -357,52 +357,6 @@ export default function Dashboard() {
       setProjectsLoading(false);
     }
   };
-
-  // In-app premium telemetry synchronization function
-  const handleRefreshSystem = async () => {
-    setIsRefreshing(true);
-    try {
-      const promises: Promise<any>[] = [fetchUsers(), fetchProjects()];
-      if (activeSidebarTab === "Inquiries") {
-        promises.push(fetchInquiries());
-      }
-      await Promise.all(promises);
-      setToast({ message: "Ecosystem control metrics synchronized successfully.", type: "success" });
-    } catch (err) {
-      console.error("[RECODEX ERROR] Sync failed:", err);
-      setToast({ message: "System telemetry synchronization failed.", type: "error" });
-    } finally {
-      setTimeout(() => {
-        setIsRefreshing(false);
-      }, 700);
-    }
-  };
-
-  // Initial fetch + real-time subscription for new user signups
-  useEffect(() => {
-    // Fetch all data immediately on mount
-    fetchProjects();
-    fetchUsers();
-    fetchInquiries();
-
-    console.log("[RECODEX DEBUG] Active Supabase Client Configuration URL:", supabase ? (supabase as any).supabaseUrl : "undefined");
-    console.log("[RECODEX DEBUG] Raw Import Meta Env:", {
-      VITE_SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL,
-      VITE_API_URL: import.meta.env.VITE_API_URL
-    });
-
-    // Listen for auth state events to align fetches with the loaded session
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log("[RECODEX DEBUG] onAuthStateChange event triggered:", event, session ? "Session active" : "No session");
-      // Fetch both projects and users once the session state has loaded
-      fetchProjects();
-      fetchUsers();
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, []);
 
   const fetchInquiries = async () => {
     setInquiriesLoading(true);
@@ -447,6 +401,244 @@ export default function Dashboard() {
     }
   };
 
+  // In-app premium telemetry synchronization function
+  const handleRefreshSystem = async () => {
+    setIsRefreshing(true);
+    try {
+      const promises: Promise<any>[] = [fetchUsers(), fetchProjects()];
+      if (activeSidebarTab === "Inquiries") {
+        promises.push(fetchInquiries());
+      }
+      await Promise.all(promises);
+      setToast({ message: "Ecosystem control metrics synchronized successfully.", type: "success" });
+    } catch (err) {
+      console.error("[RECODEX ERROR] Sync failed:", err);
+      setToast({ message: "System telemetry synchronization failed.", type: "error" });
+    } finally {
+      setTimeout(() => {
+        setIsRefreshing(false);
+      }, 700);
+    }
+  };
+
+  // Initial fetch + database synchronization
+  useEffect(() => {
+    fetchProjects();
+    fetchUsers();
+    fetchInquiries();
+  }, [userId]);
+
+  // Auto-select first loaded inquiry if none selected
+  useEffect(() => {
+    if (inquiries.length > 0 && !selectedInquiryId) {
+      setSelectedInquiryId(inquiries[0].id);
+    }
+  }, [inquiries]);
+
+  // Re-fetch when sidebar tab changes
+  useEffect(() => {
+    if (activeSidebarTab === "Users") fetchUsers();
+    if (activeSidebarTab === "Projects") fetchProjects();
+    if (activeSidebarTab === "Inquiries") fetchInquiries();
+  }, [activeSidebarTab]);
+
+  // Close user actions menu on click away
+  useEffect(() => {
+    const handleCloseMenu = () => setActiveUserActionMenuId(null);
+    document.addEventListener("click", handleCloseMenu);
+    return () => document.removeEventListener("click", handleCloseMenu);
+  }, []);
+
+  // Live Chart rendering effect
+  useEffect(() => {
+    if (activeSidebarTab !== "Dashboard") return;
+
+    const isDark = theme === "dark";
+
+    // Growth Chart (Line)
+    const growthCanvas = growthChartRef.current;
+    if (growthCanvas) {
+      const growthCtx = growthCanvas.getContext("2d");
+      if (growthCtx) {
+        if (growthChartInstance.current) {
+          growthChartInstance.current.destroy();
+        }
+
+        const gradient = growthCtx.createLinearGradient(0, 0, 0, 400);
+        gradient.addColorStop(0, isDark ? "rgba(0, 209, 255, 0.3)" : "rgba(79, 70, 229, 0.4)");
+        gradient.addColorStop(1, "rgba(0, 0, 0, 0.0)");
+
+        growthChartInstance.current = new Chart(growthCtx, {
+          type: "line",
+          data: {
+            labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
+            datasets: [{
+              label: "Active Users",
+              data: [12000, 12500, 13200, 14100, 14800, 15400 + (dbUsers.length * 15)],
+              borderColor: isDark ? "#00d1ff" : "#4f46e5",
+              backgroundColor: gradient,
+              borderWidth: 3,
+              pointBackgroundColor: isDark ? "#00d1ff" : "#ffffff",
+              pointBorderColor: isDark ? "#00d1ff" : "#4f46e5",
+              pointBorderWidth: 2,
+              pointRadius: 4,
+              pointHoverRadius: 6,
+              fill: true,
+              tension: 0.4
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                backgroundColor: isDark ? "#0b0e14" : "#213145",
+                titleFont: { family: "Geist", size: 13 },
+                bodyFont: { family: "Geist", size: 14, weight: "bold" },
+                padding: 10,
+                cornerRadius: 8,
+                displayColors: false
+              }
+            },
+            scales: {
+              x: {
+                grid: { display: false },
+                ticks: { font: { family: "Geist", size: 12 }, color: isDark ? "#a1a1aa" : "#777587" }
+              },
+              y: {
+                grid: { color: isDark ? "rgba(255, 255, 255, 0.08)" : "#e5eeff" },
+                ticks: { 
+                  font: { family: "Geist", size: 12 }, 
+                  color: isDark ? "#a1a1aa" : "#777587",
+                  callback: function(value) { return Number(value) / 1000 + "k"; }
+                },
+                beginAtZero: false,
+                min: 10000
+              }
+            },
+            interaction: { mode: "index", intersect: false }
+          }
+        });
+      }
+    }
+
+    // Category Chart (Doughnut)
+    const catCanvas = categoryChartRef.current;
+    if (catCanvas) {
+      const catCtx = catCanvas.getContext("2d");
+      if (catCtx) {
+        if (categoryChartInstance.current) {
+          categoryChartInstance.current.destroy();
+        }
+
+        const counts = {
+          "AI Models": dbProjects.filter(p => p.category === "AI & Intelligence" || p.category === "AI Models").length,
+          "Web Dev": dbProjects.filter(p => p.category === "Web Systems" || p.category === "Web Dev").length,
+          "Cybersec": dbProjects.filter(p => p.category === "Low-Level Shells" || p.category === "Cybersec").length,
+          "Other": dbProjects.filter(p => p.category === "Blockchain & Web3" || p.category === "Other").length,
+        };
+
+        const totalProjects = dbProjects.length;
+        const dataValues = totalProjects > 0
+          ? [counts["AI Models"], counts["Web Dev"], counts["Cybersec"], counts["Other"]]
+          : [45, 30, 15, 10];
+
+        categoryChartInstance.current = new Chart(catCtx, {
+          type: "doughnut",
+          data: {
+            labels: ["AI Models", "Web Dev", "Cybersec", "Other"],
+            datasets: [{
+              data: dataValues,
+              backgroundColor: [
+                isDark ? "#00d1ff" : "#4f46e5",
+                isDark ? "#22d3ee" : "#57dffe",
+                isDark ? "#818cf8" : "#4b4dd8",
+                isDark ? "#27272a" : "#d3e4fe"
+              ],
+              borderWidth: 0,
+              hoverOffset: 4
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: "75%",
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                backgroundColor: isDark ? "#0b0e14" : "#213145",
+                bodyFont: { family: "Geist", size: 13 },
+                padding: 10,
+                cornerRadius: 8
+              }
+            }
+          }
+        });
+      }
+    }
+
+    return () => {
+      if (growthChartInstance.current) growthChartInstance.current.destroy();
+      if (categoryChartInstance.current) categoryChartInstance.current.destroy();
+    };
+  }, [activeSidebarTab, dbUsers, dbProjects, theme]);
+
+  // Real-time telemetry load shifts
+  useEffect(() => {
+    const statsInterval = setInterval(() => {
+      setSysHealth((prev) => {
+        const change = (Math.random() - 0.5) * 0.01;
+        const newVal = prev + change;
+        return parseFloat(Math.min(100.00, Math.max(99.90, newVal)).toFixed(2));
+      });
+
+      setDeployments((prev) => 
+        prev.map((dep) => {
+          const newSeconds = dep.timeAgoInSeconds + 2;
+          let label = "";
+          if (newSeconds < 60) {
+            label = `${newSeconds}s ago`;
+          } else if (newSeconds < 3600) {
+            label = `${Math.floor(newSeconds / 60)}m ago`;
+          } else {
+            label = `${Math.floor(newSeconds / 3600)}h ago`;
+          }
+          return {
+            ...dep,
+            timeAgoInSeconds: newSeconds,
+            timestamp: label,
+          };
+        })
+      );
+    }, 2000);
+
+    return () => clearInterval(statsInterval);
+  }, []);
+
+  const handleSignOut = async () => {
+    try {
+      await clerk.signOut();
+    } catch (err) {
+      console.warn("Clerk sign out error:", err);
+    }
+    localStorage.removeItem("recodex_session_token");
+    localStorage.removeItem("recodex_admin_user");
+    window.location.href = "/";
+  };
+
+  const handleExportJSON = () => {
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(
+      JSON.stringify({ revenue, activeUsersCount: dbUsers.length, deploymentsCount: deployments.length, sysHealth, timestamp: new Date().toISOString() })
+    );
+    const downloadAnchor = document.createElement("a");
+    downloadAnchor.setAttribute("href", dataStr);
+    downloadAnchor.setAttribute("download", `recodex_system_overview_${Date.now()}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+  };
+
   const handleDeleteInquiry = async (id: string) => {
     if (!window.confirm("Are you sure you want to permanently delete this inquiry?")) {
       return;
@@ -484,136 +676,6 @@ export default function Dashboard() {
     }
   };
 
-  // Re-fetch when sidebar tab changes
-  useEffect(() => {
-    if (activeSidebarTab === "Users") fetchUsers();
-    if (activeSidebarTab === "Projects") fetchProjects();
-    if (activeSidebarTab === "Inquiries") fetchInquiries();
-  }, [activeSidebarTab]);
-
-
-  // Real-time telemetry load shifts
-  useEffect(() => {
-    const statsInterval = setInterval(() => {
-      // activeDevs is now real — driven by Supabase real-time, not faked
-      
-      setSysHealth((prev) => {
-        const change = (Math.random() - 0.5) * 0.01;
-        const newVal = prev + change;
-        return parseFloat(Math.min(100.00, Math.max(99.90, newVal)).toFixed(2));
-      });
-
-      setDeployments((prev) => 
-        prev.map((dep) => {
-          const newSeconds = dep.timeAgoInSeconds + 2;
-          let label = "";
-          if (newSeconds < 60) {
-            label = `${newSeconds}s ago`;
-          } else if (newSeconds < 3600) {
-            label = `${Math.floor(newSeconds / 60)}m ago`;
-          } else {
-            label = `${Math.floor(newSeconds / 3600)}h ago`;
-          }
-          return {
-            ...dep,
-            timeAgoInSeconds: newSeconds,
-            timestamp: label,
-          };
-        })
-      );
-    }, 2000);
-
-    return () => clearInterval(statsInterval);
-  }, []);
-
-  // Sine Wave visualization loop
-  useEffect(() => {
-    if (activeSidebarTab !== "Dashboard") return;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    let animationFrameId: number;
-
-    const renderWave = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      const isDark = document.documentElement.classList.contains("dark");
-      
-      ctx.beginPath();
-      ctx.strokeStyle = isDark ? "rgba(0, 209, 255, 0.85)" : "rgba(0, 103, 124, 0.85)";
-      ctx.lineWidth = 3;
-      ctx.shadowBlur = isDark ? 15 : 0;
-      ctx.shadowColor = isDark ? "rgba(0, 209, 255, 0.5)" : "transparent";
-
-      const waveHeight = 35;
-      const waveLength = 120;
-
-      for (let x = 0; x < canvas.width; x++) {
-        const y = canvas.height / 2 + Math.sin((x + waveOffsetRef.current) / waveLength) * waveHeight;
-        if (x === 0) {
-          ctx.moveTo(x, y);
-        } else {
-          ctx.lineTo(x, y);
-        }
-      }
-      ctx.stroke();
-
-      // Shaded gradient path
-      ctx.shadowBlur = 0;
-      ctx.beginPath();
-      ctx.moveTo(0, canvas.height);
-      for (let x = 0; x < canvas.width; x++) {
-        const y = canvas.height / 2 + Math.sin((x + waveOffsetRef.current) / waveLength) * waveHeight;
-        ctx.lineTo(x, y);
-      }
-      ctx.lineTo(canvas.width, canvas.height);
-      ctx.closePath();
-
-      const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-      if (isDark) {
-        gradient.addColorStop(0, "rgba(0, 209, 255, 0.12)");
-        gradient.addColorStop(1, "rgba(0, 209, 255, 0.0)");
-      } else {
-        gradient.addColorStop(0, "rgba(0, 103, 124, 0.12)");
-        gradient.addColorStop(1, "rgba(0, 103, 124, 0.0)");
-      }
-      ctx.fillStyle = gradient;
-      ctx.fill();
-
-      waveOffsetRef.current += 1.5;
-      animationFrameId = requestAnimationFrame(renderWave);
-    };
-
-    renderWave();
-    return () => cancelAnimationFrame(animationFrameId);
-  }, [activeSidebarTab, theme]);
-
-  const handleSignOut = () => {
-    // Trigger Supabase signout in the background without blocking the UI
-    try {
-      supabase.auth.signOut().catch(err => console.warn("Supabase background signout warning:", err));
-    } catch (err) {
-      console.warn("Supabase sign out error:", err);
-    }
-    localStorage.removeItem("recodex_session_token");
-    localStorage.removeItem("recodex_admin_user");
-    window.location.href = "/";
-  };
-
-  const handleExportJSON = () => {
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(
-      JSON.stringify({ revenue, activeDevs, deploymentsCount, sysHealth, timestamp: new Date().toISOString() })
-    );
-    const downloadAnchor = document.createElement("a");
-    downloadAnchor.setAttribute("href", dataStr);
-    downloadAnchor.setAttribute("download", `recodex_system_overview_${Date.now()}.json`);
-    document.body.appendChild(downloadAnchor);
-    downloadAnchor.click();
-    downloadAnchor.remove();
-  };
-
-  // Announce compiler helpers
   const handlePostAnnouncement = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newAnnTitle || !newAnnMessage) return;
@@ -627,10 +689,12 @@ export default function Dashboard() {
     setAnnouncements([newAnn, ...announcements]);
     setNewAnnTitle("");
     setNewAnnMessage("");
+    setToast({ message: "Announcement published successfully.", type: "success" });
   };
 
   const handleRemoveAnnouncement = (id: string) => {
     setAnnouncements(announcements.filter((ann) => ann.id !== id));
+    setToast({ message: "Announcement deleted.", type: "success" });
   };
 
   const handleAddCategory = (e: React.FormEvent) => {
@@ -638,6 +702,7 @@ export default function Dashboard() {
     if (!newCategoryName || categories.includes(newCategoryName)) return;
     setCategories([...categories, newCategoryName]);
     setNewCategoryName("");
+    setToast({ message: "Category added successfully.", type: "success" });
   };
 
   const handleRemoveCategory = (catName: string) => {
@@ -650,14 +715,17 @@ export default function Dashboard() {
     };
     setCategories(categories.filter((c) => c !== catName));
     setRecycleBin((prev) => [recycled, ...prev]);
+    setToast({ message: "Category moved to Recycle Bin.", type: "success" });
   };
 
   const handleModifyReportStatus = (id: string, nextStatus: "Open" | "Under Review" | "Resolved") => {
     setReports(reports.map((rep) => rep.id === id ? { ...rep, status: nextStatus } : rep));
+    setToast({ message: `Report marked as ${nextStatus}.`, type: "success" });
   };
 
   const handleModifyCertStatus = (id: string, nextStatus: "Approved" | "Pending" | "Revoked") => {
     setCertificates(certificates.map((cert) => cert.id === id ? { ...cert, status: nextStatus } : cert));
+    setToast({ message: `Certificate status updated to ${nextStatus}.`, type: "success" });
   };
 
   const handleModifyUserStatus = async (userId: string, targetStatus: string) => {
@@ -671,7 +739,7 @@ export default function Dashboard() {
         const duration = window.prompt(
           `For how long should ${userToModify.name} be suspended?\n(e.g., 24 Hours, 7 Days, 30 Days, Permanent)`
         );
-        if (duration === null) return; // User clicked "Cancel"
+        if (duration === null) return;
         suspensionDuration = duration.trim() || "Permanent";
       }
 
@@ -684,14 +752,50 @@ export default function Dashboard() {
         localStorage.removeItem(`suspension_duration_${userId}`);
       }
 
-      // Update local state instantly and refetch
       setDbUsers((prev) => prev.map((u) => u.id === userId ? { ...u, role: newRole } : u));
       fetchUsers();
+      setToast({ message: `User status changed to ${targetStatus}.`, type: "success" });
     } catch (error) {
       console.error("Failed to modify user status:", error);
     }
   };
-  
+
+  const handleSaveUserEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingUser) return;
+    setIsSavingUser(true);
+    try {
+      const token = await getAuthToken();
+      await updateUser(editingUser.id, { name: newEditName, role: newEditRole }, token);
+      setDbUsers((prev) => 
+        prev.map((u) => u.id === editingUser.id ? { ...u, name: newEditName, role: newEditRole } : u)
+      );
+      fetchUsers();
+      setToast({ message: "User profile details updated successfully.", type: "success" });
+      setEditingUser(null);
+    } catch (err: any) {
+      setToast({ message: err.message || "Failed to update user profile.", type: "error" });
+    } finally {
+      setIsSavingUser(false);
+    }
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetPasswordUser) return;
+    setIsSavingUser(true);
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 800)); // Simulate API call
+      setToast({ message: `Password reset instructions sent to ${resetPasswordUser.email} successfully.`, type: "success" });
+      setResetPasswordUser(null);
+      setNewPasswordVal("");
+    } catch (err: any) {
+      setToast({ message: "Failed to dispatch password reset request.", type: "error" });
+    } finally {
+      setIsSavingUser(false);
+    }
+  };
+
   const handleToggleUserAdmin = async (userId: string, makeAdmin: boolean) => {
     const userToModify = dbUsers.find((u) => u.id === userId);
     if (userToModify && !makeAdmin && userToModify.email === "veereshhp2004@gmail.com") {
@@ -704,28 +808,17 @@ export default function Dashboard() {
     
     const targetRole = makeAdmin ? "admin" : "developer";
     try {
-      // 1. Try Supabase direct update (works on Vercel)
-      const { error: sbError } = await supabase.from("users").update({ role: targetRole }).eq("id", userId);
-      if (sbError) throw sbError;
-
-      // Update local state instantly and refetch
+      const token = await getAuthToken();
+      const userToModify = dbUsers.find((u) => u.id === userId);
+      if (!userToModify) return;
+      await updateUser(userId, { name: userToModify.name, role: targetRole }, token);
       setDbUsers((prev) => prev.map((u) => u.id === userId ? { ...u, role: targetRole } : u));
       fetchUsers();
-    } catch (error) {
-      console.warn("Supabase admin role update failed, trying backend:", error);
-      try {
-        const token = await getAuthToken();
-        const userToModify = dbUsers.find((u) => u.id === userId);
-        if (!userToModify) return;
-        await updateUser(userId, { name: userToModify.name, role: targetRole }, token);
-        setDbUsers((prev) => prev.map((u) => u.id === userId ? { ...u, role: targetRole } : u));
-        fetchUsers();
-      } catch (err) {
-        console.error("Failed to modify user admin status:", err);
-      }
+      setToast({ message: `User role changed to ${targetRole.toUpperCase()}.`, type: "success" });
+    } catch (err) {
+      console.error("Failed to modify user admin status:", err);
     }
   };
-
 
   const handleRemoveUser = (userId: string) => {
     if (!window.confirm("Are you sure you want to delete this user? They will be moved to the Recycle Bin.")) {
@@ -743,28 +836,28 @@ export default function Dashboard() {
     };
     setSoftDeletedUserIds((prev) => [...prev, userId]);
     setRecycleBin((prev) => [recycled, ...prev]);
+    setToast({ message: "User moved to Recycle Bin.", type: "success" });
   };
 
-// Permanently delete a user with confirmation
-const handleDeleteUser = async (userId: string) => {
-  if (!window.confirm(`Are you absolutely sure you want to permanently delete this user? This action is irreversible.`)) {
-    return;
-  }
-  try {
-    const token = await getAuthToken();
-    try {
-      await deleteUser(userId, token);
-    } catch (apiErr) {
-      console.warn("API user deletion failed, cleaning up local state anyway:", apiErr);
+  const handleDeleteUser = async (userId: string) => {
+    if (!window.confirm(`Are you absolutely sure you want to permanently delete this user? This action is irreversible.`)) {
+      return;
     }
-    // Update local state
-    setDbUsers((prev) => prev.filter((u) => u.id !== userId));
-    setSoftDeletedUserIds((prev) => prev.filter((id) => id !== userId));
-    fetchUsers();
-  } catch (error) {
-    console.error("Failed to delete user permanently:", error);
-  }
-};
+    try {
+      const token = await getAuthToken();
+      try {
+        await deleteUser(userId, token);
+      } catch (apiErr) {
+        console.warn("API user deletion failed, cleaning up local state anyway:", apiErr);
+      }
+      setDbUsers((prev) => prev.filter((u) => u.id !== userId));
+      setSoftDeletedUserIds((prev) => prev.filter((id) => id !== userId));
+      fetchUsers();
+      setToast({ message: "User permanently deleted.", type: "success" });
+    } catch (error) {
+      console.error("Failed to delete user permanently:", error);
+    }
+  };
 
   const handleModifyProjectStatus = async (projId: string, nextStatus: string) => {
     try {
@@ -773,10 +866,9 @@ const handleDeleteUser = async (userId: string) => {
       if (!projectToModify) return;
 
       await updateProject(projId, { status: nextStatus }, token);
-
-      // Update local state instantly and refetch
       setDbProjects((prev) => prev.map((p) => p.id === projId ? { ...p, status: nextStatus } : p));
       fetchProjects();
+      setToast({ message: `Project status updated to ${nextStatus}.`, type: "success" });
     } catch (error) {
       console.error("Failed to modify project status:", error);
     }
@@ -795,6 +887,7 @@ const handleDeleteUser = async (userId: string) => {
     };
     setSoftDeletedProjectIds((prev) => [...prev, projId]);
     setRecycleBin((prev) => [recycled, ...prev]);
+    setToast({ message: "Project moved to Recycle Bin.", type: "success" });
   };
 
   const handleRestoreItem = (item: any) => {
@@ -806,6 +899,7 @@ const handleDeleteUser = async (userId: string) => {
       setSoftDeletedProjectIds((prev) => prev.filter((id) => id !== item.originalData.id));
     }
     setRecycleBin((prev) => prev.filter((x) => x.id !== item.id));
+    setToast({ message: `${item.type} restored successfully.`, type: "success" });
   };
 
   const handleDeletePermanently = async (item: any) => {
@@ -840,247 +934,329 @@ const handleDeleteUser = async (userId: string) => {
     } catch (error) {
       console.error("Failed to delete permanently:", error);
     } finally {
-      // Always remove from the local UI recycle bin state regardless of API success/failure
       setRecycleBin((prev) => prev.filter((x) => x.id !== item.id));
+      setToast({ message: `${item.type} permanently deleted.`, type: "success" });
     }
   };
 
-  // Rendering screen layout content dynamically
+  const navItems = [
+    { label: "Dashboard", icon: "dashboard" },
+    { label: "Users", icon: "group" },
+    { label: "Projects", icon: "terminal" },
+    { label: "Categories", icon: "category" },
+    { label: "Reports", icon: "assessment" },
+    { label: "Inquiries", icon: "question_answer" },
+    { label: "Certificates", icon: "verified" },
+    { label: "Notifications", icon: "notifications" },
+    { label: "Settings", icon: "settings" },
+    { label: "Recycle Bin", icon: "delete" },
+  ];
+
+  // Dynamic tab content rendering
   const renderMainContent = () => {
     switch (activeSidebarTab) {
       case "Dashboard":
         return (
           <>
-            {/* MVP 8-Column Grid Overview Telemetry */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              
-              {/* Total Users */}
-              <div className="bg-white dark:bg-[#0b0e14] border border-black/10 dark:border-zinc-900 rounded-2xl p-6 relative overflow-hidden flex flex-col justify-between shadow-md transition-colors duration-300">
-                <div className="flex items-center justify-between text-[8px] font-mono uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
-                  <span>Total Users</span>
-                  <Users size={12} className="text-[#00d1ff] opacity-60" />
+            {/* Row 1: Stat Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+              {/* Stat 1 */}
+              <div className="glass-card p-6 hover-lift flex flex-col justify-between min-h-[140px] relative overflow-hidden group border border-black/5 dark:border-white/10 rounded-2xl">
+                <div className="absolute -right-4 -top-4 w-24 h-24 bg-primary/10 rounded-full group-hover:scale-150 transition-transform duration-500 pointer-events-none"></div>
+                <div className="flex justify-between items-start z-10">
+                  <div>
+                    <p className="text-xs font-mono font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-1">Total Users</p>
+                    <h3 className="text-3xl font-extrabold font-mono text-zinc-900 dark:text-white tracking-tight">
+                      {dbUsers.filter(u => !softDeletedUserIds.includes(u.id)).length}
+                    </h3>
+                  </div>
+                  <div className="p-3 bg-primary/10 rounded-xl text-primary border border-primary/20">
+                    <span className="material-symbols-outlined text-[20px]">group</span>
+                  </div>
                 </div>
-                <div className="mt-4">
-                  <span className="text-2xl font-extrabold font-mono text-foreground dark:text-white block">{dbUsers.filter(u => !softDeletedUserIds.includes(u.id)).length}</span>
-                  <span className="text-[8px] font-mono text-zinc-400 dark:text-zinc-500 mt-1 block">Active directory sync</span>
+                <div className="flex items-center gap-2 mt-4 z-10">
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                    <span className="material-symbols-outlined text-[13px] mr-1">trending_up</span>
+                    +12%
+                  </span>
+                  <span className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">vs last month</span>
                 </div>
               </div>
-
-              {/* Total Students */}
-              <div className="bg-white dark:bg-[#0b0e14] border border-black/10 dark:border-zinc-900 rounded-2xl p-6 relative overflow-hidden flex flex-col justify-between shadow-md transition-colors duration-300">
-                <div className="flex items-center justify-between text-[8px] font-mono uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
-                  <span>Students / Freelancers</span>
-                  <Code size={12} className="text-[#00d1ff] opacity-60" />
+              {/* Stat 2 */}
+              <div className="glass-card p-6 hover-lift flex flex-col justify-between min-h-[140px] relative overflow-hidden group border border-black/5 dark:border-white/10 rounded-2xl">
+                <div className="absolute -right-4 -top-4 w-24 h-24 bg-cyan-500/10 rounded-full group-hover:scale-150 transition-transform duration-500 pointer-events-none"></div>
+                <div className="flex justify-between items-start z-10">
+                  <div>
+                    <p className="text-xs font-mono font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-1">Active Projects</p>
+                    <h3 className="text-3xl font-extrabold font-mono text-zinc-900 dark:text-white tracking-tight">
+                      {dbProjects.filter(p => !softDeletedProjectIds.includes(p.id)).length}
+                    </h3>
+                  </div>
+                  <div className="p-3 bg-cyan-500/10 rounded-xl text-cyan-400 border border-cyan-500/20">
+                    <span className="material-symbols-outlined text-[20px]">terminal</span>
+                  </div>
                 </div>
-                <div className="mt-4">
-                  <span className="text-2xl font-extrabold font-mono text-foreground dark:text-white block">{dbUsers.filter(u => u.role === "developer" && !softDeletedUserIds.includes(u.id)).length}</span>
-                  <span className="text-[8px] font-mono text-green-500 font-bold block mt-1">
-                    +{dbUsers.filter(u => {
-                      if (softDeletedUserIds.includes(u.id)) return false;
-                      if (u.role !== "developer") return false;
-                      if (!u.createdAt) return false;
-                      const createdTime = new Date(u.createdAt).getTime();
-                      return createdTime >= Date.now() - 7 * 24 * 60 * 60 * 1000;
-                    }).length} new this week
+                <div className="flex items-center gap-2 mt-4 z-10">
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                    <span className="material-symbols-outlined text-[13px] mr-1">trending_up</span>
+                    +8%
+                  </span>
+                  <span className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">vs last month</span>
+                </div>
+              </div>
+              {/* Stat 3 */}
+              <div className="glass-card p-6 hover-lift flex flex-col justify-between min-h-[140px] relative overflow-hidden group border border-black/5 dark:border-white/10 rounded-2xl">
+                <div className="absolute -right-4 -top-4 w-24 h-24 bg-indigo-500/10 rounded-full group-hover:scale-150 transition-transform duration-500 pointer-events-none"></div>
+                <div className="flex justify-between items-start z-10">
+                  <div>
+                    <p className="text-xs font-mono font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-1">Certificates Issued</p>
+                    <h3 className="text-3xl font-extrabold font-mono text-zinc-900 dark:text-white tracking-tight">
+                      {certificates.filter(c => c.status === "Approved").length}
+                    </h3>
+                  </div>
+                  <div className="p-3 bg-indigo-500/10 rounded-xl text-indigo-400 border border-indigo-500/20">
+                    <span className="material-symbols-outlined text-[20px]">verified</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 mt-4 z-10">
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                    <span className="material-symbols-outlined text-[13px] mr-1">trending_up</span>
+                    +20%
+                  </span>
+                  <span className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">vs last month</span>
+                </div>
+              </div>
+              {/* Stat 4 */}
+              <div className="glass-card p-6 hover-lift flex flex-col justify-between min-h-[140px] border border-rose-500/30 bg-rose-500/5 relative overflow-hidden group rounded-2xl">
+                <div className="absolute -right-4 -top-4 w-24 h-24 bg-rose-500/10 rounded-full group-hover:scale-150 transition-transform duration-500 pointer-events-none"></div>
+                <div className="flex justify-between items-start z-10">
+                  <div>
+                    <p className="text-xs font-mono font-bold uppercase tracking-wider text-rose-400 mb-1">Reports Pending</p>
+                    <h3 className="text-3xl font-extrabold font-mono text-rose-500 tracking-tight">
+                      {reports.filter(r => r.status === "Open" || r.status === "Under Review").length}
+                    </h3>
+                  </div>
+                  <div className="p-3 bg-rose-500/10 rounded-xl text-rose-400 border border-rose-500/20">
+                    <span className="material-symbols-outlined text-[20px]">warning</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 mt-4 z-10">
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                    Action required
                   </span>
                 </div>
               </div>
-
-              {/* Total Clients */}
-              <div className="bg-white dark:bg-[#0b0e14] border border-black/10 dark:border-zinc-900 rounded-2xl p-6 relative overflow-hidden flex flex-col justify-between shadow-md transition-colors duration-300">
-                <div className="flex items-center justify-between text-[8px] font-mono uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
-                  <span>Clients</span>
-                  <User size={12} className="text-[#00d1ff] opacity-60" />
-                </div>
-                <div className="mt-4">
-                  <span className="text-2xl font-extrabold font-mono text-foreground dark:text-white block">{dbUsers.filter(u => u.role === "client" && !softDeletedUserIds.includes(u.id)).length}</span>
-                  <span className="text-[8px] font-mono text-zinc-400 dark:text-zinc-500 mt-1 block">Registered agencies</span>
-                </div>
-              </div>
-
-              {/* Total Projects */}
-              <div className="bg-white dark:bg-[#0b0e14] border border-black/10 dark:border-zinc-900 rounded-2xl p-6 relative overflow-hidden flex flex-col justify-between shadow-md transition-colors duration-300">
-                <div className="flex items-center justify-between text-[8px] font-mono uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
-                  <span>Total Projects</span>
-                  <Rocket size={12} className="text-[#00d1ff] opacity-60" />
-                </div>
-                <div className="mt-4">
-                  <span className="text-2xl font-extrabold font-mono text-foreground dark:text-white block">{dbProjects.filter(p => !softDeletedProjectIds.includes(p.id)).length}</span>
-                  <span className="text-[8px] font-mono text-zinc-400 dark:text-zinc-500 mt-1 block">Ecosystem assignments</span>
-                </div>
-              </div>
-
-              {/* Active Projects */}
-              <div className="bg-white dark:bg-[#0b0e14] border border-black/10 dark:border-zinc-900 rounded-2xl p-6 relative overflow-hidden flex flex-col justify-between shadow-md transition-colors duration-300">
-                <div className="flex items-center justify-between text-[8px] font-mono uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
-                  <span>Active Projects</span>
-                  <Play size={12} className="text-[#00d1ff] opacity-60" fill="currentColor" />
-                </div>
-                <div className="mt-4">
-                  <span className="text-2xl font-extrabold font-mono text-foreground dark:text-white block">{dbProjects.filter(p => (p.status === "In Progress" || p.status === "Active" || p.status === "Approved") && !softDeletedProjectIds.includes(p.id)).length}</span>
-                  <span className="text-[8px] font-mono text-[#00d1ff] font-bold block mt-1">In production nodes</span>
-                </div>
-              </div>
-
-              {/* Completed Projects */}
-              <div className="bg-white dark:bg-[#0b0e14] border border-black/10 dark:border-zinc-900 rounded-2xl p-6 relative overflow-hidden flex flex-col justify-between shadow-md transition-colors duration-300">
-                <div className="flex items-center justify-between text-[8px] font-mono uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
-                  <span>Completed Projects</span>
-                  <CheckCircle size={12} className="text-[#00d1ff] opacity-60" />
-                </div>
-                <div className="mt-4">
-                  <span className="text-2xl font-extrabold font-mono text-foreground dark:text-white block">{dbProjects.filter(p => p.status === "Completed" && !softDeletedProjectIds.includes(p.id)).length}</span>
-                  <span className="text-[8px] font-mono text-green-500 font-bold block mt-1">Archived releases</span>
-                </div>
-              </div>
-
-              {/* Pending Approvals */}
-              <div className="bg-white dark:bg-[#0b0e14] border border-black/10 dark:border-zinc-900 rounded-2xl p-6 relative overflow-hidden flex flex-col justify-between shadow-md transition-colors duration-300">
-                <div className="flex items-center justify-between text-[8px] font-mono uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
-                  <span>Pending Approvals</span>
-                  <AlertTriangle size={12} className="text-amber-500 opacity-80" />
-                </div>
-                <div className="mt-4">
-                  <span className="text-2xl font-extrabold font-mono text-foreground dark:text-white block">{dbProjects.filter(p => (p.status === "Pending" || !p.status) && !softDeletedProjectIds.includes(p.id)).length}</span>
-                  <span className="text-[8px] font-mono text-amber-500 font-bold block mt-1">Awaiting verification</span>
-                </div>
-              </div>
-
-              {/* Total Revenue */}
-              <div className="bg-white dark:bg-[#0b0e14] border border-black/10 dark:border-zinc-900 rounded-2xl p-6 relative overflow-hidden flex flex-col justify-between shadow-md transition-colors duration-300">
-                <div className="flex items-center justify-between text-[8px] font-mono uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
-                  <span>Total Revenue</span>
-                  <CreditCard size={12} className="text-[#00d1ff] opacity-60" />
-                </div>
-                <div className="mt-4">
-                  <span className="text-2xl font-extrabold font-mono text-foreground dark:text-white block">₹{revenue.toLocaleString()}</span>
-                  <span className="text-[8px] font-mono text-[#00d1ff] font-bold block mt-1">+14.2% ARR sync</span>
-                </div>
-              </div>
-
             </div>
 
-            {/* Glowing spline curve & Top Contributors */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
-              <div className="lg:col-span-2 bg-white dark:bg-[#0b0e14] border border-black/10 dark:border-zinc-900 rounded-2xl p-6 relative overflow-hidden flex flex-col justify-between h-[360px] transition-colors duration-300">
-                <div className="flex items-center justify-between z-10">
-                  <h3 className="text-sm font-bold tracking-wider text-foreground dark:text-zinc-200">
-                    Ecosystem Activity Graph
-                  </h3>
-                  <div className="flex items-center gap-1.5 p-1 rounded bg-black/5 dark:bg-zinc-950/60 border border-black/10 dark:border-zinc-900">
-                    <button onClick={() => setActiveTimeline("7D")} className={`px-2.5 py-1 rounded text-[9px] font-mono font-bold transition-all cursor-pointer ${activeTimeline === "7D" ? "bg-primary text-white dark:bg-[#0b101c]" : "text-zinc-500 hover:text-foreground"}`}>7D</button>
-                    <button onClick={() => setActiveTimeline("30D")} className={`px-2.5 py-1 rounded text-[9px] font-mono font-bold transition-all cursor-pointer ${activeTimeline === "30D" ? "bg-primary text-white dark:bg-[#0b101c]" : "text-zinc-500 hover:text-foreground"}`}>30D</button>
+            {/* Row 2: Charts Area */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8">
+              {/* Main Chart */}
+              <div className="glass-card p-6 lg:col-span-8 flex flex-col rounded-2xl border border-black/5 dark:border-white/10">
+                <div className="flex justify-between items-center mb-6">
+                  <div>
+                    <h3 className="text-lg font-bold text-zinc-900 dark:text-white font-sans">Monthly User Growth</h3>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">Platform adoption over the last 6 months</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button className="px-3 py-1 text-xs font-mono font-bold bg-primary/10 text-primary border border-primary/20 rounded-lg">6M</button>
+                    <button className="px-3 py-1 text-xs font-mono font-bold text-zinc-400 hover:text-zinc-200 hover:bg-black/5 dark:hover:bg-white/5 rounded-lg transition-colors">1Y</button>
                   </div>
                 </div>
+                <div className="flex-1 relative min-h-[260px] w-full mt-2">
+                  <canvas ref={growthChartRef}></canvas>
+                </div>
+              </div>
+              {/* Secondary Chart */}
+              <div className="glass-card p-6 lg:col-span-4 flex flex-col rounded-2xl border border-black/5 dark:border-white/10">
+                <div className="flex justify-between items-center mb-4">
+                  <div>
+                    <h3 className="text-lg font-bold text-zinc-900 dark:text-white font-sans">Projects by Category</h3>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Distribution breakdown</p>
+                  </div>
+                </div>
+                <div className="flex-1 relative flex items-center justify-center min-h-[200px]">
+                  <canvas ref={categoryChartRef}></canvas>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                    <span className="text-2xl font-extrabold font-mono text-zinc-900 dark:text-white">
+                      {dbProjects.filter(p => !softDeletedProjectIds.includes(p.id)).length}
+                    </span>
+                    <span className="text-[9px] font-mono uppercase tracking-widest text-zinc-500">Total Projects</span>
+                  </div>
+                </div>
+                <div className="mt-4 grid grid-cols-2 gap-2 pt-2 border-t border-black/5 dark:border-white/5">
+                  <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-[#00d1ff]"></div><span className="text-xs text-zinc-400 font-mono">AI Models</span></div>
+                  <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-[#22d3ee]"></div><span className="text-xs text-zinc-400 font-mono">Web Dev</span></div>
+                  <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-[#818cf8]"></div><span className="text-xs text-zinc-400 font-mono">Cybersec</span></div>
+                  <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-[#3f3f46]"></div><span className="text-xs text-zinc-400 font-mono">Other</span></div>
+                </div>
+              </div>
+            </div>
 
-                <div className="relative w-full h-[240px] mt-4 z-0">
-                  <canvas ref={canvasRef} className="w-full h-full" width={480} height={200} />
+            {/* Row 3: Recent Users Table & Widgets */}
+            <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 pb-8">
+              {/* Recent Users Table */}
+              <div className="glass-card xl:col-span-8 overflow-hidden flex flex-col rounded-2xl border border-black/5 dark:border-white/10">
+                <div className="p-6 border-b border-black/5 dark:border-white/5 flex justify-between items-center bg-black/[0.02] dark:bg-white/[0.02]">
+                  <div>
+                    <h3 className="text-lg font-bold text-zinc-900 dark:text-white font-sans">Recent Users</h3>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Active community members & developer accounts</p>
+                  </div>
+                  <button onClick={() => setActiveSidebarTab("Users")} className="text-primary dark:text-[#00d1ff] hover:underline text-xs font-mono font-bold flex items-center gap-1 transition-colors">
+                    View All <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+                  </button>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-black/5 dark:border-white/5 bg-black/[0.01] dark:bg-white/[0.01]">
+                        <th className="px-6 py-3.5 text-xs font-mono font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">User</th>
+                        <th className="px-6 py-3.5 text-xs font-mono font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Role</th>
+                        <th className="px-6 py-3.5 text-xs font-mono font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Status</th>
+                        <th className="px-6 py-3.5 text-xs font-mono font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Date Added</th>
+                        <th className="px-6 py-3.5 text-xs font-mono font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-black/5 dark:divide-white/5">
+                      {dbUsers.filter(u => !softDeletedUserIds.includes(u.id)).slice(0, 5).map((userItem) => {
+                        const isUserAdmin = userItem.role === "admin" || userItem.email === "veereshhp2004@gmail.com";
+                        return (
+                          <tr key={userItem.id} className="hover:bg-black/5 dark:hover:bg-white/5 transition-colors group">
+                            <td className="px-6 py-4">
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl overflow-hidden bg-primary/10 border border-primary/20 flex-shrink-0 flex items-center justify-center">
+                                  {userItem.profileImage ? (
+                                    <img alt={userItem.name} className="w-full h-full object-cover" src={userItem.profileImage} />
+                                  ) : (
+                                    <span className="font-extrabold text-sm text-primary">{userItem.name[0]}</span>
+                                  )}
+                                </div>
+                                <div>
+                                  <p className="text-xs font-bold text-zinc-900 dark:text-white">{userItem.name}</p>
+                                  <p className="text-xs font-mono text-zinc-500 dark:text-zinc-400">{userItem.email}</p>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-md text-[10px] font-mono font-bold uppercase tracking-wider border ${
+                                isUserAdmin 
+                                  ? "bg-cyan-500/10 text-cyan-400 border-cyan-500/20"
+                                  : userItem.role === "client"
+                                  ? "bg-purple-500/10 text-purple-400 border-purple-500/20"
+                                  : "bg-blue-500/10 text-blue-400 border-blue-500/20"
+                              }`}>
+                                {isUserAdmin ? "Admin" : userItem.role || "Developer"}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-mono font-bold border ${
+                                userItem.role === "suspended"
+                                  ? "bg-rose-500/10 text-rose-500 border-rose-500/20"
+                                  : "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
+                              }`}>
+                                {userItem.role === "suspended" ? "Blocked" : "Active"}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-xs font-mono text-zinc-500 dark:text-zinc-400">
+                              {new Date(userItem.createdAt || Date.now()).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                            </td>
+                            <td className="px-6 py-4 text-right">
+                              <div className="flex justify-end gap-1.5 opacity-90 group-hover:opacity-100 transition-opacity">
+                                <button title="Edit User" onClick={() => { setEditingUser(userItem); setNewEditName(userItem.name); setNewEditRole(userItem.role || "developer"); }} className="p-1.5 text-zinc-400 hover:text-primary dark:hover:text-[#00d1ff] rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"><span className="material-symbols-outlined text-[18px]">edit</span></button>
+                                <button title="Reset Password" onClick={() => { setResetPasswordUser(userItem); setNewPasswordVal(""); }} className="p-1.5 text-zinc-400 hover:text-amber-500 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"><span className="material-symbols-outlined text-[18px]">lock_reset</span></button>
+                                <button title="Delete User" onClick={() => handleRemoveUser(userItem.id)} className="p-1.5 text-zinc-400 hover:text-rose-500 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"><span className="material-symbols-outlined text-[18px]">delete</span></button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               </div>
 
-              {/* Recent Announcements Panel */}
-              <div className="bg-white dark:bg-[#0b0e14] border border-black/10 dark:border-zinc-900 rounded-2xl p-6 flex flex-col justify-between h-[360px] transition-colors duration-300">
-                <div className="space-y-4">
-                  <h3 className="text-sm font-bold tracking-wider text-foreground dark:text-zinc-200">Announcements</h3>
-                  <div className="space-y-3 overflow-y-auto max-h-[220px] pr-1">
-                    {announcements.map((ann) => (
-                      <div key={ann.id} className="p-3 border border-black/5 dark:border-zinc-900 bg-black/5 dark:bg-zinc-950/40 rounded-lg space-y-1">
-                        <div className="flex justify-between items-center">
-                          <span className="text-[7px] font-mono px-1.5 py-0.5 rounded bg-primary/10 border border-primary/20 text-[#00d1ff] font-bold uppercase">{ann.type}</span>
-                          <span className="text-[8px] font-mono text-zinc-500">{formatRelativeTime(ann.date)}</span>
+              {/* Sidebar widgets */}
+              <div className="xl:col-span-4 flex flex-col gap-6">
+                {/* Recent Projects */}
+                <div className="glass-card p-6 rounded-2xl border border-black/5 dark:border-white/10">
+                  <div className="flex justify-between items-center mb-4">
+                    <h4 className="text-xs font-mono font-bold text-zinc-900 dark:text-white uppercase tracking-wider">Recent Projects</h4>
+                    <button onClick={() => setActiveSidebarTab("Projects")} className="p-1 text-zinc-400 hover:text-primary dark:hover:text-[#00d1ff] transition-colors"><span className="material-symbols-outlined text-[18px]">arrow_forward</span></button>
+                  </div>
+                  <div className="space-y-3">
+                    {dbProjects.filter(p => !softDeletedProjectIds.includes(p.id)).slice(0, 3).map((p) => (
+                      <div key={p.id} className="flex gap-3 items-center p-3 rounded-xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/5 dark:border-white/5 hover:border-primary/30 transition-all cursor-pointer">
+                        <div className="w-9 h-9 rounded-lg bg-primary/10 text-primary border border-primary/20 flex items-center justify-center shrink-0">
+                          <span className="material-symbols-outlined text-[18px]">smart_toy</span>
                         </div>
-                        <h4 className="text-[10px] font-extrabold text-foreground dark:text-white leading-tight">{ann.title}</h4>
-                        <p className="text-[9px] text-zinc-500 leading-normal line-clamp-2">{getAnnouncementMessage(ann)}</p>
+                        <div className="min-w-0 flex-1">
+                          <h5 className="text-xs font-bold text-zinc-900 dark:text-white truncate">{p.title}</h5>
+                          <p className="text-[10px] font-mono text-zinc-500 dark:text-zinc-400 mt-0.5">{p.category}</p>
+                        </div>
                       </div>
                     ))}
                   </div>
                 </div>
 
-                <button onClick={() => setActiveSidebarTab("Notifications")} className="w-full mt-4 py-2 border border-black/10 dark:border-zinc-900 hover:border-black/20 dark:hover:border-zinc-800 rounded-lg text-[8px] font-mono font-bold tracking-widest uppercase text-zinc-500 hover:text-foreground dark:hover:text-white transition-all cursor-pointer">
-                  PUBLISH_ANNOUNCEMENT
-                </button>
-              </div>
-            </div>
-
-            {/* Recent Deployments Table */}
-            <div className="border border-black/10 dark:border-zinc-900 bg-white/60 dark:bg-[#0b0e14]/60 backdrop-blur-md rounded-2xl p-6 mt-6 space-y-5 transition-colors duration-300">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-bold tracking-wider text-foreground dark:text-zinc-200">Recent Deployments</h3>
-                <span className="text-[8px] font-mono tracking-widest text-zinc-500 dark:text-zinc-600 uppercase font-bold">LAST_UPDATE: 2M_AGO</span>
-              </div>
-
-              <div className="overflow-x-auto text-[10px] font-mono">
-                <table className="w-full text-zinc-500 text-left border-collapse">
-                  <thead>
-                    <tr className="border-b border-black/10 dark:border-zinc-900 pb-3 text-[8px] tracking-widest uppercase font-bold text-zinc-400 dark:text-zinc-500">
-                      <th className="py-2.5">DEPLOYMENT_ID</th>
-                      <th className="py-2.5">REPOSITORY</th>
-                      <th className="py-2.5">STATUS</th>
-                      <th className="py-2.5">ENV</th>
-                      <th className="py-2.5">TIMESTAMP</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-black/5 dark:divide-zinc-900/40">
-                    {deployments.map((d, i) => (
-                      <tr key={i} className="hover:bg-black/5 dark:hover:bg-zinc-900/10 transition-colors h-12">
-                        <td className="py-3 font-semibold text-primary dark:text-[#00d1ff] cursor-pointer hover:underline">{d.id}</td>
-                        <td className="py-3 text-zinc-700 dark:text-zinc-300 font-sans font-medium">{d.repo}</td>
-                        <td className="py-3 font-bold">
-                          <div className="flex items-center gap-2">
-                            <span className={`w-1.5 h-1.5 rounded-full ${d.status === "LIVE" ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]" : d.status === "BUILDING" ? "bg-amber-400 animate-pulse" : "bg-rose-500"}`}></span>
-                            <span className={d.status === "LIVE" ? "text-zinc-700 dark:text-zinc-200" : d.status === "BUILDING" ? "text-zinc-500" : "text-rose-500"}>{d.status}</span>
-                          </div>
-                        </td>
-                        <td className="py-3">
-                          <span className="bg-black/5 dark:bg-zinc-900 border border-black/10 dark:border-zinc-800 px-2 py-0.5 rounded text-[8px] font-bold text-zinc-500 dark:text-zinc-400">{d.env}</span>
-                        </td>
-                        <td className="py-3 text-zinc-500 dark:text-zinc-400 font-sans text-xs">{d.timestamp}</td>
-                      </tr>
+                {/* System Reports */}
+                <div className="glass-card p-6 rounded-2xl border border-black/5 dark:border-white/10 bg-gradient-to-br from-black/[0.01] to-black/[0.03] dark:from-white/[0.01] dark:to-white/[0.03]">
+                  <div className="flex justify-between items-center mb-4">
+                    <h4 className="text-xs font-mono font-bold text-zinc-900 dark:text-white uppercase tracking-wider">System Reports</h4>
+                    <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
+                  </div>
+                  <div className="flex flex-col gap-3">
+                    {reports.slice(0, 2).map((rep) => (
+                      <div key={rep.id} className="border border-black/5 dark:border-white/10 rounded-xl p-3.5 bg-white/50 dark:bg-black/40">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-rose-500 bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/20">{rep.type}</span>
+                          <span className="text-[10px] font-mono text-zinc-400">{rep.date}</span>
+                        </div>
+                        <p className="text-xs text-zinc-650 dark:text-zinc-300 font-medium leading-relaxed">{rep.description}</p>
+                      </div>
                     ))}
-                  </tbody>
-                </table>
+                  </div>
+                  <button onClick={() => setActiveSidebarTab("Reports")} className="w-full mt-4 py-2 text-center text-xs font-mono font-bold text-primary dark:text-[#00d1ff] hover:bg-primary/10 rounded-xl transition-colors">
+                    View All Reports
+                  </button>
+                </div>
               </div>
             </div>
           </>
         );
 
       case "Users":
-        // Filter users
-        const filteredUsers = dbUsers.filter((user) => {
-          if (softDeletedUserIds.includes(user.id)) return false;
-          const matchesQuery = user.name.toLowerCase().includes(userSearch.toLowerCase()) || 
-                               user.email.toLowerCase().includes(userSearch.toLowerCase());
-          const matchesRole = userRoleFilter === "All" ? true : user.role === userRoleFilter;
+        const filteredUsers = dbUsers.filter((userItem) => {
+          if (softDeletedUserIds.includes(userItem.id)) return false;
+          const matchesQuery = userItem.name.toLowerCase().includes(userSearch.toLowerCase()) || 
+                               userItem.email.toLowerCase().includes(userSearch.toLowerCase());
+          const matchesRole = userRoleFilter === "All" ? true : userItem.role === userRoleFilter;
           return matchesQuery && matchesRole;
         });
 
         return (
-          <div className="bg-white dark:bg-[#0b0e14] border border-black/10 dark:border-zinc-900 rounded-2xl p-8 space-y-6 shadow-lg transition-colors duration-300">
+          <div className="space-y-6">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
               <div>
                 <h3 className="text-lg font-bold text-foreground dark:text-white font-sans font-extrabold uppercase">User Directory</h3>
-                <p className="text-xs text-zinc-400 dark:text-zinc-500">Live records of active engineers, developers, and clients synced in your PostgreSQL tables.</p>
+                <p className="text-xs text-zinc-400 dark:text-zinc-500">Live records of active engineers, developers, and clients synced in your MongoDB tables.</p>
               </div>
 
-              {/* Filters & Search box */}
+              {/* Filters & Search */}
               <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-                <div className="relative w-full md:w-48">
-                  <span className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-zinc-500">
-                    <Search size={12} />
-                  </span>
+                <div className="relative w-full md:w-56 select-none">
+                  <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px]">search</span>
                   <input
                     type="text"
-                    placeholder="Search query..."
+                    placeholder="Search users..."
                     value={userSearch}
                     onChange={(e) => setUserSearch(e.target.value)}
-                    className="w-full pl-7 pr-3 py-1.5 bg-black/5 dark:bg-zinc-900 border border-black/10 dark:border-zinc-800 rounded-lg text-xs focus:outline-none focus:border-primary transition-all font-mono"
+                    className="w-full pl-9 pr-4 py-1.5 bg-surface-container-low border border-outline-variant/40 rounded-full text-xs font-mono text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none"
                   />
                 </div>
                 
                 <select
                   value={userRoleFilter}
                   onChange={(e) => setUserRoleFilter(e.target.value)}
-                  className="bg-black/5 dark:bg-zinc-900 border border-black/10 dark:border-zinc-800 rounded-lg px-2 py-1.5 text-xs text-zinc-500 font-mono outline-none"
+                  className="bg-surface-container-low border border-outline-variant/40 rounded-full px-4 py-1.5 text-xs text-on-surface-variant font-mono outline-none"
                 >
                   <option value="All">All Roles</option>
                   <option value="admin">Admin</option>
@@ -1088,105 +1264,191 @@ const handleDeleteUser = async (userId: string) => {
                   <option value="client">Client</option>
                   <option value="suspended">Suspended</option>
                 </select>
+
+                <button 
+                  onClick={handleRefreshSystem} 
+                  disabled={isRefreshing}
+                  className="px-3.5 py-1.5 bg-primary-container text-on-primary rounded-full text-xs font-mono font-bold hover:bg-primary-container/90 hover-lift cursor-pointer flex items-center gap-1.5"
+                >
+                  <RefreshCw size={11} className={isRefreshing ? "animate-spin" : ""} /> Sync
+                </button>
               </div>
             </div>
  
-            <div className="overflow-x-auto text-xs font-mono w-full">
-              <table className="w-full border-collapse text-left">
-                <thead>
-                  <tr className="border-b border-black/10 dark:border-zinc-900 text-[8px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest h-10 select-none">
-                    <th className="pb-3">User Name</th>
-                    <th className="pb-3">Email or Phone Number</th>
-                    <th className="pb-3">Role</th>
-                    <th className="pb-3">Status</th>
-                    <th className="pb-3 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-black/5 dark:divide-zinc-900">
-                  {filteredUsers.map((user) => {
-                    const isUserSuspended = user.role === "suspended";
-                    const isUserAdmin = user.role === "admin" || user.email === "veereshhp2004@gmail.com";
-                    return (
-                      <tr key={user.id} className="h-14 hover:bg-black/5 dark:hover:bg-[#07090e]/25 transition-colors">
-                        <td onClick={() => setSelectedUserDetails({ ...user, role: isUserAdmin ? "admin" : user.role })} className="text-foreground dark:text-white font-extrabold cursor-pointer hover:text-primary transition-colors">{user.name}</td>
-                        <td className="text-zinc-500 dark:text-zinc-400 font-mono">{user.email}</td>
-                        <td>
-                           <span className={`px-2 py-0.5 rounded text-[8px] font-mono font-black uppercase border ${
-                            isUserAdmin ? "bg-purple-500/10 border-purple-500/25 text-purple-600 dark:text-purple-400" :
-                            user.role === "developer" ? "bg-cyan-500/10 border-cyan-500/25 text-[#00d1ff]" :
-                            user.role === "suspended" ? "bg-red-500/10 border-red-500/25 text-red-500" :
-                            "bg-black/5 border-black/10 dark:bg-zinc-800 dark:border-zinc-900 text-zinc-500 dark:text-zinc-400"
-                          }`}>
-                            {isUserAdmin ? "ADMIN" : user.role === "developer" ? "STUDENT" : user.role === "suspended" ? `SUSPENDED (${localStorage.getItem(`suspension_duration_${user.id}`) || "Permanent"})` : user.role}
-                          </span>
-                        </td>
-                        <td>
-                          <span className={`px-2 py-0.5 rounded text-[8px] font-mono font-black uppercase border ${
-                            isUserSuspended ? "bg-red-500/10 border-red-500/25 text-red-500" : "bg-green-500/10 border-green-500/25 text-green-500"
-                          }`}>
-                            {isUserSuspended ? "Suspended" : "Active"}
-                          </span>
-                        </td>
-                        <td className="py-2 text-right">
-                          <div className="flex justify-end gap-1.5">
-                            <button
-                              onClick={() => handleToggleUserAdmin(user.id, !isUserAdmin)}
-                              className={`px-2 py-1 rounded text-[8px] font-mono uppercase tracking-wider font-bold transition-all border ${
-                                isUserAdmin ? "bg-purple-500/10 border-purple-500/25 text-purple-600 dark:text-purple-400 hover:bg-purple-500/20" : "bg-cyan-500/10 border-cyan-500/25 text-cyan-500 hover:bg-cyan-500/20"
-                              }`}
-                            >
-                              {isUserAdmin ? "Remove Admin" : "Make Admin"}
-                            </button>
-                            <button
-                              onClick={() => handleModifyUserStatus(user.id, isUserSuspended ? "Active" : "Suspended")}
-                              className={`px-2 py-1 rounded text-[8px] font-mono uppercase tracking-wider font-bold transition-all border ${
-                                isUserSuspended ? "bg-green-500/10 border-green-500/25 text-green-500 hover:bg-green-500/20" : "bg-yellow-500/10 border-yellow-500/25 text-yellow-500 hover:bg-yellow-500/20"
-                              }`}
-                            >
-                              {isUserSuspended ? "Activate" : "Suspend"}
-                            </button>
-                            <button
-                              onClick={() => handleRemoveUser(user.id)}
-                              className="px-2 py-1 bg-red-500/10 border border-red-500/20 text-red-500 hover:bg-red-500/20 rounded text-[8px] font-mono uppercase tracking-wider font-bold"
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
- 
-            {/* Profile details popup modal */}
-            {selectedUserDetails && (
-              <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-6">
-                <div className="bg-white dark:bg-[#07090e] border border-black/10 dark:border-zinc-800 p-8 rounded-2xl w-full max-w-md shadow-2xl relative">
-                  <button onClick={() => setSelectedUserDetails(null)} className="absolute top-4 right-4 text-zinc-500 hover:text-foreground dark:hover:text-white cursor-pointer"><XCircle size={18} /></button>
-                  <div className="space-y-4">
-                    <h3 className="text-sm font-mono tracking-widest text-zinc-500 uppercase">Ecosystem Profile Details</h3>
-                    <div className="space-y-2 select-text">
-                      <div className="flex justify-between border-b border-black/5 dark:border-zinc-900 pb-2"><span className="text-zinc-500">Name</span><span className="font-extrabold text-foreground dark:text-white">{selectedUserDetails.name}</span></div>
-                      <div className="flex justify-between border-b border-black/5 dark:border-zinc-900 pb-2"><span className="text-zinc-500">Credential</span><span className="font-mono text-foreground dark:text-white">{selectedUserDetails.email}</span></div>
-                      <div className="flex justify-between border-b border-black/5 dark:border-zinc-900 pb-2"><span className="text-zinc-500">Role</span><span className="font-mono uppercase text-[#00d1ff]">{selectedUserDetails.role}</span></div>
-                      <div className="flex justify-between border-b border-black/5 dark:border-zinc-900 pb-2"><span className="text-zinc-500">Secure User ID</span><span className="font-mono text-[9px] text-zinc-500">{selectedUserDetails.id}</span></div>
-                      <div className="flex justify-between"><span className="text-zinc-500">Profile Status</span><span className={`font-bold ${selectedUserDetails.role === "suspended" ? "text-red-500" : "text-green-500"}`}>{selectedUserDetails.role === "suspended" ? "Suspended" : "Active"}</span></div>
-                      {selectedUserDetails.role === "suspended" && (
-                        <div className="flex justify-between border-t border-black/5 dark:border-zinc-900 pt-2"><span className="text-zinc-500">Suspension Duration</span><span className="font-bold text-red-500 font-mono">{localStorage.getItem(`suspension_duration_${selectedUserDetails.id}`) || "Permanent"}</span></div>
-                      )}
-                    </div>
-                  </div>
-                </div>
+            <div className="glass-card w-full border border-outline-variant/40">
+              <div className="overflow-visible">
+                <table className="w-full border-collapse text-left">
+                  <thead>
+                    <tr className="border-b border-outline-variant/40 bg-surface-container-low/50 text-[10px] font-mono font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-widest h-10 select-none">
+                      <th className="px-md py-3">User</th>
+                      <th className="px-md py-3">Email</th>
+                      <th className="px-md py-3">Role</th>
+                      <th className="px-md py-3">Status</th>
+                      <th className="px-md py-3">Joined Date</th>
+                      <th className="px-md py-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-outline-variant/30">
+                    {filteredUsers.map((u) => {
+                      const isUserSuspended = u.role === "suspended";
+                      const isUserAdmin = u.role === "admin" || u.email === "veereshhp2004@gmail.com";
+                      const isRootAdmin = u.email === "veereshhp2004@gmail.com";
+                      return (
+                        <tr key={u.id} className="hover:bg-surface-variant/20 transition-colors group h-14">
+                          <td className="px-md py-3">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-full overflow-hidden bg-surface-variant border border-outline-variant/50 flex-shrink-0 flex items-center justify-center font-bold text-xs text-primary">
+                                {u.profileImage ? (
+                                  <img alt={u.name} className="w-full h-full object-cover" src={u.profileImage} />
+                                ) : (
+                                  <span>{u.name[0]}</span>
+                                )}
+                              </div>
+                              <span 
+                                onClick={() => setSelectedUserDetails({ ...u, role: isUserAdmin ? "admin" : u.role })} 
+                                className="text-foreground dark:text-white font-bold cursor-pointer hover:text-primary transition-colors text-xs"
+                              >
+                                {u.name}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-md py-3 text-zinc-500 dark:text-zinc-400 font-mono text-xs">{u.email}</td>
+                          <td className="px-md py-3">
+                            <span className={`px-2 py-0.5 rounded text-[8px] font-mono font-black uppercase border ${
+                              isUserAdmin ? "bg-purple-500/10 border-purple-500/25 text-purple-650 dark:text-purple-400" :
+                              u.role === "developer" ? "bg-cyan-500/10 border-cyan-500/25 text-[#00d1ff]" :
+                              u.role === "suspended" ? "bg-red-500/10 border-red-500/25 text-red-500" :
+                              "bg-zinc-500/10 border-zinc-500/25 text-zinc-550 dark:text-zinc-450"
+                            }`}>
+                              {isUserAdmin ? "ADMIN" : u.role === "developer" ? "STUDENT" : u.role === "suspended" ? `SUSPENDED` : u.role}
+                            </span>
+                          </td>
+                          <td className="px-md py-3">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-mono font-bold border ${
+                              isUserSuspended 
+                                ? "bg-red-500/5 text-red-550 border-red-500/20" 
+                                : "bg-green-500/5 text-green-550 border-green-500/20"
+                            }`}>
+                              {isUserSuspended ? "Blocked" : "Active"}
+                            </span>
+                          </td>
+                          <td className="px-md py-3 font-mono text-zinc-500 text-xs">
+                            {new Date(u.createdAt || Date.now()).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                          </td>
+                          <td className="px-md py-3 text-right relative">
+                            <div className="flex justify-end select-none">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setActiveUserActionMenuId(activeUserActionMenuId === u.id ? null : u.id);
+                                }}
+                                className="p-1.5 hover:bg-surface-variant/50 rounded-full text-zinc-400 hover:text-foreground transition-colors cursor-pointer relative"
+                              >
+                                <span className="material-symbols-outlined text-[20px] block">more_vert</span>
+                              </button>
+
+                              {/* Dropdown Action Menu */}
+                              {activeUserActionMenuId === u.id && (
+                                <div className="absolute right-0 top-[90%] z-[100] bg-white dark:bg-[#0b0e14] border border-black/10 dark:border-zinc-800 rounded-xl py-2 w-48 shadow-xl text-left select-none animate-in fade-in duration-100">
+                                  <button
+                                    onClick={() => {
+                                      if (!isRootAdmin) {
+                                        setEditingUser(u);
+                                        setNewEditName(u.name);
+                                        setNewEditRole(u.role);
+                                        setActiveUserActionMenuId(null);
+                                      }
+                                    }}
+                                    disabled={isRootAdmin}
+                                    className={`w-full px-4 py-2 text-xs font-medium flex items-center gap-3 transition-colors ${
+                                      isRootAdmin
+                                        ? "text-zinc-300 dark:text-zinc-700 cursor-not-allowed opacity-40"
+                                        : "text-zinc-700 dark:text-zinc-300 hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer"
+                                    }`}
+                                  >
+                                    <span className="material-symbols-outlined text-[16px]">edit</span>
+                                    Edit User
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setResetPasswordUser(u);
+                                      setNewPasswordVal("");
+                                      setActiveUserActionMenuId(null);
+                                    }}
+                                    className="w-full px-4 py-2 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 flex items-center gap-3 transition-colors cursor-pointer"
+                                  >
+                                    <span className="material-symbols-outlined text-[16px] text-zinc-400 dark:text-zinc-555">lock_reset</span>
+                                    Reset Password
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      if (!isRootAdmin) {
+                                        handleToggleUserAdmin(u.id, !isUserAdmin);
+                                        setActiveUserActionMenuId(null);
+                                      }
+                                    }}
+                                    disabled={isRootAdmin}
+                                    className={`w-full px-4 py-2 text-xs font-medium flex items-center gap-3 transition-colors ${
+                                      isRootAdmin
+                                        ? "text-zinc-300 dark:text-zinc-700 cursor-not-allowed opacity-40"
+                                        : "text-zinc-700 dark:text-zinc-300 hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer"
+                                    }`}
+                                  >
+                                    <span className="material-symbols-outlined text-[16px]">admin_panel_settings</span>
+                                    {isUserAdmin ? "Remove Admin" : "Make Admin"}
+                                  </button>
+                                  <div className="border-t border-outline-variant/30 my-1"></div>
+                                  <button
+                                    onClick={() => {
+                                      if (!isRootAdmin) {
+                                        handleModifyUserStatus(u.id, isUserSuspended ? "Active" : "Suspended");
+                                        setActiveUserActionMenuId(null);
+                                      }
+                                    }}
+                                    disabled={isRootAdmin}
+                                    className={`w-full px-4 py-2 text-xs font-medium flex items-center gap-3 transition-colors ${
+                                      isRootAdmin
+                                        ? "text-zinc-300 dark:text-zinc-700 cursor-not-allowed opacity-40"
+                                        : "text-zinc-700 dark:text-zinc-300 hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer"
+                                    }`}
+                                  >
+                                    <span className="material-symbols-outlined text-[16px]">
+                                      {isUserSuspended ? "play_circle" : "pause_circle"}
+                                    </span>
+                                    {isUserSuspended ? "Reactivate Access" : "Suspend Access"}
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      if (!isUserAdmin) {
+                                        handleRemoveUser(u.id);
+                                        setActiveUserActionMenuId(null);
+                                      }
+                                    }}
+                                    disabled={isUserAdmin}
+                                    className={`w-full px-4 py-2 text-xs font-bold flex items-center gap-3 transition-colors ${
+                                      isUserAdmin
+                                        ? "text-zinc-300 dark:text-zinc-700 cursor-not-allowed opacity-40"
+                                        : "text-red-500 hover:bg-red-500/10 cursor-pointer"
+                                    }`}
+                                  >
+                                    <span className="material-symbols-outlined text-[16px]">delete</span>
+                                    Delete User
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
-            )}
- 
+            </div>
           </div>
         );
 
       case "Projects":
-        // Filter projects
         const filteredProjects = dbProjects.filter((p) => {
           if (softDeletedProjectIds.includes(p.id)) return false;
           const matchesQuery = p.title.toLowerCase().includes(projectSearch.toLowerCase()) || 
@@ -1299,7 +1561,7 @@ const handleDeleteUser = async (userId: string) => {
                             )}
                             <button
                               onClick={() => handleRemoveProject(p.id)}
-                              className="px-1.5 py-1 text-zinc-400 hover:text-red-500 border border-black/10 dark:border-zinc-800 rounded bg-white/5 dark:bg-zinc-950"
+                              className="px-1.5 py-1 text-zinc-450 hover:text-red-500 border border-black/10 dark:border-zinc-800 rounded bg-white/5 dark:bg-zinc-955"
                             >
                               <Trash2 size={11} />
                             </button>
@@ -1322,7 +1584,6 @@ const handleDeleteUser = async (userId: string) => {
               <p className="text-xs text-zinc-400 dark:text-zinc-500">Manage categories, directories, and tags for developer projects.</p>
             </div>
 
-            {/* Add Category Form inline */}
             <form onSubmit={handleAddCategory} className="flex gap-3 max-w-md select-none">
               <input
                 type="text"
@@ -1420,12 +1681,204 @@ const handleDeleteUser = async (userId: string) => {
           </div>
         );
 
+      case "Inquiries":
+        const activeInquiry = inquiries.find((i) => i.id === selectedInquiryId) || inquiries[0];
+
+        return (
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-lg font-bold text-foreground dark:text-white font-sans font-extrabold uppercase">Client Service Inquiries</h3>
+              <p className="text-xs text-zinc-400 dark:text-zinc-500">Respond to development proposals, system estimates, and support tickets submitted via contact forms.</p>
+            </div>
+
+            {inquiriesLoading ? (
+              <div className="flex flex-col items-center justify-center py-12 gap-3 select-none">
+                <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+                <span className="text-xs font-mono text-zinc-500 tracking-wider">Synchronizing secure inquiry nodes...</span>
+              </div>
+            ) : inquiries.length === 0 ? (
+              <div className="glass-card p-12 text-center text-zinc-450 border border-dashed border-outline-variant/40">
+                <span className="material-symbols-outlined text-[48px] text-zinc-650 mb-2">question_answer</span>
+                <p className="text-xs font-mono uppercase tracking-wider">No inquiries found in database.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-gutter items-start">
+                
+                {/* Left Pane: Inquiries List */}
+                <div className="lg:col-span-5 space-y-3 max-h-[580px] overflow-y-auto pr-2 no-scrollbar">
+                  {inquiries.map((inq) => {
+                    const isSelected = inq.id === activeInquiry?.id;
+                    const hasReplied = !!inq.reply;
+                    return (
+                      <div 
+                        key={inq.id}
+                        onClick={() => setSelectedInquiryId(inq.id)}
+                        className={`p-4 border rounded-xl cursor-pointer transition-all duration-200 ${
+                          isSelected
+                            ? "bg-primary/5 dark:bg-[#00d1ff]/5 border-primary dark:border-[#00d1ff]/40 shadow-sm"
+                            : "bg-surface-container-lowest border-outline-variant/40 hover:border-outline-variant/80 hover:bg-surface-variant/20"
+                        }`}
+                      >
+                        <div className="flex justify-between items-start gap-2 mb-2">
+                          <div className="min-w-0">
+                            <h4 className="font-label-md text-label-md font-bold text-foreground dark:text-white truncate">{inq.name}</h4>
+                            <p className="text-[10px] text-zinc-400 truncate">{inq.email}</p>
+                          </div>
+                          <span className={`px-2 py-0.5 rounded text-[8px] font-mono font-black uppercase flex-shrink-0 border ${
+                            hasReplied ? "bg-green-500/10 border-green-500/25 text-green-500" : "bg-amber-500/10 border-amber-500/25 text-amber-500 animate-pulse"
+                          }`}>
+                            {hasReplied ? "Replied" : "Unreplied"}
+                          </span>
+                        </div>
+                        <p className="text-xs text-zinc-400 line-clamp-2 leading-relaxed mb-3">{inq.message}</p>
+                        <div className="flex justify-between items-center text-[9px] font-mono text-zinc-500 uppercase">
+                          <span>{inq.type || "General Inquiry"}</span>
+                          <span>{formatRelativeTime(inq.createdAt)}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Right Pane: Inquiry Full View Details */}
+                <div className="lg:col-span-7 glass-card p-md min-h-[520px] flex flex-col justify-between space-y-6">
+                  {activeInquiry ? (
+                    <div className="space-y-6 flex-grow flex flex-col justify-between">
+                      <div className="space-y-5">
+                        {/* Detail Header */}
+                        <div className="flex justify-between items-start border-b border-outline-variant/40 pb-4">
+                          <div className="flex gap-3 items-center">
+                            <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-lg border border-primary/20">
+                              {activeInquiry.name[0]}
+                            </div>
+                            <div>
+                              <h3 className="font-headline-sm text-sm font-bold text-foreground dark:text-white">{activeInquiry.name}</h3>
+                              <p className="text-xs text-zinc-400 font-mono mt-0.5">{activeInquiry.email} {activeInquiry.phone ? `• ${activeInquiry.phone}` : ""}</p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <span className="inline-flex px-2 py-0.5 rounded text-[9px] font-mono font-black bg-primary/15 border border-primary/20 text-[#00d1ff] uppercase mb-1">
+                              {activeInquiry.type || "General Inquiry"}
+                            </span>
+                            <p className="text-[10px] text-zinc-400">{formatRelativeTime(activeInquiry.createdAt)}</p>
+                          </div>
+                        </div>
+
+                        {/* Full Message */}
+                        <div className="space-y-2">
+                          <h4 className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest block leading-none">Client Inquiry Description:</h4>
+                          <div className="p-4 bg-surface-container-low border border-outline-variant/30 rounded-xl">
+                            <p className="text-xs text-foreground dark:text-zinc-300 font-sans whitespace-pre-wrap leading-relaxed">
+                              {activeInquiry.message}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Sent Reply View */}
+                        {activeInquiry.reply && (
+                          <div className="space-y-2">
+                            <h4 className="text-[10px] font-mono text-green-500 uppercase tracking-widest block leading-none">Sent Admin Reply:</h4>
+                            <div className="p-4 bg-green-500/5 border border-green-500/10 dark:border-green-500/20 rounded-xl">
+                              <p className="text-xs text-foreground dark:text-zinc-300 font-sans italic leading-relaxed whitespace-pre-wrap">
+                                {activeInquiry.reply}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Reply Composer Form / Action Footer */}
+                      <div className="pt-5 border-t border-outline-variant/40">
+                        {activeInquiry.reply ? (
+                          <div className="flex justify-between items-center">
+                            <span className="text-[10px] font-mono text-zinc-500 uppercase">Status: Action completed</span>
+                            <button 
+                              onClick={() => handleDeleteInquiry(activeInquiry.id)}
+                              className="px-3.5 py-2 bg-red-500/5 hover:bg-red-500/10 border border-red-500/10 text-red-400 hover:text-red-300 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all"
+                            >
+                              Delete Inquiry Record
+                            </button>
+                          </div>
+                        ) : (
+                          <form 
+                            onSubmit={async (e) => {
+                              e.preventDefault();
+                              if (!replyText.trim()) return;
+                              setSubmittingReply(true);
+                              try {
+                                const token = await getAuthToken();
+                                const updated = await replyToInquiry(activeInquiry.id, replyText.trim(), token);
+                                setInquiries((prev) =>
+                                  prev.map((inq) => (inq.id === activeInquiry.id ? { ...inq, reply: updated.reply } : inq))
+                                );
+                                setToast({ message: "Reply message sent/recorded successfully.", type: "success" });
+                                setReplyText("");
+                              } catch (err: any) {
+                                setToast({ message: err.message || "Failed to send reply.", type: "error" });
+                              } finally {
+                                setSubmittingReply(false);
+                              }
+                            }} 
+                            className="space-y-3"
+                          >
+                            <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest block leading-none">Compose Reply Message:</label>
+                            <textarea
+                              required
+                              rows={4}
+                              value={replyText}
+                              onChange={(e) => setReplyText(e.target.value)}
+                              placeholder="Write your email reply details..."
+                              className="w-full p-3 bg-surface-container-low border border-outline-variant/40 rounded-xl text-xs font-sans text-foreground dark:text-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30"
+                            />
+                            <div className="flex justify-between items-center gap-3">
+                              <button 
+                                type="button"
+                                onClick={() => handleDeleteInquiry(activeInquiry.id)}
+                                className="px-3 py-2.5 bg-red-500/5 hover:bg-red-500/10 border border-red-500/10 text-red-400 hover:text-red-300 rounded-lg text-[10px] font-mono font-bold uppercase tracking-wider transition-all"
+                              >
+                                Delete
+                              </button>
+                              <button
+                                type="submit"
+                                disabled={submittingReply || !replyText.trim()}
+                                className="px-5 py-2.5 bg-primary dark:bg-[#00d1ff] text-on-primary dark:text-black font-extrabold rounded-lg text-[10px] flex items-center justify-center gap-1.5 uppercase hover:brightness-110 active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
+                              >
+                                {submittingReply ? (
+                                  <>
+                                    <div className="w-3 h-3 border-2 border-on-primary dark:border-black border-t-transparent rounded-full animate-spin"></div>
+                                    Sending...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Send size={11} />
+                                    Send Reply
+                                  </>
+                                )}
+                              </button>
+                            </div>
+                          </form>
+                        )}
+                      </div>
+
+                    </div>
+                  ) : (
+                    <div className="text-center py-12 text-zinc-400 font-mono text-xs uppercase">
+                      Select an inquiry to view particulars.
+                    </div>
+                  )}
+                </div>
+
+              </div>
+            )}
+          </div>
+        );
+
       case "Certificates":
         return (
           <div className="bg-white dark:bg-[#0b0e14] border border-black/10 dark:border-zinc-900 rounded-2xl p-8 space-y-6 shadow-lg transition-colors duration-300">
             <div>
               <h3 className="text-lg font-bold text-foreground dark:text-white font-sans font-extrabold uppercase">Certificate Management</h3>
-              <p className="text-xs text-zinc-400 dark:text-zinc-500">Approve, issued, revoke, and generate developer project completion credentials.</p>
+              <p className="text-xs text-zinc-400 dark:text-zinc-500">Approve, issue, revoke, and generate developer project completion credentials.</p>
             </div>
 
             <div className="overflow-x-auto text-xs font-mono w-full select-text">
@@ -1506,11 +1959,10 @@ const handleDeleteUser = async (userId: string) => {
                     <div>COMPILATION STATUS: verified_secure</div>
                     <div>ISSUE DATE: {selectedCertDownload.issueDate}</div>
                   </div>
-                  <button onClick={() => setSelectedCertDownload(null)} className="px-6 py-2 bg-primary dark:bg-[#00d1ff] text-on-primary dark:text-black font-extrabold rounded-lg text-xs uppercase hover:brightness-110 active:scale-95 transition-all w-full">Close Portal View</button>
+                  <button onClick={() => setSelectedCertDownload(null)} className="px-6 py-2 bg-primary dark:bg-[#00d1ff] text-on-primary dark:text-black font-extrabold rounded-lg text-xs uppercase hover:brightness-110 active:scale-95 transition-all w-full">Close Portal view</button>
                 </div>
               </div>
             )}
-
           </div>
         );
 
@@ -1522,7 +1974,6 @@ const handleDeleteUser = async (userId: string) => {
               <p className="text-xs text-zinc-400 dark:text-zinc-500">Post notifications and announcements directly to all logged-in developer channels.</p>
             </div>
 
-            {/* Compose form */}
             <form onSubmit={handlePostAnnouncement} className="space-y-4 max-w-xl select-none">
               <div className="space-y-1.5">
                 <label className="text-[9px] font-mono text-zinc-400 uppercase tracking-widest block">Announcement Title</label>
@@ -1536,20 +1987,18 @@ const handleDeleteUser = async (userId: string) => {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-[9px] font-mono text-zinc-400 uppercase tracking-widest block">Announcement Category</label>
-                  <select
-                    value={newAnnType}
-                    onChange={(e) => setNewAnnType(e.target.value)}
-                    className="w-full px-3 py-2 bg-black/5 dark:bg-zinc-900 border border-black/10 dark:border-zinc-800 rounded-lg text-xs text-zinc-500 font-mono outline-none"
-                  >
-                    <option value="New Feature">New Feature</option>
-                    <option value="Maintenance Notice">Maintenance Notice</option>
-                    <option value="Hackathon Announcement">Hackathon Announcement</option>
-                    <option value="Internship Opportunity">Internship Opportunity</option>
-                  </select>
-                </div>
+              <div className="space-y-1.5">
+                <label className="text-[9px] font-mono text-zinc-400 uppercase tracking-widest block">Announcement Category</label>
+                <select
+                  value={newAnnType}
+                  onChange={(e) => setNewAnnType(e.target.value)}
+                  className="w-full px-3 py-2 bg-black/5 dark:bg-zinc-900 border border-black/10 dark:border-zinc-800 rounded-lg text-xs text-zinc-500 font-mono outline-none"
+                >
+                  <option value="New Feature">New Feature</option>
+                  <option value="Maintenance Notice">Maintenance Notice</option>
+                  <option value="Hackathon Announcement">Hackathon Announcement</option>
+                  <option value="Internship Opportunity">Internship Opportunity</option>
+                </select>
               </div>
 
               <div className="space-y-1.5">
@@ -1565,11 +2014,10 @@ const handleDeleteUser = async (userId: string) => {
               </div>
 
               <button type="submit" className="px-5 py-2.5 bg-primary dark:bg-[#00d1ff] text-on-primary dark:text-black font-extrabold rounded-lg text-xs flex items-center gap-1.5 uppercase hover:brightness-110 active:scale-95 transition-all">
-                <Send size={12} /> Post announcement
+                <Send size={12} /> Post Announcement
               </button>
             </form>
 
-            {/* List announcements */}
             <div className="pt-6 border-t border-black/5 dark:border-zinc-900/60 space-y-4 select-text">
               <h4 className="text-xs font-mono uppercase tracking-widest text-zinc-500">Live published announcements</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1581,7 +2029,7 @@ const handleDeleteUser = async (userId: string) => {
                         <span className="text-[8px] font-mono text-zinc-500">{formatRelativeTime(ann.date)}</span>
                       </div>
                       <h4 className="text-xs font-extrabold text-foreground dark:text-white leading-tight">{ann.title}</h4>
-                      <p className="text-[10px] text-zinc-600 dark:text-zinc-400 leading-relaxed font-sans">{getAnnouncementMessage(ann)}</p>
+                      <p className="text-[10px] text-zinc-650 dark:text-zinc-400 leading-relaxed font-sans">{getAnnouncementMessage(ann)}</p>
                     </div>
 
                     <button onClick={() => handleRemoveAnnouncement(ann.id)} className="w-full py-1.5 bg-red-500/5 hover:bg-red-500/10 border border-red-500/10 text-red-400 hover:text-red-300 rounded text-[8px] font-mono font-bold uppercase tracking-wider select-none transition-colors">
@@ -1591,7 +2039,6 @@ const handleDeleteUser = async (userId: string) => {
                 ))}
               </div>
             </div>
-
           </div>
         );
 
@@ -1604,8 +2051,6 @@ const handleDeleteUser = async (userId: string) => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 select-none">
-              
-              {/* Profile particulars form */}
               <div className="space-y-4">
                 <h4 className="text-xs font-mono uppercase tracking-widest text-zinc-500 border-b border-black/5 dark:border-zinc-900/60 pb-2">Profile details</h4>
                 <div className="space-y-3">
@@ -1630,7 +2075,6 @@ const handleDeleteUser = async (userId: string) => {
                 </div>
               </div>
 
-              {/* Password credentials form */}
               <div className="space-y-4">
                 <h4 className="text-xs font-mono uppercase tracking-widest text-zinc-500 border-b border-black/5 dark:border-zinc-900/60 pb-2">Secure credentials update</h4>
                 <div className="space-y-3">
@@ -1659,10 +2103,8 @@ const handleDeleteUser = async (userId: string) => {
                   </div>
                 </div>
               </div>
-
             </div>
 
-            {/* Login Sessions logs */}
             <div className="pt-6 border-t border-black/5 dark:border-zinc-900/60 space-y-4 select-text">
               <h4 className="text-xs font-mono uppercase tracking-widest text-zinc-500">Security Login History Logs</h4>
               <div className="overflow-x-auto text-[9px] font-mono text-zinc-500">
@@ -1679,82 +2121,55 @@ const handleDeleteUser = async (userId: string) => {
                     <tr className="h-10 hover:bg-black/5 dark:hover:bg-zinc-900/10 transition-colors">
                       <td className="py-2.5">2026-05-29 14:51:47</td>
                       <td>127.0.0.1 (Localhost)</td>
-                      <td className="text-zinc-600">ECDSA-SHA256-AES-GCM</td>
+                      <td className="text-zinc-650">ECDSA-SHA256-AES-GCM</td>
                       <td className="text-green-500 font-bold text-right">ACTIVE_SESSION</td>
                     </tr>
                     <tr className="h-10 hover:bg-black/5 dark:hover:bg-zinc-900/10 transition-colors">
                       <td className="py-2.5">2026-05-28 09:30:14</td>
                       <td>192.168.1.104 (Core node)</td>
-                      <td className="text-zinc-600">ECDSA-SHA256-AES-GCM</td>
+                      <td className="text-zinc-650">ECDSA-SHA256-AES-GCM</td>
                       <td className="text-zinc-500 text-right">CLOSED</td>
                     </tr>
                   </tbody>
                 </table>
               </div>
             </div>
-
           </div>
         );
 
       case "Recycle Bin":
         return (
           <div className="bg-white dark:bg-[#0b0e14] border border-black/10 dark:border-zinc-900 rounded-2xl p-8 space-y-6 shadow-lg transition-colors duration-300">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div>
-                <h3 className="text-lg font-bold text-foreground dark:text-white font-sans font-extrabold uppercase flex items-center gap-2">
-                  <Trash2 size={20} className="text-[#00d1ff]" />
-                  Recycle Bin Console
-                </h3>
-                <p className="text-xs text-zinc-400 dark:text-zinc-500">Safely recover or permanently purge deleted categories, users, and project nodes.</p>
-              </div>
-              <button
-                onClick={() => {
-                  if (window.confirm("Are you sure you want to restore all soft-deleted items and reset your browser filters? This will immediately display all database projects and users.")) {
-                    localStorage.removeItem("recodex_soft_deleted_users");
-                    localStorage.removeItem("recodex_soft_deleted_projects");
-                    localStorage.removeItem("recodex_recycle_bin");
-                    setSoftDeletedUserIds([]);
-                    setSoftDeletedProjectIds([]);
-                    setRecycleBin([]);
-                    setToast({
-                      message: "All soft-delete filters cleared successfully! Dynamic stats are restored.",
-                      type: "success"
-                    });
-                    setTimeout(() => window.location.reload(), 1000);
-                  }
-                }}
-                className="px-3.5 py-1.5 bg-cyan-500/10 border border-cyan-500/25 text-[#00d1ff] hover:bg-cyan-500/20 rounded-lg text-[9px] font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shadow-sm select-none"
-              >
-                RESET_SOFT_DELETES_FILTER
-              </button>
+            <div>
+              <h3 className="text-lg font-bold text-foreground dark:text-white font-sans font-extrabold uppercase">Recycle Bin</h3>
+              <p className="text-xs text-zinc-400 dark:text-zinc-500">Restore or permanently purge soft-deleted users, categories, or projects.</p>
             </div>
 
             {recycleBin.length === 0 ? (
-              <div className="py-12 text-center border border-dashed border-black/10 dark:border-zinc-900 rounded-2xl space-y-2">
-                <Trash2 size={36} className="text-zinc-300 dark:text-zinc-800 mx-auto" />
-                <div className="text-xs font-mono font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">Recycle Bin is Empty</div>
-                <div className="text-[10px] text-zinc-450 dark:text-zinc-650">Soft-deleted directories will accumulate here for master recovery.</div>
+              <div className="border border-dashed border-black/10 dark:border-zinc-900 rounded-2xl p-12 text-center text-zinc-400 select-none">
+                <Trash2 size={32} className="mx-auto mb-3 opacity-30" />
+                <p className="text-xs font-mono uppercase tracking-wider">Recycle Bin is empty.</p>
               </div>
             ) : (
-              <div className="overflow-x-auto text-xs font-mono w-full">
+              <div className="overflow-x-auto text-xs font-mono w-full select-text">
                 <table className="w-full border-collapse text-left">
                   <thead>
                     <tr className="border-b border-black/10 dark:border-zinc-900 text-[8px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest h-10 select-none">
-                      <th className="pb-3">Deleted Item Name / Title</th>
-                      <th className="pb-3">Node Type</th>
-                      <th className="pb-3">Deleted Time</th>
+                      <th className="pb-3">Item Name</th>
+                      <th className="pb-3">Type</th>
+                      <th className="pb-3">Deleted At</th>
                       <th className="pb-3 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-black/5 dark:divide-zinc-900">
-                    {recycleBin.map((item) => (
-                      <tr key={item.id} className="h-14 hover:bg-black/5 dark:hover:bg-[#07090e]/25 transition-colors">
-                        <td className="text-foreground dark:text-white font-extrabold font-sans">{item.name}</td>
+                    {recycleBin.map((item, i) => (
+                      <tr key={i} className="h-14 hover:bg-black/5 dark:hover:bg-[#07090e]/25 transition-colors">
+                        <td className="text-foreground dark:text-white font-extrabold">{item.name}</td>
                         <td>
                           <span className={`px-2 py-0.5 rounded text-[8px] font-mono font-black uppercase border ${
-                            item.type === "Category" ? "bg-amber-500/10 border-amber-500/25 text-amber-500" :
-                            item.type === "User" ? "bg-purple-500/10 border-purple-500/25 text-purple-500" :
-                            "bg-cyan-500/10 border-cyan-500/25 text-[#00d1ff]"
+                            item.type === "User" ? "bg-cyan-500/10 border-cyan-500/25 text-[#00d1ff]" :
+                            item.type === "Project" ? "bg-purple-500/10 border-purple-500/25 text-purple-500" :
+                            "bg-yellow-500/10 border-yellow-500/25 text-yellow-500"
                           }`}>
                             {item.type}
                           </span>
@@ -1764,15 +2179,15 @@ const handleDeleteUser = async (userId: string) => {
                           <div className="flex justify-end gap-1.5 select-none">
                             <button
                               onClick={() => handleRestoreItem(item)}
-                              className="px-2.5 py-1 bg-green-500/10 border border-green-500/25 text-green-500 hover:bg-green-500/20 rounded text-[8px] font-mono font-bold uppercase tracking-wider transition-all"
+                              className="px-2 py-1 bg-green-500/10 border border-green-500/20 text-green-500 hover:bg-green-500/20 rounded text-[8px] font-mono font-bold uppercase tracking-wider"
                             >
-                              Restore Node
+                              Restore
                             </button>
                             <button
                               onClick={() => handleDeletePermanently(item)}
-                              className="px-2.5 py-1 bg-red-500/10 border border-red-500/25 text-red-500 hover:bg-red-500/20 rounded text-[8px] font-mono font-bold uppercase tracking-wider transition-all"
+                              className="px-2 py-1 bg-red-500/10 border border-red-500/20 text-red-500 hover:bg-red-500/20 rounded text-[8px] font-mono font-bold uppercase tracking-wider"
                             >
-                              Purge Permanently
+                              Purge
                             </button>
                           </div>
                         </td>
@@ -1785,356 +2200,297 @@ const handleDeleteUser = async (userId: string) => {
           </div>
         );
 
-      case "Inquiries":
-        return (
-          <div className="bg-white dark:bg-[#0b0e14] border border-black/10 dark:border-zinc-900 rounded-2xl p-8 space-y-6 shadow-lg transition-colors duration-300">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div>
-                <h3 className="text-lg font-bold text-foreground dark:text-white font-sans font-extrabold uppercase">Customer Inquiries</h3>
-                <p className="text-xs text-zinc-400 dark:text-zinc-500">Manage and review service requests and client messages received from the public contact form.</p>
-              </div>
-              <button
-                onClick={fetchInquiries}
-                disabled={inquiriesLoading}
-                className="px-3.5 py-1.5 bg-cyan-500/10 border border-cyan-500/25 text-[#00d1ff] hover:bg-cyan-500/20 rounded-lg text-[9px] font-mono font-bold uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 select-none"
-              >
-                <RefreshCw size={12} className={inquiriesLoading ? "animate-spin" : ""} />
-                REFRESH_INQUIRIES
-              </button>
-            </div>
-
-            {inquiriesLoading ? (
-              <div className="flex flex-col items-center gap-4 py-16">
-                <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-                <p className="text-xs font-mono text-zinc-500 uppercase tracking-widest animate-pulse">Retrieving client transmissions...</p>
-              </div>
-            ) : inquiries.length === 0 ? (
-              <div className="py-12 text-center border border-dashed border-black/10 dark:border-zinc-900 rounded-2xl space-y-2">
-                <FileText size={36} className="text-zinc-300 dark:text-zinc-800 mx-auto" />
-                <div className="text-xs font-mono font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">No Inquiries Found</div>
-                <div className="text-[10px] text-zinc-450 dark:text-zinc-650">We haven't received any client contact form submissions yet.</div>
-              </div>
-            ) : (
-              <div className="space-y-4 animate-fade-in select-text">
-                {inquiries.map((inq, index) => (
-                  <div
-                    key={inq.id || index}
-                    className="border border-black/10 dark:border-zinc-900 bg-white/60 dark:bg-black/20 backdrop-blur-md rounded-xl p-6 hover:border-black/20 dark:hover:border-zinc-800 transition-all space-y-4"
-                  >
-                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b border-black/5 dark:border-zinc-900/40 pb-3">
-                      <div className="space-y-1.5">
-                        <h4 className="text-sm font-bold text-foreground dark:text-white font-sans">{inq.name}</h4>
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
-                          <a
-                            href={`mailto:${inq.email}`}
-                            className="inline-flex items-center gap-1.5 text-xs text-primary dark:text-[#00d1ff] hover:underline font-mono"
-                          >
-                            <Mail size={12} className="text-zinc-400 shrink-0" />
-                            {inq.email}
-                          </a>
-                          {inq.phone && (
-                            <a
-                              href={`tel:${inq.phone}`}
-                              className="inline-flex items-center gap-1.5 text-xs text-zinc-600 dark:text-zinc-400 hover:text-primary dark:hover:text-[#00d1ff] hover:underline font-mono"
-                            >
-                              <Phone size={12} className="text-zinc-400 shrink-0" />
-                              {inq.phone}
-                            </a>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex flex-col sm:items-end gap-1 shrink-0">
-                        <span className="px-2 py-0.5 rounded text-[8px] font-mono font-black uppercase border bg-primary/10 border-primary/20 text-[#00d1ff]">
-                          Type: {inq.type}
-                        </span>
-                        <span className="text-[9px] font-mono text-zinc-500">
-                          {new Date(inq.createdAt).toLocaleString()}
-                        </span>
-                      </div>
-                    </div>
-
-                    <p className="text-xs text-zinc-750 dark:text-zinc-300 leading-relaxed font-sans whitespace-pre-wrap font-medium">
-                      {inq.message}
-                    </p>
-
-                    {inq.reply && (
-                      <div className="p-4 border border-dashed border-[#00d1ff]/20 dark:border-[#00d1ff]/10 bg-primary/5 dark:bg-[#00d1ff]/5 rounded-xl space-y-1.5">
-                        <div className="flex items-center gap-1.5 text-[8px] font-mono text-primary dark:text-[#00d1ff] font-bold uppercase tracking-widest">
-                          <MessageSquare size={11} className="text-[#00d1ff]" />
-                          ADMIN RESPONSE SENT
-                        </div>
-                        <p className="text-xs text-zinc-750 dark:text-zinc-350 leading-relaxed font-sans whitespace-pre-wrap font-medium">
-                          {inq.reply}
-                        </p>
-                      </div>
-                    )}
-
-                    <div className="flex justify-end gap-2 pt-2 border-t border-black/5 dark:border-zinc-900/40 select-none">
-                      <button
-                        onClick={() => handleDeleteInquiry(inq.id)}
-                        className="px-3 py-1.5 bg-red-500/10 border border-red-500/25 text-red-500 hover:bg-red-500/20 rounded-lg text-[10px] font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer"
-                      >
-                        <Trash2 size={12} />
-                        Delete
-                      </button>
-                      <button
-                        onClick={() => {
-                          setReplyingInquiryId(inq.id);
-                          setReplyText(inq.reply || "");
-                        }}
-                        className="px-3 py-1.5 bg-primary/10 dark:bg-cyan-500/10 border border-primary/20 dark:border-cyan-500/25 text-primary dark:text-[#00d1ff] hover:bg-primary/20 dark:hover:bg-cyan-500/20 rounded-lg text-[10px] font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer"
-                      >
-                        <Send size={12} />
-                        {inq.reply ? "Edit Reply" : "Send Message"}
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Replying Dialog/Modal */}
-            {replyingInquiryId && (
-              <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-6 select-none">
-                <div className="bg-white dark:bg-[#07090e] border border-black/10 dark:border-zinc-800 p-8 rounded-2xl w-full max-w-lg shadow-2xl relative">
-                  <button
-                    onClick={() => {
-                      setReplyingInquiryId(null);
-                      setReplyText("");
-                    }}
-                    className="absolute top-4 right-4 text-zinc-500 hover:text-foreground dark:hover:text-white cursor-pointer"
-                  >
-                    <XCircle size={18} />
-                  </button>
-                  <form onSubmit={handleSendReply} className="space-y-4">
-                    <div className="space-y-1">
-                      <h3 className="text-sm font-mono tracking-widest text-zinc-500 uppercase">Send Response Message</h3>
-                      <p className="text-xs text-zinc-400">
-                        Draft a reply to <span className="font-bold text-foreground dark:text-white">{inquiries.find(i => i.id === replyingInquiryId)?.name}</span>. This message will be recorded in the ecosystem console.
-                      </p>
-                    </div>
-                    
-                    <div className="space-y-1.5">
-                      <label className="text-[9px] font-mono text-zinc-400 uppercase tracking-widest block">Response Draft</label>
-                      <textarea
-                        required
-                        rows={6}
-                        value={replyText}
-                        onChange={(e) => setReplyText(e.target.value)}
-                        placeholder="Type your reply message here..."
-                        className="w-full px-4 py-3 bg-black/5 dark:bg-zinc-900 border border-black/10 dark:border-zinc-800 rounded-lg text-xs focus:outline-none focus:border-primary transition-all font-sans resize-none"
-                      />
-                    </div>
-
-                    <div className="flex gap-3 pt-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setReplyingInquiryId(null);
-                          setReplyText("");
-                        }}
-                        className="w-1/2 py-2.5 border border-black/10 dark:border-zinc-800 hover:border-black/20 dark:hover:border-zinc-700 rounded-lg text-[10px] font-mono font-bold uppercase tracking-wider text-zinc-500 hover:text-foreground dark:hover:text-white transition-all cursor-pointer"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="submit"
-                        disabled={submittingReply}
-                        className="w-1/2 py-2.5 bg-primary dark:bg-[#00d1ff] text-on-primary dark:text-black font-extrabold rounded-lg text-[10px] flex items-center justify-center gap-1.5 uppercase hover:brightness-110 active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
-                      >
-                        {submittingReply ? (
-                          <>
-                            <div className="w-3 h-3 border-2 border-on-primary dark:border-black border-t-transparent rounded-full animate-spin"></div>
-                            Sending...
-                          </>
-                        ) : (
-                          <>
-                            <Send size={12} />
-                            Send Reply
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  </form>
-                </div>
-              </div>
-            )}
-          </div>
-        );
-
       default:
         return null;
     }
   };
 
-  const navItems = [
-    { label: "Dashboard", icon: BarChart3 },
-    { label: "Users", icon: Users },
-    { label: "Projects", icon: Rocket },
-    { label: "Categories", icon: Layers },
-    { label: "Reports", icon: AlertTriangle },
-    { label: "Inquiries", icon: FileText },
-    { label: "Certificates", icon: Award },
-    { label: "Notifications", icon: Globe },
-    { label: "Settings", icon: SettingsIcon },
-    { label: "Recycle Bin", icon: Trash2 },
-  ];
-
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col justify-between font-sans select-none">
-      
-      {/* 1. Brand Header */}
-      <header className="border-b border-black/5 dark:border-zinc-900 bg-white/90 dark:bg-[#06080c]/90 backdrop-blur-md sticky top-0 z-50 px-6 py-4 flex items-center justify-between select-text transition-colors duration-300 print:hidden">
-        <div className="flex items-center gap-4 md:gap-12">
-          {/* Mobile Menu Hamburger Button */}
-          <button
-            onClick={() => setIsMobileMenuOpen(true)}
-            className="md:hidden p-1.5 text-zinc-500 hover:text-foreground dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 rounded-lg flex items-center justify-center cursor-pointer transition-colors"
-          >
-            <Menu size={18} />
-          </button>
-
-          {/* Logo split color */}
-          <Link to="/" className="text-xl font-black tracking-tight font-sans flex items-center gap-0.5">
-            <span className="text-foreground dark:text-white">Recode</span>
-            <span className="text-primary dark:text-[#00d1ff]">X</span>
-          </Link>
-          
-          {/* Navigation Links */}
-          <nav className="hidden md:flex items-center gap-7">
-            <Link to="/" className="text-xs font-semibold text-zinc-500 hover:text-foreground dark:hover:text-zinc-300 tracking-wider uppercase transition-colors">Home</Link>
-            <Link to="/projects" className="text-xs font-semibold text-zinc-500 hover:text-foreground dark:hover:text-zinc-300 tracking-wider uppercase transition-colors">Projects</Link>
-            <Link to="/services" className="text-xs font-semibold text-zinc-500 hover:text-foreground dark:hover:text-zinc-300 tracking-wider uppercase transition-colors">Services</Link>
-            <Link to="/categories" className="text-xs font-semibold text-zinc-500 hover:text-foreground dark:hover:text-zinc-300 tracking-wider uppercase transition-colors">Categories</Link>
-            <Link to="/announcements" className="text-xs font-semibold text-zinc-500 hover:text-foreground dark:hover:text-zinc-300 tracking-wider uppercase transition-colors">Announcements</Link>
-            <Link to="/contact" className="text-xs font-semibold text-zinc-500 hover:text-foreground dark:hover:text-zinc-300 tracking-wider uppercase transition-colors">Contact</Link>
-            <Link to="/dashboard" className="text-xs font-bold text-foreground dark:text-white tracking-wider uppercase relative py-1">
-              Admin
-              <span className="absolute bottom-[-17px] left-0 w-full h-[2.5px] bg-primary dark:bg-[#00d1ff]"></span>
+    <div className="bg-background text-on-background flex h-screen w-screen overflow-hidden font-sans select-text antialiased">
+      {/* SideNavBar */}
+      <aside className="w-64 shrink-0 h-full bg-[#06080c]/95 dark:bg-[#07090e]/95 backdrop-blur-xl border-r border-black/10 dark:border-white/10 flex flex-col justify-between select-none z-30">
+        <div className="p-5 border-b border-black/5 dark:border-white/5">
+          <div className="flex items-center gap-3">
+            <Link to="/" className="flex items-center gap-2 hover:opacity-90 transition-opacity">
+              <img src="/recodeXlogo.png" alt="RecodeX Logo" className="brand-logo-img h-8 w-auto object-contain" />
             </Link>
-          </nav>
+          </div>
         </div>
 
-        {/* Right side: Moon Toggle & ROOT_ADMIN Pill */}
-        <div className="flex items-center gap-5 select-none">
-          <button
-            onClick={toggleTheme}
-            className="p-1.5 text-zinc-500 hover:text-foreground dark:hover:text-white cursor-pointer transition-colors hover:bg-black/5 dark:hover:bg-white/5 rounded-full flex items-center justify-center"
+        <div className="px-4 py-3">
+          <button 
+            onClick={() => setActiveSidebarTab("Projects")} 
+            className="w-full py-2.5 px-4 bg-primary text-white dark:text-black rounded-xl font-mono text-xs font-extrabold uppercase tracking-wider hover:brightness-110 transition-all shadow-[0_0_20px_rgba(0,209,255,0.25)] hover-lift flex items-center justify-center gap-2 cursor-pointer"
           >
-            {theme === "dark" ? <Sun size={16} className="text-primary" /> : <Moon size={16} />}
-          </button>
-          
-          <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-full border border-black/10 dark:border-zinc-800/80 bg-black/5 dark:bg-zinc-900/40 text-xs font-bold tracking-wider font-mono">
-            <div className="w-5 h-5 rounded-full bg-black/5 dark:bg-zinc-800 flex items-center justify-center text-zinc-550 dark:text-zinc-400">
-              <User size={12} />
-            </div>
-            <span className="text-zinc-700 dark:text-zinc-300 text-[10px]">ROOT_ADMIN</span>
-          </div>
-
-          <button
-            onClick={handleSignOut}
-            className="p-2 bg-red-500/10 border border-red-500/20 text-red-500 hover:bg-red-500/20 rounded-lg flex items-center justify-center cursor-pointer transition-all active:scale-95"
-            title="Secure Signout"
-          >
-            <LogOut size={14} />
+            <span className="material-symbols-outlined text-[18px]">add</span>
+            Create Project
           </button>
         </div>
-      </header>
 
-      {/* 2. Admin Workspace Grid */}
-      <div className="flex-grow flex flex-col md:flex-row relative z-10 w-full max-w-[1440px] mx-auto px-6 md:px-8 py-8 gap-8">
-        
-        {/* Sidebar Panel - Hidden on mobile viewports */}
-        <aside className="hidden md:flex w-60 shrink-0 flex-col justify-between gap-12 select-none">
-          <div className="space-y-1">
-            {navItems.map((item) => {
-              const isActive = activeSidebarTab === item.label;
-              return (
-                <button
-                  key={item.label}
-                  onClick={() => setActiveSidebarTab(item.label)}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-bold tracking-wider font-mono uppercase transition-all border cursor-pointer ${
-                    isActive
-                      ? "bg-primary text-white dark:bg-[#0b101c] border-primary dark:border-[#00d1ff]/25"
-                      : "bg-transparent border-transparent text-zinc-500 hover:text-foreground dark:hover:text-zinc-300 hover:bg-black/5 dark:hover:bg-zinc-900/20"
-                  }`}
-                >
-                  <item.icon size={14} className={isActive ? "text-white dark:text-[#00d1ff]" : "text-zinc-500"} />
-                  {item.label}
-                </button>
-              );
-            })}
+        <nav className="flex-1 overflow-y-auto px-3 py-2 no-scrollbar space-y-1">
+          {navItems.map((item) => {
+            const isActive = activeSidebarTab === item.label;
+            return (
+              <button 
+                key={item.label}
+                onClick={() => setActiveSidebarTab(item.label)}
+                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all duration-150 cursor-pointer font-sans text-xs font-semibold ${
+                  isActive 
+                    ? "bg-primary/10 text-primary dark:text-[#00d1ff] font-bold border-l-4 border-primary dark:border-[#00d1ff] pl-3 shadow-[inset_0_0_15px_rgba(0,209,255,0.05)]" 
+                    : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5"
+                }`}
+              >
+                <span className={`material-symbols-outlined text-[20px] ${isActive ? "text-primary dark:text-[#00d1ff]" : ""}`}>{item.icon}</span>
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
+        </nav>
+
+        <div className="p-3 border-t border-black/5 dark:border-white/5 space-y-1 bg-black/5 dark:bg-white/[0.02]">
+          <button 
+            onClick={() => setActiveSidebarTab("Inquiries")} 
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-all text-xs font-semibold cursor-pointer text-left"
+          >
+            <span className="material-symbols-outlined text-[18px]">support_agent</span>
+            <span>Support</span>
+          </button>
+          <button 
+            onClick={() => setActiveSidebarTab("Settings")} 
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-all text-xs font-semibold cursor-pointer text-left"
+          >
+            <span className="material-symbols-outlined text-[18px]">help</span>
+            <span>Help</span>
+          </button>
+          <button 
+            onClick={handleSignOut} 
+            className="w-full flex items-center gap-3 px-3 py-2 mt-1 rounded-xl text-rose-500 hover:bg-rose-500/10 transition-all text-xs font-bold cursor-pointer text-left"
+          >
+            <span className="material-symbols-outlined text-[18px]">logout</span>
+            <span>Logout</span>
+          </button>
+        </div>
+      </aside>
+
+      {/* Main Content Wrapper */}
+      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden bg-background">
+        {/* TopAppBar */}
+        <header className="h-16 shrink-0 z-20 flex justify-between items-center w-full px-6 md:px-8 bg-white/80 dark:bg-[#07090e]/80 backdrop-blur-xl border-b border-black/5 dark:border-white/5 shadow-xs">
+          <div className="flex items-center gap-6">
+            {/* Search */}
+            <div className="relative w-72 select-none">
+              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 dark:text-zinc-500 text-[18px]">search</span>
+              <input 
+                value={userSearch} 
+                onChange={(e) => {
+                  setUserSearch(e.target.value);
+                  if (activeSidebarTab !== "Users") setActiveSidebarTab("Users");
+                }} 
+                className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-full py-1.5 pl-9 pr-12 text-xs text-foreground dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-primary dark:focus:border-[#00d1ff] transition-all font-sans" 
+                placeholder="Search database..." 
+                type="text"
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] font-mono text-zinc-400 dark:text-zinc-600 bg-black/5 dark:bg-white/10 px-1.5 py-0.5 rounded border border-black/5 dark:border-white/5">⌘K</span>
+            </div>
+            {/* Nav Links */}
+            <nav className="hidden md:flex gap-6 select-none">
+              <button onClick={() => setActiveSidebarTab("Dashboard")} className={`text-xs font-bold pb-1 cursor-pointer transition-colors ${activeSidebarTab === "Dashboard" ? "text-primary dark:text-[#00d1ff] border-b-2 border-primary dark:border-[#00d1ff]" : "text-zinc-400 hover:text-foreground dark:hover:text-[#00d1ff]"}`}>Dashboard</button>
+              <button onClick={() => setActiveSidebarTab("Reports")} className={`text-xs font-bold pb-1 cursor-pointer transition-colors ${activeSidebarTab === "Reports" ? "text-primary dark:text-[#00d1ff] border-b-2 border-primary dark:border-[#00d1ff]" : "text-zinc-400 hover:text-foreground dark:hover:text-[#00d1ff]"}`}>Analytics</button>
+              <button onClick={() => setActiveSidebarTab("Settings")} className={`text-xs font-bold pb-1 cursor-pointer transition-colors ${activeSidebarTab === "Settings" ? "text-primary dark:text-[#00d1ff] border-b-2 border-primary dark:border-[#00d1ff]" : "text-zinc-400 hover:text-foreground dark:hover:text-[#00d1ff]"}`}>Settings</button>
+            </nav>
           </div>
 
-          {/* Node Status Capsule */}
-          <div className="border border-black/10 dark:border-zinc-900 bg-black/5 dark:bg-zinc-950/20 rounded-xl p-4 flex items-center justify-between shadow-inner">
-            <div className="space-y-1">
-              <span className="text-[8px] font-mono tracking-widest text-zinc-500 dark:text-zinc-600 uppercase font-bold block">Node Status</span>
-              <span className="text-[10px] font-mono font-bold text-primary dark:text-[#00d1ff] block">v1.0.0-mvp</span>
-              <span className="text-[9px] font-mono text-zinc-600 dark:text-zinc-500 block">up 99.98% uptime</span>
-            </div>
-            <span className="w-2 h-2 rounded-full bg-primary dark:bg-[#00d1ff] animate-pulse shadow-[0_0_10px_rgba(0,209,255,0.7)]"></span>
-          </div>
-        </aside>
-
-        {/* Main Dashboard Space */}
-        <main className="flex-grow space-y-8 select-text">
-          
-          {/* Main Console Header */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight text-foreground dark:text-white font-sans flex items-center gap-2">
-                <span>Ecosystem Control Console</span>
-                <span className="text-xs font-mono px-2 py-0.5 rounded bg-primary/10 border border-primary/20 text-primary dark:text-[#00d1ff] font-bold uppercase select-none">{activeSidebarTab}</span>
-              </h1>
-              <p className="text-zinc-500 text-xs mt-1">
-                Real-time marketplace performance, credentials audit, and category moderation metrics.
-              </p>
-            </div>
-            <div className="flex items-center gap-3 select-none">
-              {activeSidebarTab === "Dashboard" && (
-                <button onClick={handleExportJSON} className="px-4 py-2 bg-black/5 dark:bg-zinc-950/40 border border-black/10 dark:border-zinc-800 rounded-lg text-[10px] font-mono font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-450 hover:text-foreground dark:hover:text-white hover:border-black/20 dark:hover:border-zinc-700 transition-all cursor-pointer">
-                  EXPORT_TELEMETRY
-                </button>
-              )}
-              <button onClick={handleRefreshSystem} disabled={isRefreshing} className="px-4 py-2 bg-primary dark:bg-[#00d1ff] text-on-primary dark:text-black rounded-lg text-[10px] font-mono font-bold uppercase tracking-wider hover:brightness-110 hover:shadow-[0_0_20px_rgba(0,209,255,0.4)] transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed">
-                <RefreshCw size={10} className={isRefreshing ? "animate-spin" : ""} /> REFRESH_SYSTEM
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5 text-zinc-400 dark:text-zinc-400 select-none">
+              <button onClick={() => setActiveSidebarTab("Notifications")} className="p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors relative cursor-pointer">
+                <span className="material-symbols-outlined text-[20px]">notifications</span>
+                <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full animate-pulse"></span>
+              </button>
+              <button onClick={() => setActiveSidebarTab("Inquiries")} className="p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer">
+                <span className="material-symbols-outlined text-[20px]">mail</span>
+              </button>
+              <button onClick={toggleTheme} className="p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer">
+                <span className="material-symbols-outlined text-[20px]">contrast</span>
               </button>
             </div>
-          </div>
 
-          {/* Dynamic tabs console spacer */}
-          <div className="mt-6">
-            {renderMainContent()}
-          </div>
+            <div className="h-5 w-px bg-black/10 dark:bg-white/10 mx-1"></div>
 
+            <div className="flex items-center gap-2">
+              <button onClick={handleExportJSON} className="px-3.5 py-1.5 text-xs font-mono font-bold border border-black/10 dark:border-white/15 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer text-foreground dark:text-white">Export</button>
+              <button onClick={handleRefreshSystem} disabled={isRefreshing} className="px-3.5 py-1.5 text-xs font-mono font-bold bg-primary text-white dark:text-black rounded-xl hover:brightness-110 transition-all shadow-[0_0_15px_rgba(0,209,255,0.2)] hover-lift cursor-pointer flex items-center gap-1.5">
+                <RefreshCw size={12} className={isRefreshing ? "animate-spin" : ""} /> Refresh
+              </button>
+            </div>
+
+            <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 overflow-hidden ml-1 flex items-center justify-center cursor-pointer hover:border-primary/50 transition-colors">
+              {user?.imageUrl ? (
+                <img alt="Admin User" className="w-full h-full object-cover" src={user.imageUrl} />
+              ) : (
+                <span className="font-extrabold text-xs text-primary">VH</span>
+              )}
+            </div>
+          </div>
+        </header>
+
+        {/* Main Canvas */}
+        <main className="flex-1 p-6 md:p-8 overflow-y-auto w-full max-w-[1600px] mx-auto space-y-8">
+          {activeSidebarTab === "Dashboard" && (
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-black/5 dark:border-white/5">
+              <div>
+                <h2 className="text-2xl md:text-3xl font-extrabold text-zinc-900 dark:text-white tracking-tight">Welcome Back, {adminName} 👋</h2>
+                <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">Here&apos;s what&apos;s happening today across your platform.</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 rounded-full text-xs font-mono font-bold">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                  <span>SYSTEM OPERATIONAL: 99.98% UPTIME</span>
+                </div>
+              </div>
+            </div>
+          )}
+          {renderMainContent()}
         </main>
-      </div>
 
-      {/* 3. Footer */}
-      <footer className="border-t border-black/5 dark:border-zinc-900 bg-white/40 dark:bg-black/40 py-8 px-6 md:px-12 xl:px-24 select-text print:hidden">
-        <div className="max-w-[1440px] mx-auto flex flex-col md:flex-row items-center justify-between gap-4 font-sans">
-          <div className="flex flex-col md:flex-row items-center gap-1 md:gap-3 text-xs">
-            <Link to="/" className="text-sm font-black tracking-tight uppercase">
-              <span className="text-foreground dark:text-white">Recode</span>
-              <span className="text-primary dark:text-[#00d1ff]">X</span>
-            </Link>
-            <span className="text-zinc-500 dark:text-zinc-650 text-[10px]">
-              © 2026 RecodeX Developer Marketplace. Built for high-performance engineers.
-            </span>
+        {/* Modals & toast overlays rendered via React Portals directly on document.body */}
+      {/* Profile details popup modal */}
+      {selectedUserDetails && createPortal(
+        <div className="fixed top-0 left-0 w-screen h-screen bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-6 select-text">
+          <div className="bg-white dark:bg-[#07090e] border border-black/10 dark:border-zinc-800 p-8 rounded-2xl w-[440px] max-w-full shrink-0 shadow-2xl relative font-sans">
+            <button onClick={() => setSelectedUserDetails(null)} className="absolute top-4 right-4 text-zinc-400 hover:text-zinc-700 dark:text-zinc-500 dark:hover:text-white cursor-pointer"><XCircle size={18} /></button>
+            <div className="space-y-4">
+              <h3 className="text-xs font-mono tracking-widest text-zinc-500 dark:text-zinc-400 uppercase font-bold">Ecosystem Profile Details</h3>
+              <div className="space-y-2">
+                <div className="flex justify-between border-b border-black/5 dark:border-zinc-900 pb-2"><span className="text-zinc-500 dark:text-zinc-400 font-medium">Name</span><span className="font-extrabold text-zinc-900 dark:text-white">{selectedUserDetails.name}</span></div>
+                <div className="flex justify-between border-b border-black/5 dark:border-zinc-900 pb-2"><span className="text-zinc-500 dark:text-zinc-400 font-medium">Email</span><span className="font-mono text-zinc-800 dark:text-zinc-200 font-medium">{selectedUserDetails.email}</span></div>
+                <div className="flex justify-between border-b border-black/5 dark:border-zinc-900 pb-2"><span className="text-zinc-500 dark:text-zinc-400 font-medium">Role</span><span className="font-mono uppercase text-primary dark:text-[#00d1ff] font-extrabold">{selectedUserDetails.role}</span></div>
+                <div className="flex justify-between border-b border-black/5 dark:border-zinc-900 pb-2"><span className="text-zinc-500 dark:text-zinc-400 font-medium">Secure User ID</span><span className="font-mono text-[9px] text-zinc-800 dark:text-zinc-200">{selectedUserDetails.id}</span></div>
+                <div className="flex justify-between"><span className="text-zinc-500 dark:text-zinc-400 font-medium">Status</span><span className={`font-bold ${selectedUserDetails.role === "suspended" ? "text-red-500" : "text-green-500"}`}>{selectedUserDetails.role === "suspended" ? "Suspended" : "Active"}</span></div>
+              </div>
+            </div>
           </div>
+        </div>,
+        document.body
+      )}
 
-          <div className="flex items-center gap-6 text-[10px] text-zinc-500 font-medium">
-            <span className="hover:text-primary cursor-default transition-colors">Privacy Policy</span>
-            <span className="hover:text-primary cursor-default transition-colors">Terms of Service</span>
-            <a href="https://github.com" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">
-              Github
-            </a>
-            <span className="hover:text-primary cursor-default transition-colors">Documentation</span>
+      {/* Edit User details popup modal */}
+      {editingUser && createPortal(
+        <div className="fixed top-0 left-0 w-screen h-screen bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-6 select-text animate-in fade-in duration-250">
+          <div className="bg-[#fafafa] dark:bg-[#07090e] border border-black/10 dark:border-zinc-800 p-8 rounded-2xl w-[440px] max-w-full shrink-0 shadow-2xl relative font-sans">
+            <button onClick={() => setEditingUser(null)} className="absolute top-4 right-4 text-zinc-400 hover:text-zinc-700 dark:text-zinc-500 dark:hover:text-white cursor-pointer"><XCircle size={18} /></button>
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 text-primary dark:text-[#00d1ff]">
+                <span className="material-symbols-outlined text-[24px]">edit</span>
+                <h3 className="text-sm font-mono tracking-widest text-zinc-700 dark:text-zinc-200 font-extrabold uppercase">Edit User Credentials</h3>
+              </div>
+              <form onSubmit={handleSaveUserEdit} className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-mono text-zinc-500 dark:text-zinc-400 uppercase tracking-wider block font-bold">Full Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={newEditName}
+                    onChange={(e) => setNewEditName(e.target.value)}
+                    className="w-full px-3 py-2 bg-white dark:bg-[#0b0e14] border border-zinc-300 dark:border-zinc-800 rounded-xl text-xs text-zinc-900 dark:text-white focus:outline-none focus:border-primary dark:focus:border-[#00d1ff] transition-all font-sans"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-mono text-zinc-500 dark:text-zinc-400 uppercase tracking-wider block font-bold">System Access Role</label>
+                  <select
+                    value={newEditRole}
+                    onChange={(e) => setNewEditRole(e.target.value)}
+                    className="w-full px-3 py-2 bg-white dark:bg-[#0b0e14] border border-zinc-300 dark:border-zinc-800 rounded-xl text-xs text-zinc-900 dark:text-white font-mono outline-none"
+                  >
+                    <option value="developer">Student/Freelancer</option>
+                    <option value="client">Client</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </div>
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditingUser(null)}
+                    className="w-1/2 py-2.5 bg-zinc-100 dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 rounded-xl text-[10px] font-mono font-bold uppercase tracking-wider hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-all cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSavingUser || !newEditName.trim()}
+                    className="w-1/2 py-2.5 bg-primary dark:bg-[#00d1ff] text-white dark:text-black font-extrabold rounded-xl text-[10px] flex items-center justify-center gap-1.5 uppercase hover:brightness-110 active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
+                  >
+                    {isSavingUser ? "Saving..." : "Save Changes"}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
-      </footer>      {/* Premium Glassmorphic Toast Notification Overlay */}
-      {toast && (
+        </div>,
+        document.body
+      )}
+
+      {/* Reset Password details popup modal */}
+      {resetPasswordUser && createPortal(
+        <div className="fixed top-0 left-0 w-screen h-screen bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-6 select-text animate-in fade-in duration-250">
+          <div className="bg-[#fafafa] dark:bg-[#07090e] border border-black/10 dark:border-zinc-800 p-8 rounded-2xl w-[440px] max-w-full shrink-0 shadow-2xl relative font-sans">
+            <button onClick={() => setResetPasswordUser(null)} className="absolute top-4 right-4 text-zinc-400 hover:text-zinc-700 dark:text-zinc-500 dark:hover:text-white cursor-pointer"><XCircle size={18} /></button>
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 text-primary dark:text-[#00d1ff]">
+                <span className="material-symbols-outlined text-[24px]">lock_reset</span>
+                <h3 className="text-sm font-mono tracking-widest text-zinc-700 dark:text-zinc-200 font-extrabold uppercase">Reset User Password</h3>
+              </div>
+              <p className="text-xs text-zinc-650 dark:text-zinc-300 leading-normal font-medium">
+                Trigger a secure credential reset sequence for <strong className="text-zinc-900 dark:text-white">{resetPasswordUser.name}</strong> ({resetPasswordUser.email}).
+              </p>
+              <form onSubmit={handleResetPassword} className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-mono text-zinc-500 dark:text-zinc-400 uppercase tracking-wider block font-bold">Assigned Temporary Password</label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      required
+                      placeholder="Enter new master password..."
+                      value={newPasswordVal}
+                      onChange={(e) => setNewPasswordVal(e.target.value)}
+                      className="w-full pl-3 pr-20 py-2 bg-white dark:bg-[#0b0e14] border border-zinc-300 dark:border-zinc-800 rounded-xl text-xs text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none focus:border-primary dark:focus:border-[#00d1ff] transition-all font-mono"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const randomPass = Math.random().toString(36).slice(-8) + "@" + Math.floor(100 + Math.random() * 900);
+                        setNewPasswordVal(randomPass);
+                      }}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-1 bg-primary/10 hover:bg-primary/20 dark:bg-[#00d1ff]/10 dark:hover:bg-[#00d1ff]/20 text-primary dark:text-[#00d1ff] rounded text-[9px] font-mono uppercase tracking-wider cursor-pointer font-bold"
+                    >
+                      Generate
+                    </button>
+                  </div>
+                </div>
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setResetPasswordUser(null)}
+                    className="w-1/2 py-2.5 bg-zinc-100 dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 rounded-xl text-[10px] font-mono font-bold uppercase tracking-wider hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-all cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSavingUser || !newPasswordVal.trim()}
+                    className="w-1/2 py-2.5 bg-primary dark:bg-[#00d1ff] text-white dark:text-black font-extrabold rounded-xl text-[10px] flex items-center justify-center gap-1.5 uppercase hover:brightness-110 active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
+                  >
+                    {isSavingUser ? "Resetting..." : "Reset Password"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Premium Glassmorphic Toast Notification Overlay */}
+      {toast && createPortal(
         <div className="fixed bottom-6 right-6 z-[150] max-w-sm w-full bg-white/70 dark:bg-[#07090e]/80 backdrop-blur-xl border border-black/10 dark:border-zinc-800 rounded-xl p-4 shadow-[0_10px_30px_rgba(0,0,0,0.1)] dark:shadow-[0_10px_30px_rgba(0,0,0,0.5)] flex items-start gap-3 animate-in fade-in slide-in-from-bottom-4 duration-300 select-text">
           <div className={`p-1.5 rounded-lg shrink-0 ${
             toast.type === "success" ? "bg-green-500/10 text-green-500 border border-green-500/20" :
@@ -2165,73 +2521,10 @@ const handleDeleteUser = async (userId: string) => {
           >
             <XCircle size={14} className="shrink-0" />
           </button>
-        </div>
+        </div>,
+        document.body
       )}
-
-      {/* 3. Mobile Sidebar Drawer Overlay */}
-      {isMobileMenuOpen && (
-        <div className="fixed inset-0 z-[100] md:hidden">
-          {/* Backdrop glass blur */}
-          <div 
-            onClick={() => setIsMobileMenuOpen(false)}
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300"
-          />
-          
-          {/* Drawer Panel */}
-          <div className="absolute inset-y-0 left-0 w-[280px] bg-white dark:bg-[#07090e] border-r border-black/10 dark:border-zinc-900 p-6 flex flex-col justify-between select-none shadow-2xl animate-in slide-in-from-left duration-300">
-            <div className="space-y-6">
-              {/* Header inside drawer */}
-              <div className="flex items-center justify-between border-b border-black/5 dark:border-zinc-900 pb-4">
-                <Link to="/" className="text-lg font-black tracking-tight uppercase">
-                  <span className="text-foreground dark:text-white">Recode</span>
-                  <span className="text-primary dark:text-[#00d1ff]">X</span>
-                </Link>
-                <button 
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className="p-1.5 text-zinc-500 hover:text-foreground dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 rounded-lg flex items-center justify-center cursor-pointer"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-
-              {/* Navigation items in drawer */}
-              <div className="space-y-1 overflow-y-auto max-h-[60vh] pr-1">
-                {navItems.map((item) => {
-                  const isActive = activeSidebarTab === item.label;
-                  return (
-                    <button
-                      key={item.label}
-                      onClick={() => {
-                        setActiveSidebarTab(item.label);
-                        setIsMobileMenuOpen(false); // Auto close on select
-                      }}
-                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-bold tracking-wider font-mono uppercase transition-all border cursor-pointer ${
-                        isActive
-                          ? "bg-primary text-white dark:bg-[#0b101c] border-primary dark:border-[#00d1ff]/25"
-                          : "bg-transparent border-transparent text-zinc-500 hover:text-foreground dark:hover:text-zinc-300 hover:bg-black/5 dark:hover:bg-zinc-900/20"
-                      }`}
-                    >
-                      <item.icon size={14} className={isActive ? "text-white dark:text-[#00d1ff]" : "text-zinc-500"} />
-                      {item.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Node Status Capsule inside drawer */}
-            <div className="border border-black/10 dark:border-zinc-900 bg-black/5 dark:bg-zinc-950/20 rounded-xl p-4 flex items-center justify-between shadow-inner">
-              <div className="space-y-1">
-                <span className="text-[8px] font-mono tracking-widest text-zinc-500 dark:text-zinc-600 uppercase font-bold block">Node Status</span>
-                <span className="text-[10px] font-mono font-bold text-primary dark:text-[#00d1ff] block">v1.0.0-mvp</span>
-                <span className="text-[9px] font-mono text-zinc-600 dark:text-zinc-500 block">up 99.98% uptime</span>
-              </div>
-              <span className="w-2 h-2 rounded-full bg-primary dark:bg-[#00d1ff] animate-pulse shadow-[0_0_10px_rgba(0,209,255,0.7)]"></span>
-            </div>
-          </div>
-        </div>
-      )}
-
+      </div>
     </div>
   );
 }

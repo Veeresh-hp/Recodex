@@ -43,7 +43,7 @@ router.get("/profile", requireAuth, async (req: AuthenticatedRequest, res: Respo
       role: user.role,
       profileImage: user.profileImage,
       createdAt: user.createdAt,
-      projects: user.projects.map((p) => p.project),
+      projects: user.projects.map((p: any) => p.project),
     };
 
     return res.json(formattedUser);

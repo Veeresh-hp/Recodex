@@ -16,7 +16,7 @@ cloudinary_1.v2.config({
  * @param folder - Folder path within Cloudinary
  * @returns Promise resolving to the Cloudinary API response
  */
-const uploadToCloudinary = (fileBuffer, folder = "camcod") => {
+const uploadToCloudinary = (fileBuffer, folder = "recodex") => {
     return new Promise((resolve, reject) => {
         const uploadStream = cloudinary_1.v2.uploader.upload_stream({ folder, resource_type: "auto" }, (error, result) => {
             if (error) {

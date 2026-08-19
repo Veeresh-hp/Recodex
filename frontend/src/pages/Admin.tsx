@@ -21,10 +21,11 @@ import {
   MessageSquare,
   AlertCircle
 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { useAuth } from "@clerk/clerk-react";
 import { getInquiries } from "@/services/api";
 
 export default function AdminDashboard() {
+  const { isLoaded, userId, getToken } = useAuth();
   const [activeTab, setActiveTab] = useState("Dashboard");
   const [inquiries, setInquiries] = useState<any[]>([]);
   const [inquiriesLoading, setInquiriesLoading] = useState(true);
@@ -32,6 +33,7 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     const fetchInquiries = async () => {
+      if (!isLoaded) return;
       setInquiriesLoading(true);
       setInquiriesError(null);
       try {
@@ -40,10 +42,10 @@ export default function AdminDashboard() {
         
         if (sessionToken === "admin-bypass-token" || sessionToken === "dev-bypass-token") {
           token = sessionToken;
-        } else {
-          const { data: { session } } = await supabase.auth.getSession();
-          if (session) {
-            token = session.access_token;
+        } else if (userId) {
+          const clerkToken = await getToken();
+          if (clerkToken) {
+            token = clerkToken;
           }
         }
 
@@ -87,7 +89,7 @@ export default function AdminDashboard() {
     };
 
     fetchInquiries();
-  }, []);
+  }, [isLoaded, userId]);
 
   // Mock Contributors Data
   const contributors = [

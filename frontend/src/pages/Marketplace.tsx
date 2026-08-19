@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { Project } from "@/data/mockData";
 import { getProjects } from "@/services/api";
@@ -237,14 +237,14 @@ export default function Marketplace() {
               Search Pipeline
             </span>
             <div className="relative">
-              <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400 dark:text-zinc-600">
+              <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-zinc-500 dark:text-zinc-400">
                 <Search size={14} />
               </span>
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-4 py-2.5 bg-black/5 dark:bg-[#03060c]/60 border border-black/10 dark:border-zinc-800/80 rounded-lg text-xs text-foreground placeholder-gray-400 dark:placeholder-zinc-700 focus:outline-none focus:border-primary transition-all font-mono"
+                className="w-full pl-9 pr-4 py-2.5 bg-black/5 dark:bg-[#03060c]/60 border border-black/10 dark:border-zinc-800/80 rounded-lg text-xs text-foreground placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-primary transition-all font-mono"
                 placeholder="Find stack, tags..."
               />
             </div>
@@ -252,7 +252,7 @@ export default function Marketplace() {
 
           {/* Category Filter links */}
           <div className="space-y-3">
-            <span className="text-[8px] font-mono text-gray-500 dark:text-zinc-500 tracking-wider block font-bold uppercase">
+            <span className="text-[8px] font-mono text-zinc-600 dark:text-zinc-400 tracking-wider block font-bold uppercase">
               Filter by Layer
             </span>
             <nav className="flex flex-col gap-1 font-mono text-[9px] font-bold uppercase tracking-widest">
@@ -263,7 +263,7 @@ export default function Marketplace() {
                   className={`flex items-center justify-between px-3.5 py-2.5 rounded-lg border text-left transition-all cursor-pointer ${
                     selectedCategory === cat
                       ? "bg-primary/5 dark:bg-[#0b101c] border-primary/20 text-foreground"
-                      : "bg-transparent border-transparent text-gray-500 hover:text-foreground hover:bg-black/5 dark:hover:bg-zinc-900/10"
+                      : "bg-transparent border-transparent text-zinc-600 dark:text-zinc-400 hover:text-foreground hover:bg-black/5 dark:hover:bg-zinc-900/10"
                   }`}
                 >
                   {cat}
@@ -280,7 +280,7 @@ export default function Marketplace() {
             <h1 className="text-3xl font-black tracking-tight text-foreground font-sans">
               Developer <span className="text-primary">Marketplace</span>
             </h1>
-            <p className="text-gray-500 text-xs mt-1">
+            <p className="text-zinc-600 dark:text-zinc-400 text-xs mt-1">
               Browse verified high-performance software projects and repositories.
             </p>
           </div>
@@ -339,14 +339,14 @@ export default function Marketplace() {
                       {project.title}
                     </h3>
                     
-                    <p className="text-gray-500 text-xs leading-relaxed font-sans font-medium line-clamp-3">
+                    <p className="text-zinc-600 dark:text-zinc-400 text-xs leading-relaxed font-sans font-medium line-clamp-3">
                       {project.description}
                     </p>
 
                     {/* Technical Tags */}
                     <div className="flex flex-wrap gap-1.5 pt-2">
                       {project.tags.map(tag => (
-                        <span key={tag} className="px-2 py-0.5 rounded bg-black/5 dark:bg-zinc-900 border border-black/5 dark:border-zinc-800 text-[8px] font-mono text-gray-500 dark:text-zinc-400">
+                        <span key={tag} className="px-2 py-0.5 rounded bg-black/5 dark:bg-zinc-900 border border-black/5 dark:border-zinc-800 text-[8px] font-mono text-zinc-600 dark:text-zinc-400">
                           {tag}
                         </span>
                       ))}
@@ -355,20 +355,20 @@ export default function Marketplace() {
 
                   {/* Stars, Forks, and Call To Action */}
                   <div className="pt-6 mt-6 border-t border-black/5 dark:border-white/5 flex items-center justify-between">
-                    <div className="flex items-center gap-4 text-[10px] font-mono font-bold text-gray-500 dark:text-zinc-600">
+                    <div className="flex items-center gap-4 text-[10px] font-mono font-bold text-zinc-600 dark:text-zinc-400">
                       <div className="flex items-center gap-1">
-                        <Star size={11} className="text-gray-400 dark:text-zinc-500" />
+                        <Star size={11} className="text-zinc-500 dark:text-zinc-400" />
                         <span>{project.stars}</span>
                       </div>
                       <div className="flex items-center gap-1">
-                        <GitFork size={11} className="text-gray-400 dark:text-zinc-500" />
+                        <GitFork size={11} className="text-zinc-500 dark:text-zinc-400" />
                         <span>{project.forks}</span>
                       </div>
                     </div>
 
                     <Link
                       to={`/showcase?repo=${project.id}`}
-                      className="px-3.5 py-1.5 border border-black/10 dark:border-zinc-800 hover:border-primary/40 rounded text-[9px] font-mono font-bold tracking-widest uppercase text-gray-500 hover:text-foreground hover:bg-primary/5 transition-all flex items-center gap-1 cursor-pointer"
+                      className="px-3.5 py-1.5 border border-black/10 dark:border-zinc-800 hover:border-primary/40 rounded text-[9px] font-mono font-bold tracking-widest uppercase text-zinc-700 dark:text-zinc-300 hover:text-foreground hover:bg-primary/5 transition-all flex items-center gap-1 cursor-pointer"
                     >
                       Explore Stack
                       <ChevronRight size={10} />
@@ -383,13 +383,13 @@ export default function Marketplace() {
       </main>
 
       {/* Footer */}
-      <footer className="relative z-10 border-t border-black/5 dark:border-zinc-900 bg-white/60 dark:bg-black/60 backdrop-blur-md w-full pt-16 pb-8 transition-colors select-text">
+      <footer className="site-footer relative z-10 border-t border-black/5 dark:border-zinc-900 bg-white/60 dark:bg-black/60 backdrop-blur-md w-full pt-16 pb-8 transition-colors select-text">
         <div className="max-w-7xl mx-auto px-6 md:px-12 xl:px-24">
           <div className="grid grid-cols-1 md:grid-cols-12 gap-8 lg:gap-12 pb-12">
             <div className="md:col-span-6 space-y-4">
-              <div className="text-xl font-black tracking-tight text-foreground font-sans uppercase">
-                <span className="text-primary">Cam</span>Cod
-              </div>
+              <Link to="/" className="inline-block w-fit">
+                <img src="/recodeXlogo.png" alt="RecodeX Logo" className="brand-logo-img h-9 w-auto object-contain" />
+              </Link>
               <p className="text-xs text-gray-500 max-w-sm leading-relaxed">
                 Engineering the future of work through decentralized collaboration and high-performance talent acquisition.
               </p>

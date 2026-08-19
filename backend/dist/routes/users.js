@@ -122,7 +122,7 @@ router.put("/profile", auth_1.requireAuth, upload.single("profileImage"), async 
         // Handle avatar file upload
         if (req.file) {
             try {
-                const uploadResult = await (0, cloudinary_1.uploadToCloudinary)(req.file.buffer, "camcod_avatars");
+                const uploadResult = await (0, cloudinary_1.uploadToCloudinary)(req.file.buffer, "recodex_avatars");
                 updateData.profileImage = uploadResult.secure_url;
             }
             catch (uploadError) {
@@ -228,6 +228,9 @@ router.delete("/:id", auth_1.requireAuth, async (req, res) => {
         return res.json({ message: "User profile deleted successfully from database." });
     }
     catch (error) {
+        if (error.code === "P2025") {
+            return res.json({ message: "User profile already deleted or does not exist." });
+        }
         console.error(`Error deleting user ${id} inside database:`, error);
         return res.status(500).json({ error: "Failed to delete user profile from database." });
     }

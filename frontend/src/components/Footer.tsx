@@ -3,14 +3,13 @@ import { Link } from "react-router-dom";
 
 export default function Footer() {
   return (
-    <footer className="bg-black border-t border-white/5 w-full py-16 transition-colors duration-300 mt-auto select-none">
+    <footer className="site-footer bg-black border-t border-white/5 w-full py-16 transition-colors duration-300 mt-auto select-none">
       <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-12 gap-8">
         {/* Brand Summary */}
         <div className="md:col-span-6 flex flex-col gap-4">
-          <div className="text-2xl font-bold tracking-tight text-white font-sans">
-            <span className="font-extrabold text-white">Recode</span>
-            <span className="font-light text-[#00d1ff]">X</span>
-          </div>
+          <Link to="/" className="inline-block w-fit">
+            <img src="/recodeXlogo.png" alt="RecodeX Logo" className="brand-logo-img h-10 w-auto object-contain" />
+          </Link>
           <p className="text-sm text-zinc-500 max-w-sm leading-relaxed">
             Connecting elite engineers with world-class opportunities. The technical directory for the next generation of digital builders.
           </p>

@@ -1,4 +1,4 @@
-﻿import React, { useState } from "react";
+import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import Footer from "@/components/Footer";
 import TerminalModal from "@/components/TerminalModal";
@@ -33,7 +33,7 @@ export default function Home() {
                   Excellence.
                 </span>
               </h1>
-              <p className="text-base sm:text-lg text-gray-500 max-w-xl leading-relaxed">
+              <p className="text-base sm:text-lg text-zinc-600 dark:text-zinc-400 max-w-xl leading-relaxed">
                 Connect with top-tier developers, architects, and engineers. Build scalable solutions with professionals who understand the architecture of modern software.
               </p>
               
@@ -52,7 +52,7 @@ export default function Home() {
                 </Link>
               </div>
 
-              <div className="flex items-center gap-4 pt-6 text-sm text-gray-400 font-mono">
+              <div className="flex items-center gap-4 pt-6 text-sm text-zinc-600 dark:text-zinc-400 font-mono">
                 <div className="flex -space-x-3">
                   <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-zinc-800 border-2 border-white dark:border-black flex items-center justify-center text-[10px] font-bold overflow-hidden">
                     <img alt="Dev" className="w-full h-full object-cover" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=80&q=80" />
@@ -157,7 +157,7 @@ export default function Home() {
               <h2 className="text-3xl font-bold tracking-tight text-foreground">
                 Ecosystems
               </h2>
-              <p className="text-base text-gray-500 mt-2">
+              <p className="text-base text-zinc-600 dark:text-zinc-400 mt-2">
                 Specialized developer talent engineered for complex architectures.
               </p>
             </div>
@@ -188,13 +188,13 @@ export default function Home() {
                       eco.color === "primary" ? "text-primary" : 
                       eco.color === "error" ? "text-red-400" : "text-gray-400"
                     }`}>{eco.count}</div>
-                    <div className="text-[10px] uppercase text-gray-500 font-mono tracking-widest">{eco.activeDevs}</div>
+                    <div className="text-[10px] uppercase text-zinc-600 dark:text-zinc-400 font-mono tracking-widest">{eco.activeDevs}</div>
                   </div>
                 </div>
 
                 <h3 className="text-xl font-bold text-foreground mb-4">{eco.title}</h3>
                 
-                <ul className="space-y-2 text-sm text-gray-500 mb-6">
+                <ul className="space-y-2 text-sm text-zinc-600 dark:text-zinc-400 mb-6">
                   {eco.bullets.map((bullet, index) => (
                     <li key={index} className="flex items-center gap-2">
                       <span className="w-1.5 h-1.5 rounded-full bg-primary/40"></span>
@@ -220,7 +220,7 @@ export default function Home() {
             <h2 className="text-3xl font-bold tracking-tight text-foreground">
               How it Works
             </h2>
-            <p className="text-base text-gray-500 mt-2">
+            <p className="text-base text-zinc-600 dark:text-zinc-400 mt-2">
               Simple. Technical. Efficient.
             </p>
           </div>
@@ -284,7 +284,7 @@ export default function Home() {
                 <Code size={28} />
               </div>
               <h4 className="text-lg font-bold text-foreground">1. Discovery</h4>
-              <p className="text-sm text-gray-500 leading-relaxed max-w-xs">
+              <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed max-w-xs">
                 Filter by specific GitHub contributions, tech stack mastery, and past architectural impact.
               </p>
             </div>
@@ -294,7 +294,7 @@ export default function Home() {
                 <Cpu size={28} />
               </div>
               <h4 className="text-lg font-bold text-foreground">2. Selection</h4>
-              <p className="text-sm text-gray-500 leading-relaxed max-w-xs">
+              <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed max-w-xs">
                 Review code samples, verified skills, and real-world performance metrics from previous clients.
               </p>
             </div>
@@ -304,7 +304,7 @@ export default function Home() {
                 <Award size={28} />
               </div>
               <h4 className="text-lg font-bold text-foreground">3. Integration</h4>
-              <p className="text-sm text-gray-500 leading-relaxed max-w-xs">
+              <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed max-w-xs">
                 Onboard talent seamlessly with our integrated project management and secure escrow systems.
               </p>
             </div>
@@ -320,11 +320,11 @@ export default function Home() {
                 <h2 className="text-3xl font-bold tracking-tight text-foreground font-sans">
                   Security-first Infrastructure
                 </h2>
-                <p className="text-base text-gray-500 leading-relaxed max-w-xl">
+                <p className="text-base text-zinc-600 dark:text-zinc-400 leading-relaxed max-w-xl">
                   We verify every line of code and every developer to ensure your intellectual property is protected by the highest industry standards.
                 </p>
                 
-                <div className="grid grid-cols-2 gap-4 mt-8 font-mono text-xs font-semibold text-gray-400">
+                <div className="grid grid-cols-2 gap-4 mt-8 font-mono text-xs font-semibold text-zinc-600 dark:text-zinc-400">
                   <div className="flex items-center gap-2">
                     <ShieldCheck size={16} className="text-primary" />
                     <span>100% CODE VERIFIED</span>
@@ -347,12 +347,12 @@ export default function Home() {
               <div className="grid grid-cols-2 gap-6">
                 <div className="glass-card p-8 rounded-xl flex flex-col items-center justify-center text-center border-b-4 border-b-primary shadow-lg">
                   <div className="text-4xl lg:text-5xl font-extrabold text-primary font-mono tracking-tight">99.9%</div>
-                  <div className="text-xs text-gray-500 font-semibold uppercase tracking-wider font-mono mt-3">Success Rate</div>
+                  <div className="text-xs text-zinc-600 dark:text-zinc-400 font-semibold uppercase tracking-wider font-mono mt-3">Success Rate</div>
                 </div>
                 
                 <div className="glass-card p-8 rounded-xl flex flex-col items-center justify-center text-center border-b-4 border-b-gray-500 dark:border-b-zinc-800 shadow-lg">
                   <div className="text-4xl lg:text-5xl font-extrabold text-foreground font-mono tracking-tight">5M+</div>
-                  <div className="text-xs text-gray-500 font-semibold uppercase tracking-wider font-mono mt-3">Lines Scanned</div>
+                  <div className="text-xs text-zinc-600 dark:text-zinc-400 font-semibold uppercase tracking-wider font-mono mt-3">Lines Scanned</div>
                 </div>
               </div>
 
@@ -366,7 +366,7 @@ export default function Home() {
             <h2 className="text-3xl sm:text-4xl font-extrabold text-foreground tracking-tight font-sans">
               Ready to build the future?
             </h2>
-            <p className="text-sm sm:text-base text-gray-500 max-w-2xl mx-auto leading-relaxed">
+            <p className="text-sm sm:text-base text-zinc-600 dark:text-zinc-400 max-w-2xl mx-auto leading-relaxed">
               Join the world&apos;s most performant developer network and scale your engineering team with elite talent today.
             </p>
             <div className="flex justify-center pt-2">

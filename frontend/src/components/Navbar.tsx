@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useTheme } from "@/context/ThemeContext";
 import { Sun, Moon, Menu, X, User } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { useAuth, useUser, useClerk } from "@clerk/clerk-react";
 import { useLoginModal } from "@/context/LoginModalContext";
 
 export default function Navbar() {
@@ -16,127 +16,69 @@ export default function Navbar() {
   const [navAvatar, setNavAvatar] = useState<string | null>(null);
   const [navInitials, setNavInitials] = useState("");
 
+  const { isLoaded, userId } = useAuth();
+  const { user } = useUser();
+  const clerk = useClerk();
+
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setMounted(true);
-    }, 0);
+    setMounted(true);
+  }, []);
 
-    // Check if the user is authenticated via local bypass
-    const isBypassAdmin =
-      localStorage.getItem("recodex_session_token") === "admin-bypass-token" ||
-      localStorage.getItem("recodex_admin_user") === "true";
+  useEffect(() => {
+    if (!isLoaded) return;
 
-    if (isBypassAdmin) {
-      setTimeout(() => {
-        setIsAuthenticated(true);
-        setIsAdmin(true);
-        // Load bypass avatar
+    if (userId && user) {
+      setIsAuthenticated(true);
+      const userEmail = user.primaryEmailAddress?.emailAddress || "";
+      const isUserAdmin =
+        userEmail === "veereshhp2004@gmail.com" ||
+        localStorage.getItem("recodex_admin_user") === "true";
+      setIsAdmin(!!isUserAdmin);
+
+      const savedAvatar = localStorage.getItem(`profile_avatar_${userId}`);
+      setNavAvatar(savedAvatar || user.imageUrl || null);
+
+      const name = user.fullName || user.username || userEmail.split("@")[0] || "";
+      setNavInitials(
+        name
+          .split(" ")
+          .map((n: string) => n[0])
+          .join("")
+          .substring(0, 2)
+          .toUpperCase()
+      );
+    } else {
+      const stillBypassed =
+        localStorage.getItem("recodex_session_token") === "admin-bypass-token" ||
+        localStorage.getItem("recodex_admin_user") === "true";
+
+      setIsAuthenticated(stillBypassed);
+      setIsAdmin(stillBypassed);
+      if (stillBypassed) {
         const savedAvatar = localStorage.getItem("profile_avatar_sandbox-admin-001");
         if (savedAvatar) setNavAvatar(savedAvatar);
         setNavInitials("VH");
-      }, 0);
-    } else {
-      // Check if a live Supabase Auth session exists
-      const checkSession = async () => {
-        const { data: { session } } = await supabase.auth.getSession();
-        await updateNavbarState(session);
-      };
-      checkSession();
-    }
-
-    // Listen for avatar updates from Profile page
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === "recodex_user_avatar" && e.newValue) {
-        setNavAvatar(e.newValue);
-      }
-    };
-    window.addEventListener("storage", handleStorageChange);
-
-    // Subscribe to session transitions
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      await updateNavbarState(session);
-    });
-
-    // Custom event to sync authentication state changes (such as database checks resolving)
-    const handleAuthUpdate = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      await updateNavbarState(session);
-    };
-    window.addEventListener("recodex-auth-update", handleAuthUpdate);
-
-    return () => {
-      clearTimeout(timer);
-      subscription.unsubscribe();
-      window.removeEventListener("storage", handleStorageChange);
-      window.removeEventListener("recodex-auth-update", handleAuthUpdate);
-    };
-  }, []);
-
-  const updateNavbarState = async (session: any) => {
-    if (session) {
-      const currentToken = localStorage.getItem("recodex_session_token");
-      const hasValidToken = currentToken && (
-        currentToken === session.access_token ||
-        currentToken === "admin-bypass-token" ||
-        currentToken === "dev-bypass-token"
-      );
-
-      if (hasValidToken) {
-        setIsAuthenticated(true);
-        const isRootAdmin = session.user && session.user.email === "veereshhp2004@gmail.com";
-        const isStoredAdmin = localStorage.getItem("recodex_admin_user") === "true";
-        if (isRootAdmin || isStoredAdmin) {
-          setIsAdmin(true);
-        } else {
-          setIsAdmin(false);
-        }
-        // Load avatar: prefer localStorage override, then Google avatar
-        const userId = session.user.id;
-        const savedAvatar = localStorage.getItem(`profile_avatar_${userId}`);
-        const googleAvatar = session.user.user_metadata?.avatar_url || null;
-        setNavAvatar(savedAvatar || googleAvatar);
-        // Build initials
-        const name = session.user.user_metadata?.full_name ||
-                     session.user.user_metadata?.name ||
-                     session.user.email?.split("@")[0] || "";
-        setNavInitials(name.split(" ").map((n: string) => n[0]).join("").substring(0, 2).toUpperCase());
-        return;
+      } else {
+        setNavAvatar(null);
+        setNavInitials("");
       }
     }
+  }, [isLoaded, userId, user]);
 
-    // If no valid session or token, check if we're in admin bypass
-    const stillBypassed =
-      localStorage.getItem("recodex_session_token") === "admin-bypass-token" ||
-      localStorage.getItem("recodex_admin_user") === "true";
-
-    setIsAuthenticated(stillBypassed);
-    setIsAdmin(stillBypassed);
-    if (stillBypassed) {
-      const savedAvatar = localStorage.getItem("profile_avatar_sandbox-admin-001");
-      if (savedAvatar) setNavAvatar(savedAvatar);
-      setNavInitials("VH");
-    } else {
-      setNavAvatar(null);
-      setNavInitials("");
-    }
-  };
-
-  const handleSignOut = () => {
-    // Trigger Supabase signout in the background without blocking the UI
+  const handleSignOut = async () => {
     try {
-      supabase.auth.signOut().catch(err => console.warn("Supabase background signout warning:", err));
+      await clerk.signOut();
     } catch (err) {
-      console.warn("Supabase sign out error:", err);
+      console.warn("Clerk sign out error:", err);
     }
-    
-    // Instantly purge local state and session tokens
+
     localStorage.removeItem("recodex_session_token");
     localStorage.removeItem("recodex_admin_user");
     setIsAuthenticated(false);
-    
-    // Immediately redirect to clear the UI
+
     window.location.href = "/";
   };
+
 
   // Sub-routes that belong under the "Categories" parent nav item
   const categoriesSubRoutes = ["/marketplace", "/solutions", "/showcase", "/terms"];
@@ -156,10 +98,9 @@ export default function Navbar() {
         {/* Brand Logo */}
         <Link
           to="/"
-          className="text-2xl font-bold tracking-tight text-foreground hover:text-primary transition-colors flex items-center gap-1 font-sans"
+          className="flex items-center gap-2 hover:opacity-90 transition-opacity"
         >
-          <span className="font-extrabold text-black dark:text-white">Recode</span>
-          <span className="font-light text-primary dark:text-[#00d1ff]">X</span>
+          <img src="/recodeXlogo.png" alt="RecodeX Logo" className="brand-logo-img h-9 sm:h-10 w-auto object-contain" />
         </Link>
 
         {/* Desktop Route Index */}
@@ -174,8 +115,8 @@ export default function Navbar() {
                 to={item.href}
                 className={`text-sm font-medium py-1.5 px-3 rounded-md transition-all duration-200 relative ${
                   isActive
-                    ? "text-primary border-b-2 border-primary rounded-b-none"
-                    : "text-gray-500 hover:text-foreground hover:bg-gray-100/50 dark:hover:bg-white/5"
+                    ? "text-primary border-b-2 border-primary rounded-b-none font-bold"
+                    : "text-zinc-700 dark:text-zinc-300 hover:text-zinc-950 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 font-semibold"
                 }`}
               >
                 {item.label}
@@ -188,7 +129,7 @@ export default function Navbar() {
         <div className="hidden md:flex items-center gap-4">
           <button
             onClick={toggleTheme}
-            className="p-2 text-gray-500 hover:text-primary transition-colors hover:bg-gray-100 dark:hover:bg-white/5 rounded-full flex items-center justify-center active:scale-90"
+            className="p-2 text-zinc-700 dark:text-zinc-300 hover:text-primary transition-colors hover:bg-black/5 dark:hover:bg-white/5 rounded-full flex items-center justify-center active:scale-90"
             aria-label="Toggle theme"
           >
             {mounted ? (
@@ -202,7 +143,7 @@ export default function Navbar() {
               {isAdmin && (
                 <Link
                   to="/dashboard"
-                  className="text-sm font-semibold text-gray-500 hover:text-primary transition-colors py-1.5"
+                  className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 hover:text-primary transition-colors py-1.5"
                 >
                   Dashboard
                 </Link>
@@ -241,7 +182,7 @@ export default function Navbar() {
         <div className="flex md:hidden items-center gap-3">
           <button
             onClick={toggleTheme}
-            className="p-2 text-gray-500 hover:text-primary transition-colors rounded-full"
+            className="p-2 text-zinc-700 dark:text-zinc-300 hover:text-primary transition-colors rounded-full"
             aria-label="Toggle theme"
           >
             {mounted ? (
@@ -252,7 +193,7 @@ export default function Navbar() {
           </button>
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="p-2 text-gray-500 hover:text-foreground transition-colors"
+            className="p-2 text-zinc-700 dark:text-zinc-300 hover:text-foreground transition-colors"
             aria-label="Toggle menu"
           >
             {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
@@ -276,7 +217,7 @@ export default function Navbar() {
                   className={`text-base font-medium py-2 px-3 rounded-md transition-colors ${
                     isActive
                       ? "text-primary bg-primary/5 font-semibold"
-                      : "text-gray-500 hover:text-foreground hover:bg-gray-100 dark:hover:bg-white/5"
+                      : "text-zinc-700 dark:text-zinc-300 hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5 font-medium"
                   }`}
                 >
                   {item.label}

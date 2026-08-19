@@ -3,6 +3,7 @@ import React from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from "react-router-dom";
 import Home from "./pages/Home";
 import Signup from "./pages/Signup";
+import Login from "./pages/Login";
 import ForgotPassword from "./pages/ForgotPassword";
 import Admin from "./pages/Admin";
 import Categories from "./pages/Categories";
@@ -21,7 +22,7 @@ import { LoginModalProvider, useLoginModal } from "./context/LoginModalContext";
 import InteractiveGrid from "./components/InteractiveGrid";
 import LoginModal from "./components/LoginModal";
 import Navbar from "./components/Navbar";
-import { supabase } from "./lib/supabase";
+import { useAuth, useUser } from "@clerk/clerk-react";
 import { syncUser } from "./services/api";
 
 
@@ -46,73 +47,50 @@ function PersistentLayout() {
 }
 
 export default function App() {
+  const { isLoaded, userId, getToken } = useAuth();
+  const { user } = useUser();
+
   React.useEffect(() => {
+    if (!isLoaded) return;
 
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log(`[RECODEX AUTH] Event: ${event}`, session);
-
-      if (session) {
-        const intent = localStorage.getItem("recodex_auth_intent");
-
-        if (intent !== "signup") {
-          // Verify if user exists in the public users table
-          const { data: dbUser, error: checkError } = await supabase
-            .from("users")
-            .select("id")
-            .eq("id", session.user.id)
-            .maybeSingle();
-
-          const isAdmin = session.user.email === "veereshhp2004@gmail.com" || session.user.email === "veereshhp04@gmail.com";
-
-          if ((!dbUser || checkError) && !isAdmin) {
-            console.warn("[RECODEX AUTH] Access Denied: User record not found in database. Signup required.");
-            
-            // Sign out completely
-            await supabase.auth.signOut();
-            localStorage.removeItem("recodex_session_token");
-            localStorage.removeItem("recodex_admin_user");
-            localStorage.removeItem("recodex_auth_intent");
-            window.dispatchEvent(new Event("recodex-auth-update"));
-            
-            // Redirect to login with error parameter
-            window.location.href = "/login?error=user_not_found";
-            return;
-          }
+    const handleAuth = async () => {
+      if (userId && user) {
+        const token = await getToken();
+        if (token) {
+          localStorage.setItem("recodex_session_token", token);
+        } else {
+          localStorage.setItem("recodex_session_token", `clerk_${userId}`);
         }
 
-        // Standard user sync (for signups or valid logins)
-        localStorage.setItem("recodex_session_token", session.access_token);
+        const userEmail = user.primaryEmailAddress?.emailAddress || "";
+        const isAdmin = userEmail === "veereshhp2004@gmail.com";
+
+        if (isAdmin) {
+          localStorage.setItem("recodex_admin_user", "true");
+        } else {
+          localStorage.removeItem("recodex_admin_user");
+        }
+
         localStorage.removeItem("recodex_auth_intent");
         window.dispatchEvent(new Event("recodex-auth-update"));
 
-        if (session.user) {
-          const fullName = session.user.user_metadata?.full_name ||
-                           session.user.user_metadata?.name ||
-                           session.user.email?.split("@")[0] ||
-                           "RecodeX Engineer";
+        const fullName = user.fullName || user.username || userEmail.split("@")[0] || "RecodeX Engineer";
 
-          await syncUser({
-            id: session.user.id,
-            email: session.user.email || "",
-            name: fullName,
-            role: session.user.user_metadata?.role || "developer",
-            profileImage: session.user.user_metadata?.avatar_url || null,
-          });
+        await syncUser({
+          id: userId,
+          email: userEmail,
+          name: fullName,
+          role: isAdmin ? "admin" : "developer",
+          profileImage: user.imageUrl || undefined,
+        });
 
-          // Auto-login redirect for landing / auth pages after signup/signin resolves
-          const currentPath = window.location.pathname;
-          const isAuthPage = currentPath === "/" || currentPath === "/login" || currentPath === "/signup";
-          if (isAuthPage) {
-            const isAdmin = session.user.email === "veereshhp2004@gmail.com" || session.user.email === "veereshhp04@gmail.com";
-            if (isAdmin) {
-              localStorage.setItem("recodex_admin_user", "true");
-              window.dispatchEvent(new Event("recodex-auth-update"));
-              window.location.href = "/dashboard";
-            } else {
-              window.dispatchEvent(new Event("recodex-auth-update"));
-              window.location.href = "/projects";
-            }
+        const currentPath = window.location.pathname;
+        const isAuthPage = currentPath === "/" || currentPath === "/login" || currentPath === "/signup";
+        if (isAuthPage) {
+          if (isAdmin) {
+            window.location.href = "/dashboard";
+          } else {
+            window.location.href = "/projects";
           }
         }
       } else {
@@ -123,12 +101,11 @@ export default function App() {
           window.dispatchEvent(new Event("recodex-auth-update"));
         }
       }
-    });
-
-    return () => {
-      subscription.unsubscribe();
     };
-  }, []);
+
+    handleAuth();
+  }, [isLoaded, userId, user, getToken]);
+
 
   return (
     <ThemeProvider>
@@ -140,13 +117,12 @@ export default function App() {
             {/* All routes share the single persistent Navbar via PersistentLayout */}
             <Route element={<PersistentLayout />}>
               <Route path="/" element={<Home />} />
-              <Route path="/login" element={<RedirectToLoginPopup />} />
+              <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<Signup />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/admin" element={<Admin />} />
               <Route path="/categories" element={<Categories />} />
               <Route path="/contact" element={<Contact />} />
-              <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/marketplace" element={<Marketplace />} />
               <Route path="/projects" element={<Projects />} />
               <Route path="/services" element={<Services />} />
@@ -156,6 +132,7 @@ export default function App() {
               <Route path="/profile" element={<Profile />} />
               <Route path="/announcements" element={<Announcements />} />
             </Route>
+            <Route path="/dashboard" element={<Dashboard />} />
           </Routes>
         </Router>
       </LoginModalProvider>

@@ -25,7 +25,7 @@ export default function SubNavbar() {
                 className={`transition-all duration-200 ${
                   isActive
                     ? "text-primary drop-shadow-[0_0_5px_rgba(0,209,255,0.4)] border-b border-primary pb-0.5"
-                    : "text-gray-500 dark:text-gray-400 hover:text-primary hover:drop-shadow-[0_0_5px_rgba(0,209,255,0.4)]"
+                    : "text-zinc-700 dark:text-zinc-300 hover:text-primary hover:drop-shadow-[0_0_5px_rgba(0,209,255,0.4)]"
                 }`}
               >
                 {item.label}

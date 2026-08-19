@@ -96,7 +96,7 @@ export default function Announcements() {
               <Megaphone size={28} className="text-primary dark:text-[#00d1ff] animate-pulse" />
               Ecosystem Broadcast Hub
             </h1>
-            <p className="text-xs sm:text-sm text-gray-555 dark:text-zinc-400">
+            <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400">
               Live updates, hackathon announcements, software feature releases, and developer nodes telemetry.
             </p>
           </div>
@@ -104,9 +104,9 @@ export default function Announcements() {
           {/* Announcements Feed Grid */}
           {announcements.length === 0 ? (
             <div className="py-20 text-center bg-white/5 dark:bg-black/20 rounded-2xl border border-black/5 dark:border-white/5 max-w-lg mx-auto space-y-3 shadow-inner">
-              <ShieldAlert className="mx-auto text-gray-500 mb-2 animate-bounce" size={42} />
+              <ShieldAlert className="mx-auto text-zinc-500 dark:text-zinc-400 mb-2 animate-bounce" size={42} />
               <h3 className="text-sm font-mono font-bold uppercase tracking-widest text-foreground">No broadcasts active</h3>
-              <p className="text-xs text-gray-500 max-w-xs mx-auto leading-normal">
+              <p className="text-xs text-zinc-600 dark:text-zinc-400 max-w-xs mx-auto leading-normal">
                 Check back later! Active administrative broadcasts will automatically populate here in real-time.
               </p>
             </div>
@@ -129,7 +129,7 @@ export default function Announcements() {
                       <span className="text-[8px] font-bold font-mono px-2 py-0.5 rounded bg-primary/10 border border-primary/20 text-primary dark:text-[#00d1ff] uppercase tracking-wider block w-max">
                         {ann.type}
                       </span>
-                      <span className="text-[10px] font-mono text-zinc-500 flex items-center gap-1">
+                      <span className="text-[10px] font-mono text-zinc-600 dark:text-zinc-400 flex items-center gap-1">
                         <Calendar size={10} />
                         {formatRelativeTime(ann.date)}
                       </span>
@@ -141,7 +141,7 @@ export default function Announcements() {
                     <h3 className="text-base font-extrabold text-foreground group-hover:text-primary transition-colors leading-tight">
                       {ann.title}
                     </h3>
-                    <p className="text-xs text-gray-650 dark:text-zinc-350 leading-relaxed font-sans font-medium">
+                    <p className="text-xs text-zinc-700 dark:text-zinc-300 leading-relaxed font-sans font-medium">
                       {getAnnouncementMessage(ann)}
                     </p>
                   </div>

@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Project, MOCK_PROJECTS } from "../data/mockData";
 import { getProjects } from "../services/api";
@@ -206,7 +206,7 @@ function ShowcaseContent() {
         {/* Left Column (Repository Selectors & Stats) */}
         <aside className="w-full lg:w-72 space-y-6 lg:sticky lg:top-24 select-none">
           <div className="space-y-1">
-            <span className="text-[8px] font-mono text-zinc-500 tracking-wider block font-bold uppercase">
+            <span className="text-[8px] font-mono text-zinc-600 dark:text-zinc-400 tracking-wider block font-bold uppercase">
               Select Workspace
             </span>
             <div className="space-y-1.5 flex flex-col w-full">
@@ -217,7 +217,7 @@ function ShowcaseContent() {
                   className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl border text-left transition-all cursor-pointer group ${
                     selectedRepo.id === p.id
                       ? "bg-primary text-white dark:bg-[#0b101c] border-primary dark:border-[#00d1ff]/25"
-                      : "bg-black/5 dark:bg-[#04060a]/40 border-black/5 dark:border-zinc-900 text-zinc-500 hover:text-foreground dark:hover:text-zinc-300 hover:border-black/10 dark:hover:border-zinc-800"
+                      : "bg-black/5 dark:bg-[#04060a]/40 border-black/5 dark:border-zinc-900 text-zinc-700 dark:text-zinc-300 hover:text-foreground dark:hover:text-white hover:border-black/10 dark:hover:border-zinc-800"
                   }`}
                 >
                   <div className="flex items-center gap-2.5">
@@ -232,27 +232,27 @@ function ShowcaseContent() {
 
           {/* Selected Repository statistics */}
           <div className="border border-black/10 dark:border-zinc-900 bg-black/5 dark:bg-zinc-950/20 rounded-2xl p-5 space-y-4">
-            <span className="text-[8px] font-mono text-zinc-500 dark:text-zinc-600 tracking-widest uppercase font-bold block">
+            <span className="text-[8px] font-mono text-zinc-600 dark:text-zinc-400 tracking-widest uppercase font-bold block">
               Workspace Telemetry
             </span>
             <div className="grid grid-cols-2 gap-4 text-xs font-mono">
               <div className="space-y-1">
-                <span className="text-[8px] text-zinc-400 dark:text-zinc-600 font-bold block">ACTIVE_DEVS</span>
+                <span className="text-[8px] text-zinc-600 dark:text-zinc-400 font-bold block">ACTIVE_DEVS</span>
                 <span className="text-foreground dark:text-white font-bold block">{selectedRepo.devsCount}</span>
               </div>
               <div className="space-y-1">
-                <span className="text-[8px] text-zinc-400 dark:text-zinc-600 font-bold block">COMMIT_RATING</span>
+                <span className="text-[8px] text-zinc-600 dark:text-zinc-400 font-bold block">COMMIT_RATING</span>
                 <span className="text-primary dark:text-[#00d1ff] font-bold block">A+</span>
               </div>
               <div className="space-y-1">
-                <span className="text-[8px] text-zinc-400 dark:text-zinc-600 font-bold block">STARS_COUNT</span>
+                <span className="text-[8px] text-zinc-600 dark:text-zinc-400 font-bold block">STARS_COUNT</span>
                 <span className="text-foreground dark:text-white font-bold block flex items-center gap-1">
                   <Star size={10} className="text-zinc-500" />
                   {selectedRepo.stars}
                 </span>
               </div>
               <div className="space-y-1">
-                <span className="text-[8px] text-zinc-400 dark:text-zinc-600 font-bold block">FORKS_COUNT</span>
+                <span className="text-[8px] text-zinc-600 dark:text-zinc-400 font-bold block">FORKS_COUNT</span>
                 <span className="text-foreground dark:text-white font-bold block flex items-center gap-1">
                   <GitFork size={10} className="text-zinc-500" />
                   {selectedRepo.forks}

@@ -56,6 +56,91 @@
   
   --animate-marquee: marquee 30s linear infinite;
   --animate-float: float 4s ease-in-out infinite;
+
+  /* Stitch Custom Dashboard Colors */
+  --color-surface-dim: var(--surface-dim);
+  --color-on-secondary-fixed: #001f26;
+  --color-on-primary-container: #dad7ff;
+  --color-error-container: #ffdad6;
+  --color-tertiary-fixed-dim: #c0c1ff;
+  --color-surface-variant: var(--surface-variant);
+  --color-on-primary-fixed: #0f0069;
+  --color-secondary-fixed: #acedff;
+  --color-surface-bright: var(--surface-bright);
+  --color-on-error-container: #93000a;
+  --color-surface: var(--surface);
+  --color-tertiary-container: #4b4dd8;
+  --color-on-tertiary: #ffffff;
+  --color-on-tertiary-fixed-variant: #2f2ebe;
+  --color-on-tertiary-fixed: #07006c;
+  --color-inverse-on-surface: #eaf1ff;
+  --color-on-surface-variant: var(--on-surface-variant);
+  --color-secondary-fixed-dim: #4cd7f6;
+  --color-inverse-surface: var(--inverse-surface);
+  --color-on-primary-fixed-variant: #3323cc;
+  --color-tertiary: #3130c0;
+  --color-on-tertiary-container: #d9d8ff;
+  --color-on-secondary: #ffffff;
+  --color-on-background: var(--on-background);
+  --color-on-secondary-container: #006172;
+  --color-on-surface: var(--on-surface);
+  --color-surface-container-low: var(--surface-container-low);
+  --color-surface-container-highest: var(--surface-container-highest);
+  --color-outline: var(--outline);
+  --color-outline-variant: var(--outline-variant);
+  --color-primary-fixed-dim: #c3c0ff;
+  --color-tertiary-fixed: #e1e0ff;
+  --color-surface-tint: #4d44e3;
+  --color-surface-container-high: var(--surface-container-high);
+  --color-surface-container: var(--surface-container);
+  --color-inverse-primary: #c3c0ff;
+  --color-surface-container-lowest: var(--surface-container-lowest);
+  /* Custom Stitch Utilities */
+  --spacing-gutter: 24px;
+  --spacing-container-max: 1440px;
+  --spacing-margin-mobile: 16px;
+
+  /* Stitch Font Sizes */
+  --font-size-body-sm: 14px;
+  --font-size-headline-sm: 24px;
+  --font-size-display-lg-mobile: 36px;
+  --font-size-label-sm: 12px;
+  --font-size-display-lg: 48px;
+  --font-size-body-md: 16px;
+  --font-size-label-md: 14px;
+}
+
+/* Custom Stitch Utility styles */
+.ambient-shadow {
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+}
+
+.p-md {
+  padding: 1.5rem;
+}
+
+.p-lg {
+  padding: 2rem;
+}
+
+.space-y-lg > :not([hidden]) ~ :not([hidden]) {
+  margin-top: 2rem;
+}
+
+.glass-card {
+  background: var(--color-surface-container-lowest);
+  border: 1px solid var(--color-surface-variant);
+  border-radius: 14px;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+}
+
+.hover-lift {
+  transition: transform 150ms ease, box-shadow 150ms ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
 }
 
 @keyframes marquee {
@@ -109,6 +194,23 @@
 
   --error: #ba1a1a;
   --error-container: #ffdad6;
+
+  /* Stitch Light Mode Variables */
+  --surface: #f8f9ff;
+  --surface-dim: #cbdbf5;
+  --surface-variant: #d3e4fe;
+  --surface-bright: #f8f9ff;
+  --surface-container-low: #eff4ff;
+  --surface-container-highest: #d3e4fe;
+  --surface-container-high: #dce9ff;
+  --surface-container: #e5eeff;
+  --surface-container-lowest: #ffffff;
+  --on-background: #0b1c30;
+  --on-surface: #0b1c30;
+  --on-surface-variant: #464555;
+  --outline: #777587;
+  --outline-variant: #c7c4d8;
+  --inverse-surface: #213145;
 }
 
 /* Dark Mode Variables */
@@ -131,6 +233,23 @@
 
   --error: #ffb4ab;
   --error-container: #93000a;
+
+  /* Stitch Dark Mode Variables */
+  --surface: #07090e;
+  --surface-dim: #1a1e24;
+  --surface-variant: #1e222b;
+  --surface-bright: #0c0f16;
+  --surface-container-low: #090b11;
+  --surface-container-highest: #1a1d26;
+  --surface-container-high: #12151d;
+  --surface-container: #0b0e14;
+  --surface-container-lowest: #07090e;
+  --on-background: #e3e2e2;
+  --on-surface: #e3e2e2;
+  --on-surface-variant: #a1a1aa; /* zinc-400 */
+  --outline: #52525b; /* zinc-600 */
+  --outline-variant: #27272a; /* zinc-800 */
+  --inverse-surface: #f4f4f5;
 }
 
 body {
@@ -138,6 +257,15 @@ body {
   color: var(--foreground);
   transition: background-color 0.4s ease, color 0.4s ease;
   overflow-x: hidden;
+}
+
+/* Hide scrollbars custom helper */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 /* Custom Glassmorphism */
@@ -208,67 +336,203 @@ body {
   100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 209, 255, 0); }
 }
 
-/* Force all footers globally across all pages to render in stable ultra-premium dark theme with 100% visible text */
-footer {
+/* Site Footer Theme Overrides */
+footer.site-footer {
   background-color: #050608 !important; /* Stable deep dark background */
   color: #a1a1aa !important; /* Zinc-400 text color */
   border-top-width: 1px !important;
   border-color: rgba(255, 255, 255, 0.08) !important; /* Sub-pixel border line */
 }
 
-/* Ensure headings, links, and foreground classes inside the footer are highly visible */
-footer h1,
-footer h2,
-footer h3,
-footer h4,
-footer h5,
-footer h6,
-footer [class*="text-foreground"],
-footer .text-foreground,
-footer a:not(.text-zinc-500):not(.text-gray-500) {
+/* Ensure headings, links, and foreground classes inside site footer are highly visible */
+footer.site-footer h1,
+footer.site-footer h2,
+footer.site-footer h3,
+footer.site-footer h4,
+footer.site-footer h5,
+footer.site-footer h6,
+footer.site-footer [class*="text-foreground"],
+footer.site-footer .text-foreground,
+footer.site-footer a:not(.text-zinc-500):not(.text-gray-500) {
   color: #ffffff !important; /* Pure white for high-contrast visibility */
 }
 
-/* Force standard paragraphs and spans to remain clear and readable gray */
-footer p,
-footer span:not(.font-mono):not(.text-primary):not([class*="text-[#00d1ff]"]) {
+/* Force standard paragraphs and spans in site footer to remain clear gray */
+footer.site-footer p,
+footer.site-footer span:not(.font-mono):not(.text-primary):not([class*="text-[#00d1ff]"]) {
   color: #a1a1aa !important; /* Zinc-400 text */
 }
 
 /* Specific styling for copyright footer and developer marketplace text */
-footer span.font-mono,
-footer .text-zinc-500,
-footer .text-gray-400,
-footer .text-zinc-650,
-footer .text-zinc-600 {
+footer.site-footer span.font-mono,
+footer.site-footer .text-zinc-500,
+footer.site-footer .text-gray-400,
+footer.site-footer .text-zinc-650,
+footer.site-footer .text-zinc-600 {
   color: #71717a !important; /* Zinc-500 copyright and telemetry logs */
 }
 
-/* Brand highlights, signature logo color, and hovers */
-footer .text-primary,
-footer [class*="text-primary"],
-footer span.font-light,
-footer a:hover,
-footer span:hover,
-footer div:hover > span {
+/* Brand highlights, signature logo color, and hovers in site footer */
+footer.site-footer .text-primary,
+footer.site-footer [class*="text-primary"],
+footer.site-footer span.font-light,
+footer.site-footer a:hover,
+footer.site-footer span:hover,
+footer.site-footer div:hover > span {
   color: #00d1ff !important; /* RecodeX signature cyan styling */
 }
 
-/* Sub-containers backgrounds should be transparent so the dark background flows perfectly */
-footer div,
-footer nav,
-footer p,
-footer span,
-footer aside {
+/* Sub-containers backgrounds inside site footer */
+footer.site-footer div,
+footer.site-footer nav,
+footer.site-footer p,
+footer.site-footer span,
+footer.site-footer aside {
   background-color: transparent !important;
 }
 
-/* Specific overrides for security circles at the bottom */
-footer div.rounded-full {
+/* Specific overrides for security circles at the bottom of site footer */
+footer.site-footer div.rounded-full {
   background-color: rgba(255, 255, 255, 0.05) !important;
   border-color: rgba(255, 255, 255, 0.1) !important;
 }
-footer div.rounded-full svg {
+footer.site-footer div.rounded-full svg {
   color: #a1a1aa !important;
 }
+
+/* ==========================================
+   Clerk Auth Components Theme Adaptation
+   ========================================== */
+.cl-rootBox {
+  width: 100%;
+}
+
+.cl-card {
+  background-color: transparent !important;
+  box-shadow: none !important;
+}
+
+/* Light Mode Clerk Overrides */
+:root:not(.dark) .cl-headerTitle {
+  color: #09090b !important;
+}
+:root:not(.dark) .cl-headerSubtitle {
+  color: #52525b !important;
+}
+:root:not(.dark) .cl-socialButtonsBlockButton {
+  background-color: #f4f4f5 !important;
+  border: 1px solid #e4e4e7 !important;
+  color: #09090b !important;
+}
+:root:not(.dark) .cl-socialButtonsBlockButtonText {
+  color: #09090b !important;
+  font-weight: 600 !important;
+}
+:root:not(.dark) .cl-dividerLine {
+  background-color: #e4e4e7 !important;
+}
+:root:not(.dark) .cl-dividerText {
+  color: #71717a !important;
+}
+:root:not(.dark) .cl-formFieldLabel {
+  color: #3f3f46 !important;
+  font-weight: 600 !important;
+}
+:root:not(.dark) .cl-formFieldInput {
+  background-color: #ffffff !important;
+  border: 1px solid #d4d4d8 !important;
+  color: #09090b !important;
+}
+:root:not(.dark) .cl-formFieldInput::placeholder {
+  color: #71717a !important;
+}
+:root:not(.dark) .cl-footer,
+:root:not(.dark) footer.cl-footer {
+  background-color: transparent !important;
+  background: transparent !important;
+  border-top: 1px solid #f4f4f5 !important;
+  color: #52525b !important;
+}
+:root:not(.dark) .cl-footerActionText,
+:root:not(.dark) .cl-footerText,
+:root:not(.dark) .cl-userButtonOuterIdentifier,
+:root:not(.dark) .cl-internal-ph928n {
+  color: #52525b !important;
+}
+:root:not(.dark) .cl-footerActionLink,
+:root:not(.dark) .cl-footerPagesLink {
+  color: #00677c !important;
+  font-weight: 600 !important;
+}
+:root:not(.dark) .cl-identityPreviewText {
+  color: #09090b !important;
+}
+
+/* Dark Mode Clerk Overrides */
+:root.dark .cl-headerTitle {
+  color: #ffffff !important;
+}
+:root.dark .cl-headerSubtitle {
+  color: #a1a1aa !important;
+}
+:root.dark .cl-socialButtonsBlockButton {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  color: #ffffff !important;
+}
+:root.dark .cl-socialButtonsBlockButtonText {
+  color: #ffffff !important;
+  font-weight: 600 !important;
+}
+:root.dark .cl-dividerLine {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+}
+:root.dark .cl-dividerText {
+  color: #a1a1aa !important;
+}
+:root.dark .cl-formFieldLabel {
+  color: #d4d4d8 !important;
+  font-weight: 600 !important;
+}
+:root.dark .cl-formFieldInput {
+  background-color: rgba(0, 0, 0, 0.4) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  color: #ffffff !important;
+}
+:root.dark .cl-formFieldInput::placeholder {
+  color: #71717a !important;
+}
+:root.dark .cl-footer,
+:root.dark footer.cl-footer {
+  background-color: transparent !important;
+  background: transparent !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
+  color: #a1a1aa !important;
+}
+:root.dark .cl-footerActionText,
+:root.dark .cl-footerText,
+:root.dark .cl-userButtonOuterIdentifier,
+:root.dark .cl-internal-ph928n {
+  color: #a1a1aa !important;
+}
+:root.dark .cl-footerActionLink,
+:root.dark .cl-footerPagesLink {
+  color: #00d1ff !important;
+  font-weight: 600 !important;
+}
+:root.dark .cl-identityPreviewText {
+  color: #ffffff !important;
+}
+
+/* ==========================================
+   Brand Logo Dark & Light Theme Adaptation
+   ========================================== */
+.brand-logo-img {
+  transition: filter 0.3s ease, opacity 0.3s ease;
+}
+
+:root.dark .brand-logo-img {
+  filter: invert(1) hue-rotate(180deg) brightness(1.25) contrast(1.1);
+}
+
 

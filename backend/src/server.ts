@@ -1,6 +1,10 @@
 import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import { clerkMiddleware } from "@clerk/express";
+import { serve } from "inngest/express";
+import { inngest } from "./inngest/client";
+import { generateIndustryInsights } from "./inngest/functions";
 import projectRoutes from "./routes/projects";
 import userRoutes from "./routes/users";
 import contactRoutes from "./routes/contacts";
@@ -35,6 +39,9 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 
+// Register Clerk middleware globally
+app.use(clerkMiddleware());
+
 // Expose built-in JSON body parsers
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -49,6 +56,7 @@ app.use((req: Request, _res: Response, next: NextFunction) => {
 app.use("/api/projects", projectRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/contacts", contactRoutes);
+app.use("/api/inngest", serve({ client: inngest, functions: [generateIndustryInsights] }));
 
 // Basic Health Check Endpoint
 app.get("/health", (_req: Request, res: Response) => {

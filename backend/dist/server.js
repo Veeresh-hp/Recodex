@@ -6,18 +6,40 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const dotenv_1 = __importDefault(require("dotenv"));
+const express_2 = require("@clerk/express");
+const express_3 = require("inngest/express");
+const client_1 = require("./inngest/client");
+const functions_1 = require("./inngest/functions");
 const projects_1 = __importDefault(require("./routes/projects"));
 const users_1 = __importDefault(require("./routes/users"));
+const contacts_1 = __importDefault(require("./routes/contacts"));
 // Initialize environment variables from .env
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 const PORT = process.env.PORT || 5000;
-// Enable Cross-Origin Resource Sharing for the Next.js Frontend
+// Enable Cross-Origin Resource Sharing for Frontend
 const corsOptions = {
-    origin: process.env.FRONTEND_URL || "http://localhost:3000",
+    origin: (origin, callback) => {
+        // Allow requests with no origin (like mobile apps, curl, etc.)
+        if (!origin) {
+            callback(null, true);
+            return;
+        }
+        const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+        const isLocal = /^http:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)(:\d+)?$/.test(origin);
+        if (origin === frontendUrl || isLocal || !process.env.VERCEL) {
+            callback(null, true);
+        }
+        else {
+            callback(new Error("Not allowed by CORS"));
+        }
+    },
+    credentials: true,
     optionsSuccessStatus: 200,
 };
 app.use((0, cors_1.default)(corsOptions));
+// Register Clerk middleware globally
+app.use((0, express_2.clerkMiddleware)());
 // Expose built-in JSON body parsers
 app.use(express_1.default.json());
 app.use(express_1.default.urlencoded({ extended: true }));
@@ -29,11 +51,13 @@ app.use((req, _res, next) => {
 // Register API Routes
 app.use("/api/projects", projects_1.default);
 app.use("/api/users", users_1.default);
+app.use("/api/contacts", contacts_1.default);
+app.use("/api/inngest", (0, express_3.serve)({ client: client_1.inngest, functions: [functions_1.generateIndustryInsights] }));
 // Basic Health Check Endpoint
 app.get("/health", (_req, res) => {
     res.json({
         status: "online",
-        system: "CAMCOD DevMarket Core Server",
+        system: "RECODEX DevMarket Core Server",
         timestamp: new Date().toISOString(),
     });
 });
@@ -48,11 +72,14 @@ app.use((err, _req, res, _next) => {
         error: err.message || "An unexpected system exception occurred inside DevMarket core.",
     });
 });
-// Boot Server
-app.listen(PORT, () => {
-    console.log("====================================================");
-    console.log(`⚡️ CAMCOD BACKEND API CORE BOOTED SUCCESSFULLY ⚡️`);
-    console.log(`📡 Server active on: http://localhost:${PORT}`);
-    console.log(`🌐 Frontend Allowed Origin: ${process.env.FRONTEND_URL || "http://localhost:3000"}`);
-    console.log("====================================================");
-});
+// Boot Server (only in non-serverless environments)
+if (!process.env.VERCEL) {
+    app.listen(PORT, () => {
+        console.log("====================================================");
+        console.log(`⚡️ RECODEX BACKEND API CORE BOOTED SUCCESSFULLY ⚡️`);
+        console.log(`📡 Server active on: http://localhost:${PORT}`);
+        console.log(`🌐 Frontend Allowed Origin: ${process.env.FRONTEND_URL || "http://localhost:3000"}`);
+        console.log("====================================================");
+    });
+}
+exports.default = app;

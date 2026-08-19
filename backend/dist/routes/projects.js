@@ -105,7 +105,7 @@ router.post("/", auth_1.requireAuth, upload.single("image"), async (req, res) =>
         let imageUrl = "https://images.unsplash.com/photo-1555066931-4365d14bab8c?q=80&w=600"; // Default image fallback
         if (req.file) {
             try {
-                const uploadResult = await (0, cloudinary_1.uploadToCloudinary)(req.file.buffer, "camcod_projects");
+                const uploadResult = await (0, cloudinary_1.uploadToCloudinary)(req.file.buffer, "recodex_projects");
                 imageUrl = uploadResult.secure_url;
             }
             catch (uploadError) {
@@ -195,7 +195,7 @@ router.put("/:id", auth_1.requireAuth, upload.single("image"), async (req, res) 
         if (category)
             updateData.category = category;
         if (req.file) {
-            const uploadResult = await (0, cloudinary_1.uploadToCloudinary)(req.file.buffer, "camcod_projects");
+            const uploadResult = await (0, cloudinary_1.uploadToCloudinary)(req.file.buffer, "recodex_projects");
             updateData.imageUrl = uploadResult.secure_url;
         }
         if (tags) {
@@ -235,14 +235,13 @@ router.put("/:id", auth_1.requireAuth, upload.single("image"), async (req, res) 
 router.delete("/:id", auth_1.requireAuth, async (req, res) => {
     const { id } = req.params;
     try {
-        const existingProject = await db_1.default.project.findUnique({ where: { id } });
-        if (!existingProject) {
-            return res.status(404).json({ error: "Project not found." });
-        }
         await db_1.default.project.delete({ where: { id } });
         return res.json({ message: "Project deleted successfully." });
     }
     catch (error) {
+        if (error.code === "P2025") {
+            return res.json({ message: "Project already deleted or does not exist." });
+        }
         console.error(`Error deleting project ${id}:`, error);
         return res.status(500).json({ error: "Failed to delete project listing." });
     }

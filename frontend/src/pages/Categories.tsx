@@ -289,7 +289,7 @@ export default function Categories() {
             
             {/* Stack Navigation list */}
             <div className="space-y-4">
-              <h3 className="text-[9px] font-mono text-gray-500 dark:text-zinc-500 uppercase tracking-widest font-bold block mb-2 pl-3">
+              <h3 className="text-[9px] font-mono text-zinc-600 dark:text-zinc-400 uppercase tracking-widest font-bold block mb-2 pl-3">
                 Stack Navigation
               </h3>
               <div className="space-y-1">
@@ -302,7 +302,7 @@ export default function Categories() {
                       className={`w-full text-left py-2.5 px-3.5 text-xs font-bold tracking-wider font-mono uppercase rounded-lg border transition-all flex items-center relative ${
                         isActive
                           ? "bg-primary/5 dark:bg-[#0b101c] border-primary/20 text-foreground"
-                          : "bg-transparent border-transparent text-gray-500 hover:text-foreground hover:bg-black/5 dark:hover:bg-zinc-900/10"
+                          : "bg-transparent border-transparent text-zinc-600 dark:text-zinc-400 hover:text-foreground hover:bg-black/5 dark:hover:bg-zinc-900/10"
                       }`}
                     >
                       {isActive && (
@@ -317,12 +317,12 @@ export default function Categories() {
 
             {/* Request Add Box */}
             <div className="border border-black/5 dark:border-zinc-900 bg-black/5 dark:bg-zinc-950/20 p-5 rounded-xl space-y-3">
-              <span className="text-[10px] text-gray-500 dark:text-zinc-500 font-sans block leading-relaxed font-semibold">
+              <span className="text-[10px] text-zinc-600 dark:text-zinc-400 font-sans block leading-relaxed font-semibold">
                 Can&apos;t find a stack?
               </span>
               <button
                 onClick={() => { setRequestSubmitted(false); setRequestStack(""); setRequestModalOpen(true); }}
-                className="w-full py-2.5 border border-black/10 dark:border-outline-variant rounded-lg text-[9px] font-mono font-bold uppercase tracking-widest text-gray-500 dark:text-zinc-400 hover:bg-primary/5 hover:text-foreground hover:border-primary/20 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                className="w-full py-2.5 border border-black/10 dark:border-outline-variant rounded-lg text-[9px] font-mono font-bold uppercase tracking-widest text-zinc-600 dark:text-zinc-400 hover:bg-primary/5 hover:text-foreground hover:border-primary/20 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <Plus size={11} />
                 Request Add
@@ -339,7 +339,7 @@ export default function Categories() {
               <h1 className="text-3xl font-black text-foreground tracking-tight font-sans">
                 Tech Directory
               </h1>
-              <p className="text-gray-500 text-xs leading-relaxed mt-3 max-w-2xl font-sans font-medium">
+              <p className="text-zinc-600 dark:text-zinc-400 text-xs leading-relaxed mt-3 max-w-2xl font-sans font-medium">
                 Explore organized clusters of technology stacks curated for performance and scalability. Discover experts and projects built on your favorite frameworks.
               </p>
             </div>
@@ -412,14 +412,14 @@ export default function Categories() {
                         {tech.name}
                       </h3>
                       
-                      <p className="text-[11px] text-gray-500 leading-relaxed font-sans font-medium line-clamp-3">
+                      <p className="text-[11px] text-zinc-600 dark:text-zinc-400 leading-relaxed font-sans font-medium line-clamp-3">
                         {tech.description}
                       </p>
                     </div>
 
                     <div className="flex flex-wrap gap-1 pt-2 select-none">
                       {tech.tags.map(tag => (
-                        <span key={tag} className="text-[8px] font-mono bg-black/5 dark:bg-zinc-900 border border-black/5 dark:border-zinc-800/50 text-gray-500 dark:text-zinc-500 px-2 py-0.5 rounded">
+                        <span key={tag} className="text-[8px] font-mono bg-black/5 dark:bg-zinc-900 border border-black/5 dark:border-zinc-800/50 text-zinc-600 dark:text-zinc-400 px-2 py-0.5 rounded">
                           {tag}
                         </span>
                       ))}
@@ -436,7 +436,7 @@ export default function Categories() {
                   <TrendingUp size={16} className="text-primary" />
                   Stack Masters
                 </h2>
-                <p className="text-[10px] text-gray-500 font-sans font-medium">
+                <p className="text-[10px] text-zinc-600 dark:text-zinc-400 font-sans font-medium">
                   Top contributors in {activeTab} this month.
                 </p>
               </div>
