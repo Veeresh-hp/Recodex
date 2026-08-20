@@ -15,6 +15,7 @@ import Services from "./pages/Services";
 import Showcase from "./pages/Showcase";
 import Solutions from "./pages/Solutions";
 import Terms from "./pages/Terms";
+import Privacy from "./pages/Privacy";
 import Profile from "./pages/Profile";
 import Announcements from "./pages/Announcements";
 import { ThemeProvider } from "./context/ThemeContext";
@@ -129,6 +130,7 @@ export default function App() {
               <Route path="/showcase" element={<Showcase />} />
               <Route path="/solutions" element={<Solutions />} />
               <Route path="/terms" element={<Terms />} />
+              <Route path="/privacy" element={<Privacy />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/announcements" element={<Announcements />} />
             </Route>
