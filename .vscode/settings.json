@@ -1,3 +1,4 @@
 {
-    "liveServer.settings.multiRootWorkspaceName": "camcod"
+    "liveServer.settings.multiRootWorkspaceName": "camcod",
+    "css.lint.unknownAtRules": "ignore"
 }
