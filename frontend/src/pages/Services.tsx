@@ -1,5 +1,4 @@
 import React from "react";
-import Footer from "@/components/Footer";
 import { Link } from "react-router-dom";
 import { Cpu, Code, Server, Shield, Sparkles, Layers } from "lucide-react";
 
@@ -120,8 +119,6 @@ export default function Services() {
 
         </div>
       </main>
-
-      <Footer />
     </>
   );
 }

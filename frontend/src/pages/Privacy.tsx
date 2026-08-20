@@ -320,59 +320,6 @@ export default function PrivacyPolicy() {
 
         </div>
       </main>
-
-      {/* Footer */}
-      <footer className="relative z-10 border-t border-white/5 bg-black/60 backdrop-blur-md w-full pt-16 pb-8 transition-colors select-text print:hidden">
-        <div className="max-w-7xl mx-auto px-6 md:px-12 xl:px-24">
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-8 lg:gap-12 pb-12">
-            <div className="md:col-span-6 space-y-4">
-              <div className="text-xl font-black tracking-tight text-white font-sans uppercase">
-                <span className="text-[#00d1ff]">Recode</span>X
-              </div>
-              <p className="text-xs text-zinc-500 max-w-sm leading-relaxed">
-                Engineering the future of work through decentralized collaboration and high-performance talent acquisition.
-              </p>
-            </div>
-
-            <div className="md:col-span-6 grid grid-cols-2 gap-6">
-              <div className="space-y-3">
-                <h4 className="text-[9px] font-bold text-[#00d1ff] font-mono uppercase tracking-widest">
-                  Resources
-                </h4>
-                <div className="flex flex-col gap-2 text-xs text-zinc-500">
-                  <span className="hover:text-[#00d1ff] cursor-pointer transition-colors">Network Status</span>
-                  <span className="hover:text-[#00d1ff] cursor-pointer transition-colors">Security</span>
-                  <span className="hover:text-[#00d1ff] cursor-pointer transition-colors">API Reference</span>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <h4 className="text-[9px] font-bold text-[#00d1ff] font-mono uppercase tracking-widest">
-                  Legal
-                </h4>
-                <div className="flex flex-col gap-2 text-xs text-zinc-500">
-                  <Link to="/terms" className="hover:text-[#00d1ff] transition-colors">Terms of Service</Link>
-                  <Link to="/privacy" className="hover:text-[#00d1ff] transition-colors">Privacy Policy</Link>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="border-t border-white/5 pt-6 flex flex-col md:flex-row items-center justify-between gap-4">
-            <span className="text-[9px] font-mono text-zinc-650 tracking-wider uppercase font-bold">
-              © 2026 RecodeX. Engineering the future of work.
-            </span>
-            <div className="flex items-center gap-3">
-              <div className="w-7 h-7 rounded-full bg-zinc-900/30 border border-zinc-800 flex items-center justify-center text-zinc-500">
-                <Shield size={13} />
-              </div>
-              <div className="w-7 h-7 rounded-full bg-zinc-900/30 border border-zinc-800 flex items-center justify-center text-zinc-500">
-                <CheckCircle2 size={13} />
-              </div>
-            </div>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }

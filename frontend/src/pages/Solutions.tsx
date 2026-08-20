@@ -4,7 +4,6 @@ import {
   Fingerprint, Lock, RefreshCw, Brain, Network, Braces, BarChart3
 } from "lucide-react";
 import SubNavbar from "../components/SubNavbar";
-import Footer from "../components/Footer";
 import { useTheme } from "../context/ThemeContext";
 
 export default function Solutions() {
@@ -443,8 +442,7 @@ export default function Solutions() {
           </div>
         </section>
       </main>
-
-      <Footer />
     </>
   );
+}
 }

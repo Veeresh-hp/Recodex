@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import Footer from "@/components/Footer";
 import { Link } from "react-router-dom";
 import { 
   MapPin, 
@@ -404,8 +403,6 @@ export default function Contact() {
 
         </div>
       </main>
-
-      <Footer />
     </>
   );
 }

@@ -1,6 +1,5 @@
 import React, { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import Footer from "../components/Footer";
 import TerminalModal from "../components/TerminalModal";
 import { Project, MOCK_PROJECTS } from "../data/mockData";
 import { getProjects } from "../services/api";
@@ -295,15 +294,12 @@ function ProjectsContent() {
 
 export default function Projects() {
   return (
-    <>
-      <Suspense fallback={
-        <div className="min-h-screen bg-black flex items-center justify-center text-primary font-mono text-sm">
-          Loading gallery systems...
-        </div>
-      }>
-        <ProjectsContent />
-      </Suspense>
-      <Footer />
-    </>
+    <Suspense fallback={
+      <div className="min-h-screen bg-black flex items-center justify-center text-primary font-mono text-sm">
+        Loading gallery systems...
+      </div>
+    }>
+      <ProjectsContent />
+    </Suspense>
   );
 }

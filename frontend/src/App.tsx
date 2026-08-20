@@ -23,6 +23,7 @@ import { LoginModalProvider, useLoginModal } from "./context/LoginModalContext";
 import InteractiveGrid from "./components/InteractiveGrid";
 import LoginModal from "./components/LoginModal";
 import Navbar from "./components/Navbar";
+import Footer from "./components/Footer";
 import { useAuth, useUser } from "@clerk/clerk-react";
 import { syncUser } from "./services/api";
 
@@ -37,13 +38,16 @@ function RedirectToLoginPopup() {
   return <Navigate to="/" replace />;
 }
 
-// Persistent layout — Navbar rendered once here, never re-mounts on route change
+// Persistent layout — Navbar & Footer rendered once here for all pages
 function PersistentLayout() {
   return (
-    <>
+    <div className="flex flex-col min-h-screen">
       <Navbar />
-      <Outlet />
-    </>
+      <div className="flex-grow">
+        <Outlet />
+      </div>
+      <Footer />
+    </div>
   );
 }
 

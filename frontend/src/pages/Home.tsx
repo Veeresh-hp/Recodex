@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
-import Footer from "@/components/Footer";
 import TerminalModal from "@/components/TerminalModal";
 import { MOCK_PROJECTS, ECOSYSTEMS } from "@/data/mockData";
 import { ArrowUpRight, Terminal as TerminalIcon, Code, ShieldCheck, Cpu, Award } from "lucide-react";
@@ -381,8 +380,6 @@ export default function Home() {
         </section>
 
       </main>
-
-      <Footer />
 
       {/* Terminal View Dialog Overlay */}
       <TerminalModal

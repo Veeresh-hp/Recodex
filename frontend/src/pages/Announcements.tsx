@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import Footer from "../components/Footer";
 import { Megaphone, Bell, Calendar, ShieldAlert } from "lucide-react";
 
 interface Announcement {
@@ -152,8 +151,6 @@ export default function Announcements() {
 
         </div>
       </main>
-
-      <Footer />
     </div>
   );
 }
