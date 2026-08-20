@@ -12,22 +12,11 @@ export default function Footer() {
           
           {/* Column 1: Brand Summary */}
           <div className="md:col-span-5 flex flex-col gap-4">
-            <Link to="/" className="inline-block w-fit">
+            <Link to="/" className="flex items-center gap-3 hover:opacity-90 transition-opacity w-fit group">
               <img 
                 src="/recodeXlogo.png" 
                 alt="RecodeX Logo" 
-                className="brand-logo-img h-9 w-auto object-contain"
-                onError={(e) => {
-                  // Fallback text if logo image is missing
-                  e.currentTarget.style.display = 'none';
-                  const parent = e.currentTarget.parentElement;
-                  if (parent && !parent.querySelector('.logo-fallback')) {
-                    const span = document.createElement('span');
-                    span.className = 'logo-fallback text-2xl font-black tracking-tight text-white uppercase font-sans';
-                    span.innerHTML = '<span class="text-[#00d1ff]">Recode</span>X';
-                    parent.appendChild(span);
-                  }
-                }}
+                className="brand-logo-img h-10 w-auto object-contain shrink-0" 
               />
             </Link>
             <p className="text-xs md:text-sm text-zinc-400 dark:text-zinc-500 max-w-sm leading-relaxed font-sans font-medium">
