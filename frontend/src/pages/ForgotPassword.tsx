@@ -319,19 +319,6 @@ export default function ForgotPassword() {
 
         </div>
       </main>
-
-      {/* Standalone Authentication bottom Copyright bar */}
-      <footer className="relative z-10 border-t border-black/5 dark:border-zinc-955 bg-white/40 dark:bg-black/40 backdrop-blur-md w-full py-6 select-text">
-        <div className="max-w-7xl mx-auto px-6 md:px-12 xl:px-24 flex items-center justify-between text-[8px] font-mono text-zinc-500 dark:text-zinc-700 tracking-wider uppercase font-bold">
-          <span>
-            Â© 2026 RECODEX Developer Marketplace. All rights reserved.
-          </span>
-          <div className="flex items-center gap-3">
-            <Shield size={12} />
-            <CheckCircle2 size={12} />
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }

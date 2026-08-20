@@ -470,56 +470,6 @@ export default function Categories() {
         </div>
       </main>
 
-      {/* Technical Footer */}
-      <footer className="relative z-10 border-t border-black/5 dark:border-zinc-900 bg-white/60 dark:bg-black/60 backdrop-blur-md w-full pt-16 pb-8 transition-colors select-text">
-        <div className="max-w-7xl mx-auto px-6 md:px-12 xl:px-24">
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-8 lg:gap-12 pb-12">
-            <div className="md:col-span-6 space-y-4">
-              <div className="text-xl font-black tracking-tight text-foreground font-sans uppercase">
-                <span className="text-primary">Cam</span>Cod
-              </div>
-              <p className="text-xs text-gray-500 max-w-sm leading-relaxed">
-                Engineering the future of work through decentralized collaboration and high-performance talent acquisition.
-              </p>
-            </div>
-            <div className="md:col-span-6 grid grid-cols-2 gap-6">
-              <div className="space-y-3">
-                <h4 className="text-[9px] font-bold text-primary font-mono uppercase tracking-widest">
-                  Resources
-                </h4>
-                <div className="flex flex-col gap-2 text-xs text-gray-500">
-                  <span className="hover:text-primary cursor-pointer transition-colors">Network Status</span>
-                  <span className="hover:text-primary cursor-pointer transition-colors">Security</span>
-                  <span className="hover:text-primary cursor-pointer transition-colors">API Reference</span>
-                </div>
-              </div>
-              <div className="space-y-3">
-                <h4 className="text-[9px] font-bold text-primary font-mono uppercase tracking-widest">
-                  Legal
-                </h4>
-                <div className="flex flex-col gap-2 text-xs text-gray-500">
-                  <Link to="/terms" className="hover:text-primary transition-colors">Terms of Service</Link>
-                  <span className="hover:text-primary cursor-pointer transition-colors">Privacy Policy</span>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="border-t border-black/5 dark:border-zinc-900 pt-6 flex flex-col md:flex-row items-center justify-between gap-4">
-            <span className="text-[9px] font-mono text-gray-400 dark:text-zinc-600 tracking-wider uppercase font-bold">
-              Â© 2026 RecodeX. Engineering the future of work.
-            </span>
-            <div className="flex items-center gap-3">
-              <div className="w-7 h-7 rounded-full bg-black/5 dark:bg-zinc-900/30 border border-black/5 dark:border-zinc-800 flex items-center justify-center text-gray-500">
-                <Shield size={13} />
-              </div>
-              <div className="w-7 h-7 rounded-full bg-black/5 dark:bg-zinc-900/30 border border-black/5 dark:border-zinc-800 flex items-center justify-center text-gray-500">
-                <CheckCircle2 size={13} />
-              </div>
-            </div>
-          </div>
-        </div>
-      </footer>
-
       {/* Request Add Stack Modal */}
       {requestModalOpen && (
         <div
