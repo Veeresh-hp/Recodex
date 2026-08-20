@@ -16,8 +16,11 @@ export default function Footer() {
               <img 
                 src="/recodeXlogo.png" 
                 alt="RecodeX Logo" 
-                className="brand-logo-img h-10 w-auto object-contain shrink-0" 
+                className="brand-logo-img h-9 md:h-10 w-auto object-contain shrink-0" 
               />
+              <span className="text-xl font-black tracking-tight text-white uppercase font-sans drop-shadow-sm">
+                <span className="text-[#00d1ff]">Recode</span>X
+              </span>
             </Link>
             <p className="text-xs md:text-sm text-zinc-400 dark:text-zinc-500 max-w-sm leading-relaxed font-sans font-medium">
               Connecting elite engineers with world-class opportunities. The technical directory for the next generation of digital builders.
