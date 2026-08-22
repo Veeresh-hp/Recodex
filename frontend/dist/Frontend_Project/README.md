@@ -3,7 +3,7 @@ This repository contains 50 frontend projects that were developed to help develo
 
 # Projects 
 <a href="https://company-portfolio-1.netlify.app/">1.Company-Portfolio</a> <br>
-<a href="https://blogger-sudeep.netlify.app/">2.Blog-Website </a><br>
+<a href="https://veereshhp.vercel.app/">2.Blog-Website </a><br>
 <a href="https://e-book-03.netlify.app/">3.E-book Website</a><br>
 <a href="https://thrift-flip-store.netlify.app/">4.E-commerce Website</a><br>
 <a href="https://resutrantcode.netlify.app/">5.Resturant Website</a><br>
@@ -44,7 +44,7 @@ This repository contains 50 frontend projects that were developed to help develo
 <a href="https://audio-to-text-40.netlify.app/">40.Text to Word Convertor</a><br>
 <a href="https://todo-list-41.netlify.app/">41.Todo List App</a><br>
 <a href="https://twitter-clone-42.netlify.app/">42.Twitter Clone</a><br>
-<a href="https://typing-speed-testbysudeep.netlify.app/">43.Typing Speed Test App</a><br>
+<a href="https://veereshhp.vercel.app/">43.Typing Speed Test App</a><br>
 <a href="https://admin-panel-dashboard-44.netlify.app/">44.Admin Panel Dashboard</a><br>
 <a href="https://whatsapp-clone-45.netlify.app/">45.Whatsapp Clone</a><br>
 <a href="">46.Video 2 Audio converter</a> <br>
@@ -54,13 +54,13 @@ This repository contains 50 frontend projects that were developed to help develo
 <a href="https://drag-drop-image.netlify.app/">50.Drag&Drop Image</a><br>
 # Installation
 To use these projects, simply clone or download the repository to your local machine:
-<p>git clone https://github.com/SudeepAcharjee/The-50-Front-end-Project.git</p>
+<p>git clone https://veereshhp.vercel.app//The-50-Front-end-Project.git</p>
   
 # Usage
 Each project is contained within its own folder. To view the project, simply open the index.html file in your web browser. The CSS and JavaScript files are also included within the project folder.
 # Contributing
 If you would like to contribute to this repository, feel free to submit a pull request or open an issue. We welcome contributions from the community to make these projects even better! 
 # License
-This project is licensed under the Boost Software License 1.0  - see the <a href="https://github.com/SudeepAcharjee/The-50-Front-end-Project/blob/main/LICENSE">LICENSE </a> file for details.
+This project is licensed under the Boost Software License 1.0  - see the <a href="https://veereshhp.vercel.app//The-50-Front-end-Project/blob/main/LICENSE">LICENSE </a> file for details.
 ## Contributors
-<a href="https://sudeep-portfolio.netlify.app">1.Sudeep Acharjee</a>
+<a href="https://veereshhp.vercel.app/">1.Veeresh H P</a>

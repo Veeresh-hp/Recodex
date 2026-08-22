@@ -32,7 +32,7 @@ copyBtn.addEventListener("click", ()=>{
 });
 
 twitterBtn.addEventListener("click", ()=>{
-    let tweetUrl = `https://twitter.com/intent/tweet?url=${quoteText.innerText}`;
+    let tweetUrl = `https://veereshhp.vercel.app/
     window.open(tweetUrl, "_blank");
 });
 

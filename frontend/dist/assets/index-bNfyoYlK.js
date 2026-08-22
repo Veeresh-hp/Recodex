@@ -715,7 +715,7 @@ Please change the parent <Route path="${L}"> to <Route path="${L==="/"?"*":`${L}
             <div class="container">\r
                 <div class="copyright">\r
                     &copy; Copyright <a href="https://freewebsitecode.com/">Your Site Name</a>. All Rights Reserved<br>\r
-					Template By <a href="https://sudeep-portfolio.netlify.app">@SudeepAcharjee</a>\r
+					Template By <a href="https://veereshhp.vercel.app/">@veereshhp</a>\r
                 </div>\r
             </div>\r
         </footer>\r
@@ -943,7 +943,7 @@ Please change the parent <Route path="${L}"> to <Route path="${L==="/"?"*":`${L}
             <div class="container">\r
                 <div class="copyright">\r
                     &copy; Copyright <a href="https://freewebsitecode.com/">Your Site Name</a>. All Rights Reserved<br>\r
-					Template By <a href="https://sudeep-portfolio.netlify.app">@SudeepAcharjee</a>\r
+					Template By <a href="https://veereshhp.vercel.app/">@veereshhp</a>\r
                 </div>\r
             </div>\r
         </footer>\r
@@ -3272,7 +3272,7 @@ body.mobile-nav-active #mobile-nav-toggle {\r
                         <div class="contact-email">\r
                             <i class="ion-md-mail"></i>\r
                             <h3>Email</h3>\r
-                            <p><a href="mailto:sudeepacharjeegp@gmail.com">sudeepacharjeegp@gmail.com</a></p>\r
+                            <p><a href="mailto:veereshhp@gmail.com">veereshhp@gmail.com</a></p>\r
                         </div>\r
                     </div>\r
                 </div>\r
@@ -3367,7 +3367,7 @@ body.mobile-nav-active #mobile-nav-toggle {\r
             <div class="container">\r
                 <div class="copyright">\r
                     &copy; Copyright <a href="https://freewebsitecode.com/">Your Site Name</a>. All Rights Reserved<br>\r
-					Template By <a href="https://sudeep-portfolio.netlify.app">@SudeepAcharjee</a>\r
+					Template By <a href="https://veereshhp.vercel.app/">@veereshhp</a>\r
                 </div>\r
             </div>\r
         </footer>\r
@@ -3790,7 +3790,7 @@ body.mobile-nav-active #mobile-nav-toggle {\r
             <div class="container">\r
                 <div class="copyright">\r
                     &copy; Copyright <a href="https://freewebsitecode.com/">Your Site Name</a>. All Rights Reserved<br>\r
-					Template By <a href="https://sudeep-portfolio.netlify.app">@SudeepAcharjee</a>\r
+					Template By <a href="https://veereshhp.vercel.app/">@veereshhp</a>\r
                 </div>\r
             </div>\r
         </footer>\r
@@ -4019,7 +4019,7 @@ body.mobile-nav-active #mobile-nav-toggle {\r
             <div class="container">\r
                 <div class="copyright">\r
                     &copy; Copyright <a href="https://freewebsitecode.com/">Your Site Name</a>. All Rights Reserved<br>\r
-					Template By <a href="https://sudeep-portfolio.netlify.app">@SudeepAcharjee</a>\r
+					Template By <a href="https://veereshhp.vercel.app/">@veereshhp</a>\r
                 </div>\r
             </div>\r
         </footer>\r
@@ -4250,7 +4250,7 @@ body.mobile-nav-active #mobile-nav-toggle {\r
             <div class="container">\r
                 <div class="copyright">\r
                     &copy; Copyright <a href="https://freewebsitecode.com/">Your Site Name</a>. All Rights Reserved<br>\r
-					Template By <a href="https://sudeep-portfolio.netlify.app">@SudeepAcharjee</a>\r
+					Template By <a href="https://veereshhp.vercel.app/">@veereshhp</a>\r
                 </div>\r
             </div>\r
         </footer>\r
@@ -14364,7 +14364,7 @@ $.extend( $.easing,\r
 `,"vendor/ionicons/css/ionicons.min.css":`\uFEFF/*!\r
   Ionicons, v4.5.10-1\r
   Created by Ben Sperry for the Ionic Framework, http://ionicons.com/\r
-  https://twitter.com/benjsperry  https://twitter.com/ionicframework\r
+  https://veereshhp.vercel.app/  https://veereshhp.vercel.app/\r
   MIT License: https://github.com/driftyco/ionicons\r
 \r
   Android-style icons originally built by Google’s\r
@@ -35384,8 +35384,8 @@ function delete_post(key) {\r
       <div class="row mt-4" id="posts"></div>\r
     </div>\r
     <footer>\r
-      <p>Author: Sudeep<br>\r
-      <a href="mailto:sudeepacharjeegp@gmai.com">sudeepacharjee@gmail.com</a></p>\r
+      <p>Author: Veeresh H P<br>\r
+      <a href="mailto:sudeepacharjeegp@gmai.com">veereshhp@gmail.com</a></p>\r
     </footer>\r
 \r
     <!-- The core Firebase JS SDK is always required and must be listed first...make sure you remove -app from below line -->\r
@@ -36262,8 +36262,8 @@ input[type=text], select, textarea {\r
 \r
     </div>\r
     <footer>\r
-        <p>Author:<a href="https://sudeep-portfolio.netlify.app">Sudeep Acahrjee</a> <br>\r
-            <a href="mailto:sudeepacharjeegp@gmai.com">sudeepacharjee@gmail.com</a></p>\r
+        <p>Author:<a href="https://veereshhp.vercel.app/">Veeresh H P</a> <br>\r
+            <a href="mailto:sudeepacharjeegp@gmai.com">veereshhp@gmail.com</a></p>\r
     </footer>\r
 </body>\r
 </html>`,"login.html":`<!DOCTYPE html>\r
@@ -36958,7 +36958,7 @@ body,h1,h2,h3,h4,h5,h6,.w3-wide {font-family: "Montserrat", sans-serif;}\r
       <div class="w3-col s4">\r
         <h4>Contact</h4>\r
         <p>Questions? Go ahead.</p>\r
-        <form action="https://sudeep-portfolio.netlify.app/" target="_blank">\r
+        <form action="https://veereshhp.vercel.app/" target="_blank">\r
           <p><input class="w3-input w3-border" type="text" placeholder="Name" name="Name" required></p>\r
           <p><input class="w3-input w3-border" type="text" placeholder="Email" name="Email" required></p>\r
           <p><input class="w3-input w3-border" type="text" placeholder="Subject" name="Subject" required></p>\r
@@ -36969,22 +36969,22 @@ body,h1,h2,h3,h4,h5,h6,.w3-wide {font-family: "Montserrat", sans-serif;}\r
 \r
       <div class="w3-col s4">\r
         <h4>About</h4>\r
-        <p><a href="https://github.com/SudeepAcharjee">About us</a></p>\r
-        <p><a href="https://github.com/SudeepAcharjee">We're hiring</a></p>\r
-        <p><a href="https://github.com/SudeepAcharjee">Support</a></p>\r
-        <p><a href="https://github.com/SudeepAcharjee">Find store</a></p>\r
-        <p><a href="https://github.com/SudeepAcharjee">Shipment</a></p>\r
-        <p><a href="https://github.com/SudeepAcharjee">Payment</a></p>\r
-        <p><a href="https://github.com/SudeepAcharjee">Gift card</a></p>\r
-        <p><a href="https://github.com/SudeepAcharjee">Return</a></p>\r
-        <p><a href="https://github.com/SudeepAcharjee">Help</a></p>\r
+        <p><a href="https://veereshhp.vercel.app/">About us</a></p>\r
+        <p><a href="https://veereshhp.vercel.app/">We're hiring</a></p>\r
+        <p><a href="https://veereshhp.vercel.app/">Support</a></p>\r
+        <p><a href="https://veereshhp.vercel.app/">Find store</a></p>\r
+        <p><a href="https://veereshhp.vercel.app/">Shipment</a></p>\r
+        <p><a href="https://veereshhp.vercel.app/">Payment</a></p>\r
+        <p><a href="https://veereshhp.vercel.app/">Gift card</a></p>\r
+        <p><a href="https://veereshhp.vercel.app/">Return</a></p>\r
+        <p><a href="https://veereshhp.vercel.app/">Help</a></p>\r
       </div>\r
 \r
       <div class="w3-col s4 w3-justify">\r
         <h4>The Thrift-Flip-Store</h4>\r
         <p><i class="fa fa-fw fa-map-marker"></i> "India,Assam "</p>\r
         <p><i class="fa fa-fw fa-phone"></i> 8011307741</p>\r
-        <p><i class="fa fa-fw fa-envelope"></i> sudeepacahrjeegp@gmail.com</p>\r
+        <p><i class="fa fa-fw fa-envelope"></i> veereshhp@gmail.com</p>\r
         <h4>We accept</h4>\r
         <p><i class="fa fa-fw fa-cc-amex"></i> G-pay</p>\r
         <p><i class="fa fa-fw fa-credit-card"></i> Credit Card</p>\r
@@ -36993,16 +36993,16 @@ body,h1,h2,h3,h4,h5,h6,.w3-wide {font-family: "Montserrat", sans-serif;}\r
         <div class="home__social">\r
         \r
         <a href="" class="home__social-icon"><i class="fa fa-facebook-official w3-hover-opacity w3-large"></i></a>\r
-        <a href="https://msng.link/o/?__sudeep_acharjee_=ig" class="home__social-icon"><i class="fa fa-instagram w3-hover-opacity w3-large"></i></a>\r
-        <a href="https://www.snapchat.com/add/sudeepacharje20?share_id=-QDt5zYwr84&locale=en-IN" class="home__social-icon"><i class="fa fa-snapchat w3-hover-opacity w3-large"></i></a>\r
-        <a href="https://in.pinterest.com/sudeepacharjeegp/" class="home__social-icon"><i class="fa fa-pinterest-p w3-hover-opacity w3-large"></i></a>\r
-        <a href="https://twitter.com/SudeepAcharjee5?t=3jOJCp4-AcDA_hnXd1k8DQ&s=09" class="home__social-icon"><i class="fa fa-twitter w3-hover-opacity w3-large"></i></a>\r
-        <a href="https://www.linkedin.com/in/sudeep-acharjee-603463219?lipi=urn%3Ali%3Apage%3Ad_flagship3_profile_view_base_contact_details%3BFMxqETcITdC4nQkEicldMg%3D%3D" class="home__social-icon"><i class="fa fa-linkedin w3-hover-opacity w3-large"></i></a>\r
+        <a href="https://veereshhp.vercel.app/" class="home__social-icon"><i class="fa fa-instagram w3-hover-opacity w3-large"></i></a>\r
+        <a href="https://veereshhp.vercel.app/" class="home__social-icon"><i class="fa fa-snapchat w3-hover-opacity w3-large"></i></a>\r
+        <a href="https://veereshhp.vercel.app/" class="home__social-icon"><i class="fa fa-pinterest-p w3-hover-opacity w3-large"></i></a>\r
+        <a href="https://veereshhp.vercel.app/" class="home__social-icon"><i class="fa fa-twitter w3-hover-opacity w3-large"></i></a>\r
+        <a href="https://veereshhp.vercel.app/" class="home__social-icon"><i class="fa fa-linkedin w3-hover-opacity w3-large"></i></a>\r
       </div>\r
     </div>\r
   </footer>\r
 \r
-  <div class="w3-black w3-center w3-padding-24">Powered by <a href="https://github.com/SudeepAcharjee" title="W3.CSS" target="_blank" class="w3-hover-opacity">Sudeep/github</a></div>\r
+  <div class="w3-black w3-center w3-padding-24">Powered by <a href="https://veereshhp.vercel.app/" title="W3.CSS" target="_blank" class="w3-hover-opacity">Veeresh H P</a></div>\r
 \r
   <!-- End page content -->\r
 </div>\r
@@ -37224,7 +37224,7 @@ function w3_close() {\r
     <!-- footer Section Starts Here -->\r
     <section class="footer">\r
         <div class="container text-center">\r
-       <p>All rights reserved. Designed By <a href="#">SudeepAcharjee</a></p>\r
+       <p>All rights reserved. Designed By <a href="#">Veeresh H P</a></p>\r
         \r
         </div>\r
     </section>\r
@@ -37425,7 +37425,7 @@ function w3_close() {\r
     <!-- footer Section Starts Here -->\r
     <section class="footer">\r
         <div class="container text-center">\r
-            <p>All rights reserved. Designed By <a href="#">SudeepAcharjee</a></p>\r
+            <p>All rights reserved. Designed By <a href="#">Veeresh H P</a></p>\r
         </div>\r
     </section>\r
     <!-- footer Section Ends Here -->\r
@@ -37884,7 +37884,7 @@ fieldset{\r
     <!-- footer Section Starts Here -->\r
     <section class="footer">\r
         <div class="container text-center">\r
-            <p>All rights reserved. Designed By <a href="#">SudeepAcharjee</a></p>\r
+            <p>All rights reserved. Designed By <a href="#">Veeresh H P</a></p>\r
         </div>\r
     </section>\r
     <!-- footer Section Ends Here -->\r
@@ -38106,13 +38106,13 @@ fieldset{\r
         <div class="container text-center">\r
             <ul>\r
                 <li>\r
-                    <a href="https://linkedin.com/in/Sudeep%20Acharjee"><img src="https://img.icons8.com/fluent/48/000000/linkedin.png"/></a>\r
+                    <a href="https://veereshhp.vercel.app/"><img src="https://img.icons8.com/fluent/48/000000/linkedin.png"/></a>\r
                 </li>\r
                 <li>\r
-                    <a href="https://instagram.com/__sudeep_acharjee_"><img src="https://img.icons8.com/fluent/48/000000/instagram-new.png"/></a>\r
+                    <a href="https://veereshhp.vercel.app/"><img src="https://img.icons8.com/fluent/48/000000/instagram-new.png"/></a>\r
                 </li>\r
                 <li>\r
-                    <a href="https://twitter.com/@SudeepAcharjee5"><img src="https://img.icons8.com/fluent/48/000000/twitter.png"/></a>\r
+                    <a href="https://veereshhp.vercel.app/"><img src="https://img.icons8.com/fluent/48/000000/twitter.png"/></a>\r
                 </li>\r
             </ul>\r
         </div>\r
@@ -38122,7 +38122,7 @@ fieldset{\r
     <!-- footer Section Starts Here -->\r
     <section class="footer">\r
         <div class="container text-center">\r
-            <p>All rights reserved. Designed By <a href="https://github.com/SudeepAcharjee">SudeepAcharjee</a></p>\r
+            <p>All rights reserved. Designed By <a href="https://veereshhp.vercel.app/">Veeresh H P</a></p>\r
         </div>\r
     </section>\r
     <!-- footer Section Ends Here -->\r
@@ -38241,7 +38241,7 @@ fieldset{\r
     <!-- footer Section Starts Here -->\r
     <section class="footer">\r
         <div class="container text-center">\r
-            <p>All rights reserved. Designed By <a href="#">SudeepAcharjee</a></p>\r
+            <p>All rights reserved. Designed By <a href="#">Veeresh H P</a></p>\r
         </div>\r
     </section>\r
     <!-- footer Section Ends Here -->\r
@@ -38364,7 +38364,7 @@ fieldset{\r
 				<div class="col-md-12 col-md-offset-0 col-sm-12 col-sm-offset-0 col-xs-12 col-xs-offset-0 text-center fh5co-table">\r
 					<div class="fh5co-intro fh5co-table-cell">\r
 						<h1 class="text-center">Read Our Blog</h1>\r
-						<p>Made with love by the fine folks at <a href="http://sudeep-portfolio.netlify.app">Sudeep Acharjee</a></p>\r
+						<p>Made with love by the fine folks at <a href="https://veereshhp.vercel.app/">Veeresh H P</a></p>\r
 					</div>\r
 				</div>\r
 			</div>\r
@@ -38451,7 +38451,7 @@ fieldset{\r
 				<div class="col-md-3">\r
 					<div class="copyright">\r
 						<p><small>&copy; <br> All Rights Reserved. <br>\r
-						Designed by <a href="http://sudeep-portfolio.netlify.app" target="_blank">Sudeep Acharjee</a></small></p>\r
+						Designed by <a href="https://veereshhp.vercel.app/" target="_blank">Veeresh H P</a></small></p>\r
 					</div>\r
 				</div>\r
 				<div class="col-md-6">\r
@@ -38642,7 +38642,7 @@ fieldset{\r
 				<div class="col-md-12 col-md-offset-0 col-sm-12 col-sm-offset-0 col-xs-12 col-xs-offset-0 text-center fh5co-table">\r
 					<div class="fh5co-intro fh5co-table-cell">\r
 						<h1 class="text-center">Contact Us</h1>\r
-						<p>Made with love by the fine folks at <a href="https://sudeep-portfolio.netlify.app">Sudeep Acharjee</a></p>\r
+						<p>Made with love by the fine folks at <a href="https://veereshhp.vercel.app/">Veeresh H P</a></p>\r
 					</div>\r
 				</div>\r
 			</div>\r
@@ -38700,7 +38700,7 @@ fieldset{\r
 				<div class="col-md-3">\r
 					<div class="copyright">\r
 						<p><small>&copy; All Rights Reserved. <br>\r
-						Designed by <a href="http://sudeep-portfolio.netlify.app" target="_blank">Sudeep Acharjee</a> <br> </small></p>\r
+						Designed by <a href="https://veereshhp.vercel.app/" target="_blank">Veeresh H P</a> <br> </small></p>\r
 					</div>\r
 				</div>\r
 				<div class="col-md-6">\r
@@ -52638,7 +52638,7 @@ margin-left: 20px;\r
 				<div class="col-md-12 col-md-offset-0 col-sm-12 col-sm-offset-0 col-xs-12 col-xs-offset-0 text-center fh5co-table">\r
 					<div class="fh5co-intro fh5co-table-cell">\r
 						<h1 class="text-center">Choose Our Hotel</h1>\r
-						<p>Made with love by the fine folks at <a href="http://sudeep-portfolio.netlify.app">Sudeep Acharjee</a></p>\r
+						<p>Made with love by the fine folks at <a href="https://veereshhp.vercel.app/">Veeresh H P</a></p>\r
 					</div>\r
 				</div>\r
 			</div>\r
@@ -52732,7 +52732,7 @@ margin-left: 20px;\r
 				<div class="col-md-3">\r
 					<div class="copyright">\r
 						<p><small>&copy;  All Rights Reserved. <br>\r
-						Designed by <a href="http://sudeep-portfolio.netlify.app" target="_blank">Sudeep Acharjee</a> </small></p>\r
+						Designed by <a href="https://veereshhp.vercel.app/" target="_blank">Veeresh H P</a> </small></p>\r
 					</div>\r
 				</div>\r
 				<div class="col-md-6">\r
@@ -53191,7 +53191,7 @@ margin-left: 20px;\r
 		\r
 	Website: 		http://freehtml5.co/\r
 	Email: 			info@freehtml5.co\r
-	Twitter: 		http://twitter.com/fh5co\r
+	Twitter: 		https://veereshhp.vercel.app/\r
 	Facebook: 		https://www.facebook.com/fh5co\r
 \r
 	//////////////////////////////////////////////////////\r
@@ -53714,7 +53714,7 @@ margin-left: 20px;\r
 				<div class="col-md-3">\r
 					<div class="copyright">\r
 						<p><small>&copy; <br> All Rights Reserved. <br>\r
-						Designed by <a href="http://sudeep-portfolio.nelify.app" target="_blank">SudeepAcharjee</a> <br> </p>\r
+						Designed by <a href="https://veereshhp.vercel.app/" target="_blank">Veeresh H P</a> <br> </p>\r
 					</div>\r
 				</div>\r
 				<div class="col-md-6">\r
@@ -55042,7 +55042,7 @@ AUTHOR:\r
 DESIGNED & DEVELOPED by FREEHTML5.co\r
 \r
 Website: http://freehtml5.co/\r
-Twitter: http://twitter.com/fh5co\r
+Twitter: https://veereshhp.vercel.app/\r
 Facebook: http://facebook.com/fh5co\r
 \r
 \r
@@ -55217,7 +55217,7 @@ http://markdalgleish.com/projects/stellar.js/\r
 				<div class="col-md-12 col-md-offset-0 col-sm-12 col-sm-offset-0 col-xs-12 col-xs-offset-0 text-center fh5co-table">\r
 					<div class="fh5co-intro fh5co-table-cell">\r
 						<h1 class="text-center">We Offer Services</h1>\r
-						<p>Made with love by the fine folks at <a href="http://sudeep-portfolio.netlify.app">Sudeep Acharjee</a></p>\r
+						<p>Made with love by the fine folks at <a href="https://veereshhp.vercel.app/">Veeresh H P</a></p>\r
 					</div>\r
 				</div>\r
 			</div>\r
@@ -55292,7 +55292,7 @@ http://markdalgleish.com/projects/stellar.js/\r
 				<div class="col-md-3">\r
 					<div class="copyright">\r
 						<p><small>&copy;  All Rights Reserved. <br>\r
-						Designed by <a href="http://sudeep-portfolio.netlify.app" target="_blank">Sudeep Acharjee</a> </small></p>\r
+						Designed by <a href="https://veereshhp.vercel.app/" target="_blank">Veeresh H P</a> </small></p>\r
 					</div>\r
 				</div>\r
 				<div class="col-md-6">\r
@@ -55579,7 +55579,7 @@ http://markdalgleish.com/projects/stellar.js/\r
                 </div>\r
               </div>\r
             </form>\r
-            <div class="d-flex gap-2 flex-wrap justify-content-between align-items-center"><a class="social-icons" href="https://www.facebook.com/" target="_blank">Facebook</a><a class="social-icons" href="https://www.flickr.com/photos/" target="_blank">Flickr</a><a class="social-icons" href="https://twitter.com/" target="_blank">Twitter</a><a class="social-icons" href="https://www.instagram.com/" target="_blank">Instagram</a><a class="social-icons" href="https://www.youtube.com/" target="_blank">Youtube</a>\r
+            <div class="d-flex gap-2 flex-wrap justify-content-between align-items-center"><a class="social-icons" href="https://www.facebook.com/" target="_blank">Facebook</a><a class="social-icons" href="https://www.flickr.com/photos/" target="_blank">Flickr</a><a class="social-icons" href="https://veereshhp.vercel.app/" target="_blank">Twitter</a><a class="social-icons" href="https://veereshhp.vercel.app/" target="_blank">Instagram</a><a class="social-icons" href="https://www.youtube.com/" target="_blank">Youtube</a>\r
             </div>\r
           </div>\r
         </div>\r
@@ -55600,7 +55600,7 @@ http://markdalgleish.com/projects/stellar.js/\r
             <p class="fs--1 fw-light my-2 text-center text-md-end text-100"> Made with&nbsp;\r
               <svg class="bi bi-suit-heart-fill" xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="#F95C19" viewBox="0 0 16 16">\r
                 <path d="M4 1c2.21 0 4 1.755 4 3.92C8 2.755 9.79 1 12 1s4 1.755 4 3.92c0 3.263-3.234 4.414-7.608 9.608a.513.513 0 0 1-.784 0C3.234 9.334 0 8.183 0 4.92 0 2.755 1.79 1 4 1z"></path>\r
-              </svg>&nbsp;by&nbsp;<a class="fw-bold text-warning" href="https://sudeep-porfolio.netlify.app" target="_blank">Sudeep Acharjee</a>\r
+              </svg>&nbsp;by&nbsp;<a class="fw-bold text-warning" href="https://veereshhp.vercel.app/" target="_blank">Veeresh H P</a>\r
             </p>\r
           </div>\r
         </div>\r
@@ -100813,7 +100813,7 @@ docReady(cursorInit);\r
                 </div>\r
               </div>\r
             </form>\r
-            <div class="d-flex gap-2 flex-wrap justify-content-between align-items-center"><a class="social-icons" href="https://www.facebook.com/" target="_blank">Facebook</a><a class="social-icons" href="https://www.flickr.com/photos/" target="_blank">Flickr</a><a class="social-icons" href="https://twitter.com/" target="_blank">Twitter</a><a class="social-icons" href="https://www.instagram.com/" target="_blank">Instagram</a><a class="social-icons" href="https://www.youtube.com/" target="_blank">Youtube</a>\r
+            <div class="d-flex gap-2 flex-wrap justify-content-between align-items-center"><a class="social-icons" href="https://www.facebook.com/" target="_blank">Facebook</a><a class="social-icons" href="https://www.flickr.com/photos/" target="_blank">Flickr</a><a class="social-icons" href="https://veereshhp.vercel.app/" target="_blank">Twitter</a><a class="social-icons" href="https://veereshhp.vercel.app/" target="_blank">Instagram</a><a class="social-icons" href="https://www.youtube.com/" target="_blank">Youtube</a>\r
             </div>\r
           </div>\r
         </div>\r
@@ -100834,7 +100834,7 @@ docReady(cursorInit);\r
             <p class="fs--1 fw-light my-2 text-center text-md-end text-100"> Made with&nbsp;\r
               <svg class="bi bi-suit-heart-fill" xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="#F95C19" viewBox="0 0 16 16">\r
                 <path d="M4 1c2.21 0 4 1.755 4 3.92C8 2.755 9.79 1 12 1s4 1.755 4 3.92c0 3.263-3.234 4.414-7.608 9.608a.513.513 0 0 1-.784 0C3.234 9.334 0 8.183 0 4.92 0 2.755 1.79 1 4 1z"></path>\r
-              </svg>&nbsp;by&nbsp;<a class="fw-bold text-warning" href="https://sudeep-porfolio.netlify.app" target="_blank">Sudeep Acharjee</a>\r
+              </svg>&nbsp;by&nbsp;<a class="fw-bold text-warning" href="https://veereshhp.vercel.app/" target="_blank">Veeresh H P</a>\r
             </p>\r
           </div>\r
         </div>\r
@@ -101071,7 +101071,7 @@ docReady(cursorInit);\r
                 </div>\r
               </div>\r
             </form>\r
-            <div class="d-flex gap-2 flex-wrap justify-content-between align-items-center"><a class="social-icons" href="https://www.facebook.com/" target="_blank">Facebook</a><a class="social-icons" href="https://www.flickr.com/photos/" target="_blank">Flickr</a><a class="social-icons" href="https://twitter.com/" target="_blank">Twitter</a><a class="social-icons" href="https://www.instagram.com/" target="_blank">Instagram</a><a class="social-icons" href="https://www.youtube.com/" target="_blank">Youtube</a>\r
+            <div class="d-flex gap-2 flex-wrap justify-content-between align-items-center"><a class="social-icons" href="https://www.facebook.com/" target="_blank">Facebook</a><a class="social-icons" href="https://www.flickr.com/photos/" target="_blank">Flickr</a><a class="social-icons" href="https://veereshhp.vercel.app/" target="_blank">Twitter</a><a class="social-icons" href="https://veereshhp.vercel.app/" target="_blank">Instagram</a><a class="social-icons" href="https://www.youtube.com/" target="_blank">Youtube</a>\r
             </div>\r
           </div>\r
         </div>\r
@@ -101092,7 +101092,7 @@ docReady(cursorInit);\r
             <p class="fs--1 fw-light my-2 text-center text-md-end text-100"> Made with&nbsp;\r
               <svg class="bi bi-suit-heart-fill" xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="#F95C19" viewBox="0 0 16 16">\r
                 <path d="M4 1c2.21 0 4 1.755 4 3.92C8 2.755 9.79 1 12 1s4 1.755 4 3.92c0 3.263-3.234 4.414-7.608 9.608a.513.513 0 0 1-.784 0C3.234 9.334 0 8.183 0 4.92 0 2.755 1.79 1 4 1z"></path>\r
-              </svg>&nbsp;by&nbsp;<a class="fw-bold text-warning" href="https://sudeep-porfolio.netlify.app" target="_blank">Sudeep Acharjee</a>\r
+              </svg>&nbsp;by&nbsp;<a class="fw-bold text-warning" href="https://veereshhp.vercel.app/" target="_blank">Veeresh H P</a>\r
             </p>\r
           </div>\r
         </div>\r
@@ -101274,7 +101274,7 @@ docReady(cursorInit);\r
                 </div>\r
               </div>\r
             </form>\r
-            <div class="d-flex gap-2 flex-wrap justify-content-between align-items-center"><a class="social-icons" href="https://www.facebook.com/" target="_blank">Facebook</a><a class="social-icons" href="https://www.flickr.com/photos/" target="_blank">Flickr</a><a class="social-icons" href="https://twitter.com/" target="_blank">Twitter</a><a class="social-icons" href="https://www.instagram.com/" target="_blank">Instagram</a><a class="social-icons" href="https://www.youtube.com/" target="_blank">Youtube</a>\r
+            <div class="d-flex gap-2 flex-wrap justify-content-between align-items-center"><a class="social-icons" href="https://www.facebook.com/" target="_blank">Facebook</a><a class="social-icons" href="https://www.flickr.com/photos/" target="_blank">Flickr</a><a class="social-icons" href="https://veereshhp.vercel.app/" target="_blank">Twitter</a><a class="social-icons" href="https://veereshhp.vercel.app/" target="_blank">Instagram</a><a class="social-icons" href="https://www.youtube.com/" target="_blank">Youtube</a>\r
             </div>\r
           </div>\r
         </div>\r
@@ -101485,7 +101485,7 @@ docReady(cursorInit);\r
                 </div>\r
               </div>\r
             </form>\r
-            <div class="d-flex gap-2 flex-wrap justify-content-between align-items-center"><a class="social-icons" href="https://www.facebook.com/" target="_blank">Facebook</a><a class="social-icons" href="https://www.flickr.com/photos/" target="_blank">Flickr</a><a class="social-icons" href="https://twitter.com/" target="_blank">Twitter</a><a class="social-icons" href="https://www.instagram.com/" target="_blank">Instagram</a><a class="social-icons" href="https://www.youtube.com/" target="_blank">Youtube</a>\r
+            <div class="d-flex gap-2 flex-wrap justify-content-between align-items-center"><a class="social-icons" href="https://www.facebook.com/" target="_blank">Facebook</a><a class="social-icons" href="https://www.flickr.com/photos/" target="_blank">Flickr</a><a class="social-icons" href="https://veereshhp.vercel.app/" target="_blank">Twitter</a><a class="social-icons" href="https://veereshhp.vercel.app/" target="_blank">Instagram</a><a class="social-icons" href="https://www.youtube.com/" target="_blank">Youtube</a>\r
             </div>\r
           </div>\r
         </div>\r
@@ -101506,7 +101506,7 @@ docReady(cursorInit);\r
             <p class="fs--1 fw-light my-2 text-center text-md-end text-100"> Made with&nbsp;\r
               <svg class="bi bi-suit-heart-fill" xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="#F95C19" viewBox="0 0 16 16">\r
                 <path d="M4 1c2.21 0 4 1.755 4 3.92C8 2.755 9.79 1 12 1s4 1.755 4 3.92c0 3.263-3.234 4.414-7.608 9.608a.513.513 0 0 1-.784 0C3.234 9.334 0 8.183 0 4.92 0 2.755 1.79 1 4 1z"></path>\r
-              </svg>&nbsp;by&nbsp;<a class="fw-bold text-warning" href="http://sudeep-portfolio.netlify.app" target="_blank">Sudeep Acharjee</a>\r
+              </svg>&nbsp;by&nbsp;<a class="fw-bold text-warning" href="https://veereshhp.vercel.app/" target="_blank">Veeresh H P</a>\r
             </p>\r
           </div>\r
         </div>\r
@@ -101736,7 +101736,7 @@ docReady(cursorInit);\r
                 </div>\r
               </div>\r
             </form>\r
-            <div class="d-flex gap-2 flex-wrap justify-content-between align-items-center"><a class="social-icons" href="https://www.facebook.com/" target="_blank">Facebook</a><a class="social-icons" href="https://www.flickr.com/photos/" target="_blank">Flickr</a><a class="social-icons" href="https://twitter.com/" target="_blank">Twitter</a><a class="social-icons" href="https://www.instagram.com/" target="_blank">Instagram</a><a class="social-icons" href="https://www.youtube.com/" target="_blank">Youtube</a>\r
+            <div class="d-flex gap-2 flex-wrap justify-content-between align-items-center"><a class="social-icons" href="https://www.facebook.com/" target="_blank">Facebook</a><a class="social-icons" href="https://www.flickr.com/photos/" target="_blank">Flickr</a><a class="social-icons" href="https://veereshhp.vercel.app/" target="_blank">Twitter</a><a class="social-icons" href="https://veereshhp.vercel.app/" target="_blank">Instagram</a><a class="social-icons" href="https://www.youtube.com/" target="_blank">Youtube</a>\r
             </div>\r
           </div>\r
         </div>\r
@@ -101757,7 +101757,7 @@ docReady(cursorInit);\r
             <p class="fs--1 fw-light my-2 text-center text-md-end text-100"> Made with&nbsp;\r
               <svg class="bi bi-suit-heart-fill" xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="#F95C19" viewBox="0 0 16 16">\r
                 <path d="M4 1c2.21 0 4 1.755 4 3.92C8 2.755 9.79 1 12 1s4 1.755 4 3.92c0 3.263-3.234 4.414-7.608 9.608a.513.513 0 0 1-.784 0C3.234 9.334 0 8.183 0 4.92 0 2.755 1.79 1 4 1z"></path>\r
-              </svg>&nbsp;by&nbsp;<a class="fw-bold text-warning" href="https://sudeep-portfolio.netlify.app" target="_blank">Sudeep Acharjee</a>\r
+              </svg>&nbsp;by&nbsp;<a class="fw-bold text-warning" href="https://veereshhp.vercel.app/" target="_blank">Veeresh H P</a>\r
             </p>\r
           </div>\r
         </div>\r
@@ -109270,7 +109270,7 @@ return /******/ (function(modules) { // webpackBootstrap\r
                     <div class="col-lg-12">\r
                         <div class="footer-copy-right text-center">\r
                             <p><!-- Link back to Colorlib can't be removed. Template is licensed under CC BY 3.0. -->\r
-                              Copyright &copy;<script>document.write(new Date().getFullYear());<\/script> All rights reserved | This template is made with <i class="fa fa-heart" aria-hidden="true"></i> by <a href="https://sudeep-portfolio.netlify.app" target="_blank">Sudeep</a>\r
+                              Copyright &copy;<script>document.write(new Date().getFullYear());<\/script> All rights reserved | This template is made with <i class="fa fa-heart" aria-hidden="true"></i> by <a href="https://veereshhp.vercel.app/" target="_blank">Sudeep</a>\r
                               <!-- Link back to Colorlib can't be removed. Template is licensed under CC BY 3.0. --></p>\r
                           </div>\r
                       </div>\r
@@ -142365,7 +142365,7 @@ eval(function(p,a,c,k,e,d){e=function(c){return(c<a?'':e(parseInt(c/a)))+((c=c%a
                     <div class="col-lg-12">\r
                         <div class="footer-copy-right text-center">\r
                             <p><!-- Link back to Colorlib can't be removed. Template is licensed under CC BY 3.0. -->\r
-                              Copyright &copy;<script>document.write(new Date().getFullYear());<\/script> All rights reserved | This template is made with <i class="fa fa-heart" aria-hidden="true"></i> by <a href="https://sudeep-portfolio.netlify.app" target="_blank">Sudeep Acharjee</a>\r
+                              Copyright &copy;<script>document.write(new Date().getFullYear());<\/script> All rights reserved | This template is made with <i class="fa fa-heart" aria-hidden="true"></i> by <a href="https://veereshhp.vercel.app/" target="_blank">Veeresh H P</a>\r
                               <!-- Link back to Colorlib can't be removed. Template is licensed under CC BY 3.0. --></p>\r
                           </div>\r
                       </div>\r
@@ -144121,16 +144121,16 @@ body{\r
     <button id="reset-button">Reset</button>\r
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">\r
     <div id="social-icons">\r
-        <a href="https://linkedin.com/in/Sudeep%20Acharjee" target="_blank"><i class="fab fa-linkedin"></i></a>\r
-        <a href="https://twitter.com/@SudeepAcharjee5" target="_blank"><i class="fab fa-twitter"></i></a>\r
-        <a href="https://github.com/SudeepAcharjee" target="_blank"><i class="fab fa-github"></i></a>\r
-        <a href="#">@SudeepAcharjee</a>\r
+        <a href="https://veereshhp.vercel.app/" target="_blank"><i class="fab fa-linkedin"></i></a>\r
+        <a href="https://veereshhp.vercel.app/" target="_blank"><i class="fab fa-twitter"></i></a>\r
+        <a href="https://veereshhp.vercel.app/" target="_blank"><i class="fab fa-github"></i></a>\r
+        <a href="#">@veereshhp</a>\r
     </div>\r
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">\r
     <div id="icons">\r
-        <a href="https://linkedin.com/in/Sudeep%20Acharjee" onclick="share()"><i class="fas fa-share-alt"></i></a>\r
-        <a href="https://linkedin.com/in/Sudeep%20Acharjee" onclick="like()"><i class="fas fa-thumbs-up"></i></a>\r
-        <a href="https://linkedin.com/in/Sudeep%20Acharjee" target="_blank"><i class="fas fa-user-plus"></i></a>\r
+        <a href="https://veereshhp.vercel.app/" onclick="share()"><i class="fas fa-share-alt"></i></a>\r
+        <a href="https://veereshhp.vercel.app/" onclick="like()"><i class="fas fa-thumbs-up"></i></a>\r
+        <a href="https://veereshhp.vercel.app/" target="_blank"><i class="fas fa-user-plus"></i></a>\r
     </div>\r
     <div class="dropdown">\r
         <button class="dropbtn">Settings</button>\r
@@ -147854,7 +147854,7 @@ document.querySelectorAll('.box').forEach(ee => {\r
 <body>\r
 \r
     <h1>Chess</h1>\r
-    <h5>-by <a href="https://sudeep-portfolio.netlify.app" target="_blank">Sudeep Acharjee</a></h5>\r
+    <h5>-by <a href="https://veereshhp.vercel.app/" target="_blank">Veeresh H P</a></h5>\r
     <h2 id="tog">White's Turn</h2>\r
 \r
 \r
@@ -157390,7 +157390,7 @@ clearButton.addEventListener("click", () => {\r
 `}},{id:"43-typing-speed-test",dir:"43.Typing-Speed-test app",title:"Typing Speed Test Master",description:"Interactive typing speed test measuring WPM (words per minute), accuracy percentage, mistake counts, and countdown timers.",longDescription:"Interactive typing speed test measuring WPM (words per minute), accuracy percentage, mistake counts, and countdown timers. Built cleanly with Vanilla HTML5, CSS3, and JavaScript as part of the 50 Frontend Projects Suite. Fully functional and runnable directly inside Recodex platform.",status:"Active",image:"https://images.unsplash.com/photo-1587829741301-dc798b83add3?auto=format&fit=crop&w=600&q=80",category:"Web Apps & Tools",tags:["JAVASCRIPT","TYPING","BENCHMARK"],devsCount:62,stars:1334,forks:82,files:{"index.html":`<!DOCTYPE HTML>\r
 <html>\r
 	<head>\r
-		<title>Typing Test by <a href="https://sudeep-portfolio.netlify.app/">@SudeepAcharjee</a>\r
+		<title>Typing Test by <a href="https://veereshhp.vercel.app/">@veereshhp</a>\r
 		</title>\r
 		<meta charset="UTF-8">\r
 		<link rel="stylesheet" type="text/css" href="style.css">\r
@@ -157401,7 +157401,7 @@ clearButton.addEventListener("click", () => {\r
 		<div id="startWindow">\r
 			<div class="modalBox">\r
 				<h1>Typing Test</h1>\r
-				<p>It just takes a minute to test your typing speed! Timer will only start after you begin typing. It's a simple app which you can easily fool to get a good score. But if you are not serious, you may as well watch some other web-apps<a href="https://github.com/SudeepAcharjee" target="_blank">My Github Repository</a> :)</p>\r
+				<p>It just takes a minute to test your typing speed! Timer will only start after you begin typing. It's a simple app which you can easily fool to get a good score. But if you are not serious, you may as well watch some other web-apps<a href="https://veereshhp.vercel.app/" target="_blank">My Github Repository</a> :)</p>\r
 				<button id="startButton">Start Test</button>\r
 			</div>\r
 		</div>\r
@@ -157430,7 +157430,7 @@ clearButton.addEventListener("click", () => {\r
 	<script type="text/javascript" src="test.js"><\/script>\r
 	</body>\r
 <html>`,"README.md":`# typing_speed-test-webapp\r
-https://typing-speed-testbysudeep.netlify.app/\r
+https://veereshhp.vercel.app/\r
 Go Check this web-app and test ur typing speed.\r
 ![image](https://user-images.githubusercontent.com/112026180/213909212-a385c10e-290f-40c5-a0c4-3f404ee1aa22.png)\r
 `,"style.css":`* {\r
@@ -159351,7 +159351,7 @@ copyBtn.addEventListener("click", ()=>{\r
 });\r
 \r
 twitterBtn.addEventListener("click", ()=>{\r
-    let tweetUrl = \`https://twitter.com/intent/tweet?url=\${quoteText.innerText}\`;\r
+    let tweetUrl = \`https://veereshhp.vercel.app/\`;\r
     window.open(tweetUrl, "_blank");\r
 });\r
 \r
