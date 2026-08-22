@@ -3,15 +3,16 @@ import { Project } from "../data/mockData";
 import { 
   X, Play, RefreshCw, Terminal, FileCode, CheckCircle, 
   Sun, Moon, Zap, Sliders, Database, Sparkles, PlayCircle,
-  Activity, ShieldCheck
+  Activity, ShieldCheck, ExternalLink
 } from "lucide-react";
 
 interface TerminalModalProps {
   project: Project | null;
+  initialTab?: "code" | "logs" | "output";
   onClose: () => void;
 }
 
-export default function TerminalModal({ project, onClose }: TerminalModalProps) {
+export default function TerminalModal({ project, initialTab = "output", onClose }: TerminalModalProps) {
   let files: Record<string, string> = {};
   if (project && project.files) {
     if (typeof project.files === "string") {
@@ -29,7 +30,7 @@ export default function TerminalModal({ project, onClose }: TerminalModalProps) 
   
   const [terminalLogs, setTerminalLogs] = useState<string[]>([]);
   const [isCompiling, setIsCompiling] = useState(false);
-  const [activeTab, setActiveTab] = useState<"code" | "logs" | "output">("code");
+  const [activeTab, setActiveTab] = useState<"code" | "logs" | "output">("output");
 
   // Sync selected file and initial logs when project selection changes
   useEffect(() => {
@@ -41,6 +42,8 @@ export default function TerminalModal({ project, onClose }: TerminalModalProps) 
     } else {
       setSelectedFile("");
     }
+
+    setActiveTab(initialTab || "output");
 
     // Reset logs
     setTerminalLogs([
@@ -54,9 +57,9 @@ export default function TerminalModal({ project, onClose }: TerminalModalProps) 
       `Ready to compile. Press "Run Build" or switch to "Live Output" to interact.`
     ]);
 
-    // Reset tab to code
-    setActiveTab("code");
-  }, [project]);
+    // Set active tab to initialTab or Live Preview (output)
+    setActiveTab(initialTab || "output");
+  }, [project, initialTab]);
 
   // --- 1. APEX-GLOW LIVE CHART TELEMETRY STATE ---
   const [chartType, setChartType] = useState<"LINE" | "AREA" | "BAR">("LINE");
@@ -149,10 +152,11 @@ export default function TerminalModal({ project, onClose }: TerminalModalProps) 
       setTerminalLogs((prev) => [
         ...prev,
         `[SUCCESS] Zero errors, zero warnings. Compiled successfully!`,
-        `[SUCCESS] Output directory built. Speed metrics stable.`,
+        `[SUCCESS] Output directory built. Launching live view...`,
         `$`
       ]);
-    }, 2500);
+      setActiveTab("output");
+    }, 2000);
   };
 
   // Run Backend Diagnostic loop simulation
@@ -285,6 +289,46 @@ export default function TerminalModal({ project, onClose }: TerminalModalProps) 
   // Render content block for Live Output sandbox Tab
   const renderLiveOutput = () => {
     if (!project) return null;
+
+    if (project.dir) {
+      const projectUrl = `/Frontend_Project/${encodeURIComponent(project.dir)}/index.html`;
+      return (
+        <div className="h-full flex flex-col justify-between font-sans gap-3">
+          <div className="flex justify-between items-center select-none bg-[#0c0f12] px-3 py-2 rounded-lg border border-white/5">
+            <div className="space-y-0.5">
+              <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5 font-mono">
+                <Sparkles size={12} className="text-[#00d1ff] animate-pulse" />
+                {project.title} — Live Interactive Workspace
+              </h4>
+              <p className="text-[10px] text-gray-400 font-medium font-sans">
+                Running in sandboxed iframe environment. Fully functional and interactive.
+              </p>
+            </div>
+
+            <a
+              href={projectUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-3 py-1.5 bg-primary/10 border border-primary/20 hover:bg-primary hover:text-black text-primary text-[10px] font-bold font-mono rounded transition-all flex items-center gap-1.5 shadow-sm"
+            >
+              <ExternalLink size={12} />
+              Open Full Screen
+            </a>
+          </div>
+
+          {/* Interactive Live Web App Frame */}
+          <div className="flex-grow bg-white rounded-lg border border-white/10 overflow-hidden min-h-[360px] relative shadow-inner">
+            <iframe
+              src={projectUrl}
+              title={project.title}
+              className="w-full h-full border-none bg-white"
+              sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+            />
+          </div>
+        </div>
+      );
+    }
+
     switch (project.id) {
       // 1. APEX-GLOW DASHBOARD
       case "apex-glow-analytics":
@@ -468,7 +512,7 @@ export default function TerminalModal({ project, onClose }: TerminalModalProps) 
                     setBtnClicks(c => c + 1);
                     setLabLogs(l => [`[CLICK] CyberPrimary activated (clicks: ${btnClicks + 1})`, ...l.slice(0, 3)]);
                   }}
-                  className="px-5 py-2.5 bg-primary text-black font-mono font-bold rounded-lg text-xs tracking-wider uppercase hover:brightness-110 transition-all cursor-pointer active:scale-95 shadow-md"
+                  className="px-5 py-2.5 bg-primary text-white dark:text-black font-mono font-bold rounded-lg text-xs tracking-wider uppercase hover:brightness-110 transition-all cursor-pointer active:scale-95 shadow-md"
                   style={{ boxShadow: `0 0 ${glowIntensity}px rgba(0, 209, 255, 0.45)` }}
                 >
                   CyberPrimary
@@ -1184,156 +1228,106 @@ export default function TerminalModal({ project, onClose }: TerminalModalProps) 
 
   if (!project) return null;
 
+  const projectUrl = `/Frontend_Project/${encodeURIComponent(project.dir || project.id)}/index.html`;
+  const rawNumMatch = project.dir?.match(/^(\d+)\./) || project.id.match(/^(\d+)-/);
+  const projectNum = rawNumMatch ? rawNumMatch[1].padStart(2, '0') : "01";
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
-      <div className="w-full max-w-4xl bg-[#090b0c] border border-primary/20 rounded-lg overflow-hidden shadow-2xl flex flex-col h-[550px] font-mono">
-        {/* Terminal Header */}
-        <div className="bg-[#121518] px-4 py-3 flex items-center justify-between border-b border-white/5">
-          <div className="flex items-center gap-3">
-            <div className="flex gap-1.5">
-              <span className="w-3.5 h-3.5 rounded-full bg-red-500/80 cursor-pointer" onClick={onClose}></span>
-              <span className="w-3.5 h-3.5 rounded-full bg-yellow-500/80"></span>
-              <span className="w-3.5 h-3.5 rounded-full bg-green-500/80"></span>
-            </div>
-            <span className="text-xs text-gray-400 font-semibold tracking-wider flex items-center gap-1.5 ml-2">
-              <Terminal size={14} className="text-primary" />
-              TERMINAL - {project.title.toLowerCase()}.git
-            </span>
-          </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors p-1">
-            <X size={18} />
-          </button>
-        </div>
-
-        {/* Action Bar */}
-        <div className="bg-[#0b0e11] px-4 py-2.5 flex items-center justify-between border-b border-white/5 gap-2 flex-wrap">
-          {/* Tabs */}
-          <div className="flex gap-2">
-            <button
-              onClick={() => setActiveTab("code")}
-              className={`px-3 py-1 text-xs rounded transition-all flex items-center gap-1.5 ${
-                activeTab === "code"
-                  ? "bg-primary/10 text-primary border border-primary/20"
-                  : "text-gray-400 hover:text-white"
-              }`}
-            >
-              <FileCode size={13} />
-              Code View
-            </button>
-            <button
-              onClick={() => setActiveTab("logs")}
-              className={`px-3 py-1 text-xs rounded transition-all flex items-center gap-1.5 ${
-                activeTab === "logs"
-                  ? "bg-primary/10 text-primary border border-primary/20"
-                  : "text-gray-400 hover:text-white"
-              }`}
-            >
-              <Terminal size={13} />
-              Terminal Logs
-            </button>
-            <button
-              onClick={() => setActiveTab("output")}
-              className={`px-3 py-1 text-xs rounded transition-all flex items-center gap-1.5 ${
-                activeTab === "output"
-                  ? "bg-primary/10 text-primary border border-primary/20"
-                  : "text-gray-400 hover:text-white"
-              }`}
-            >
-              <PlayCircle size={13} />
-              Live Output
-            </button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#090d16]/90 backdrop-blur-md p-3 sm:p-6 select-none">
+      <div className="w-full max-w-[1280px] h-[90vh] bg-[#0f172a] rounded-[20px] border border-white/10 flex flex-col overflow-hidden shadow-[0_25px_50px_-12px_rgba(0,0,0,0.8)]">
+        
+        {/* Modal Header (Exact Screenshot Match) */}
+        <div className="px-3 sm:px-6 py-3 sm:py-4 bg-[#1e293b] border-b border-white/10 flex justify-between items-center shrink-0 gap-2">
+          <div className="text-white font-bold text-xs sm:text-lg flex items-center gap-1.5 sm:gap-2.5 font-sans min-w-0">
+            <PlayCircle size={18} className="text-[#38bdf8] shrink-0" />
+            <span className="truncate">#{projectNum} <span className="truncate max-w-[100px] xs:max-w-[180px] sm:max-w-none inline-block align-bottom">{project.title}</span></span>
           </div>
 
-          {/* Build actions */}
-          <div className="flex gap-2">
-            <button
-              onClick={handleCompile}
-              disabled={isCompiling}
-              className={`px-3 py-1 text-xs rounded font-semibold transition-all flex items-center gap-1.5 ${
-                isCompiling
-                  ? "bg-gray-800 text-gray-500 border border-gray-700 cursor-not-allowed"
-                  : "bg-primary text-white dark:text-black hover:brightness-110 hover:shadow-[0_0_15px_rgba(0,209,255,0.4)]"
-              }`}
-            >
-              {isCompiling ? (
-                <RefreshCw size={13} className="animate-spin" />
-              ) : (
-                <Play size={13} fill="currentColor" />
-              )}
-              Run Build
-            </button>
-          </div>
-        </div>
-
-        {/* Main Work Area */}
-        <div className="flex-grow flex overflow-hidden">
-          {/* File sidebar (Only in Code View) */}
-          {activeTab === "code" && (
-            <div className="w-52 bg-[#0c0f12] border-r border-white/5 p-2 overflow-y-auto hidden sm:block">
-              <span className="text-[10px] text-gray-500 uppercase tracking-widest block px-2 mb-2">
-                Files
-              </span>
-              <div className="flex flex-col gap-1">
-                {fileNames.map((fileName) => (
-                  <button
-                    key={fileName}
-                    onClick={() => setSelectedFile(fileName)}
-                    className={`w-full text-left text-xs px-2.5 py-1.5 rounded transition-all truncate flex items-center gap-2 ${
-                      selectedFile === fileName
-                        ? "bg-white/5 text-primary border-l-2 border-primary"
-                        : "text-gray-400 hover:text-white hover:bg-white/5"
-                    }`}
-                  >
-                    <FileCode size={14} className={selectedFile === fileName ? "text-primary" : "text-gray-500"} />
-                    {fileName}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Code/Logs/Output Screen */}
-          <div className="flex-grow bg-[#050708] p-4 overflow-auto terminal-scrollbar relative">
+          <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
             {activeTab === "code" ? (
-              <pre className="text-xs text-gray-300 whitespace-pre leading-relaxed select-text font-mono">
-                <code>{files[selectedFile] || "// No source files indexed inside this repository."}</code>
-              </pre>
-            ) : activeTab === "logs" ? (
-              <div className="text-xs text-green-400 space-y-1.5 select-text font-mono">
-                {terminalLogs.map((log, idx) => (
-                  <div key={idx} className={log.startsWith("$") ? "text-white font-semibold" : log.startsWith("[SUCCESS]") ? "text-cyan-400" : log.startsWith("[ERROR]") ? "text-red-400" : "text-green-500/80"}>
-                    {log}
-                  </div>
-                ))}
-                {isCompiling && (
-                  <div className="flex items-center gap-2 text-cyan-400 font-semibold mt-1">
-                    <RefreshCw size={12} className="animate-spin" />
-                    Compiling in debug mode...
-                  </div>
-                )}
-                {!isCompiling && (
-                  <div className="flex items-center gap-1 mt-1 text-white">
-                    <span>$</span>
-                    <span className="w-1.5 h-4 bg-green-400 animate-pulse ml-0.5"></span>
-                  </div>
-                )}
-              </div>
+              <button
+                onClick={() => setActiveTab("output")}
+                className="px-2.5 sm:px-3.5 py-1.5 bg-white/10 hover:bg-white/20 border border-white/10 text-gray-200 hover:text-white rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer font-sans"
+                title="Live Preview"
+              >
+                <PlayCircle size={14} className="text-[#38bdf8]" />
+                <span className="hidden sm:inline">Live Preview</span>
+              </button>
             ) : (
-              // LIVE SANDBOX INTERACTIVE CONTAINER RENDER
-              <div className="w-full h-full min-h-[220px]">
-                {renderLiveOutput()}
-              </div>
+              <button
+                onClick={() => setActiveTab("code")}
+                className="px-2.5 sm:px-3.5 py-1.5 bg-white/10 hover:bg-white/20 border border-white/10 text-gray-200 hover:text-white rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer font-sans"
+                title="Show Code"
+              >
+                <FileCode size={14} className="text-[#38bdf8]" />
+                <span className="hidden sm:inline">Show Code</span>
+              </button>
             )}
+
+            <a
+              href={projectUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-2.5 sm:px-3.5 py-1.5 bg-white/10 hover:bg-white/20 border border-white/10 text-gray-200 hover:text-white rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 font-sans"
+              title="Open in Full Page"
+            >
+              <ExternalLink size={14} />
+              <span className="hidden md:inline">Open in Full Page</span>
+            </a>
+
+            <button
+              onClick={onClose}
+              className="px-2.5 sm:px-3.5 py-1.5 bg-[#ef4444]/20 hover:bg-[#ef4444] text-[#ef4444] hover:text-white border border-[#ef4444]/30 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer font-sans"
+              title="Close Modal"
+            >
+              <X size={14} />
+              <span className="hidden xs:inline">Close</span>
+            </button>
           </div>
         </div>
 
-        {/* Terminal Footer */}
-        <div className="bg-[#121518] px-4 py-2 border-t border-white/5 flex justify-between items-center text-[10px] text-gray-500">
-          <span>utf-8</span>
-          <span className="flex items-center gap-1.5">
-            <CheckCircle size={10} className="text-primary" />
-            Environment: Docker/Sandboxed-Linux (React Node20)
-          </span>
+        {/* Modal Body / Full Height Preview Viewport */}
+        <div className="flex-grow w-full h-full relative overflow-hidden bg-white">
+          {activeTab === "code" ? (
+            <div className="w-full h-full bg-[#050708] flex font-mono text-xs select-text">
+              {/* File sidebar */}
+              <div className="w-56 bg-[#0c0f12] border-r border-white/10 p-3 overflow-y-auto hidden sm:block">
+                <span className="text-[10px] text-gray-500 uppercase tracking-widest block mb-2 font-bold select-none">
+                  Repository Files
+                </span>
+                <div className="flex flex-col gap-1">
+                  {fileNames.map((fileName) => (
+                    <button
+                      key={fileName}
+                      onClick={() => setSelectedFile(fileName)}
+                      className={`w-full text-left text-xs px-2.5 py-1.5 rounded transition-all truncate flex items-center gap-2 ${
+                        selectedFile === fileName
+                          ? "bg-white/10 text-[#38bdf8] border-l-2 border-[#38bdf8]"
+                          : "text-gray-400 hover:text-white hover:bg-white/5"
+                      }`}
+                    >
+                      <FileCode size={13} className={selectedFile === fileName ? "text-[#38bdf8]" : "text-gray-500"} />
+                      {fileName}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Code Screen */}
+              <div className="flex-grow p-4 overflow-auto terminal-scrollbar bg-[#050708]">
+                <pre className="text-gray-300 leading-relaxed font-mono whitespace-pre select-text">
+                  <code>{files[selectedFile] || "// No source files indexed inside this repository."}</code>
+                </pre>
+              </div>
+            </div>
+          ) : (
+            <iframe
+              src={projectUrl}
+              title={project.title}
+              className="w-full h-full border-none bg-white block"
+              sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+            />
+          )}
         </div>
       </div>
     </div>

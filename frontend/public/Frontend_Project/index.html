@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The 50 Frontend Projects - Interactive Suite & Hub</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --bg-dark: #090d16;
+            --card-bg: rgba(21, 29, 46, 0.7);
+            --border-color: rgba(255, 255, 255, 0.08);
+            --primary: #38bdf8;
+            --primary-glow: rgba(56, 189, 248, 0.3);
+            --accent: #818cf8;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Outfit', 'Inter', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            min-height: 100vh;
+            background-image: 
+                radial-gradient(circle at 15% 15%, rgba(56, 189, 248, 0.12) 0%, transparent 40%),
+                radial-gradient(circle at 85% 85%, rgba(129, 140, 248, 0.12) 0%, transparent 40%);
+            background-attachment: fixed;
+        }
+
+        /* Header / Hero */
+        header {
+            padding: 48px 24px 32px 24px;
+            text-align: center;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .badge-hero {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 16px;
+            border-radius: 9999px;
+            background: rgba(56, 189, 248, 0.1);
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            color: var(--primary);
+            font-size: 0.875rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+
+        header h1 {
+            font-size: 3rem;
+            font-weight: 800;
+            letter-spacing: -0.025em;
+            background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 50%, var(--primary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 16px;
+        }
+
+        header p {
+            font-size: 1.15rem;
+            color: var(--text-muted);
+            max-width: 680px;
+            margin: 0 auto 32px auto;
+            line-height: 1.6;
+        }
+
+        /* Stats Bar */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 16px;
+            max-width: 800px;
+            margin: 0 auto 40px auto;
+        }
+
+        .stat-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 16px 20px;
+            backdrop-filter: blur(12px);
+            text-align: center;
+        }
+
+        .stat-card .num {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .stat-card .label {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        /* Search & Controls */
+        .controls-section {
+            max-width: 1200px;
+            margin: 0 auto 32px auto;
+            padding: 0 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .search-wrapper {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+        }
+
+        .search-wrapper i {
+            position: absolute;
+            left: 18px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            font-size: 1.1rem;
+        }
+
+        .search-bar {
+            width: 100%;
+            padding: 14px 20px 14px 50px;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            color: #fff;
+            font-size: 1rem;
+            outline: none;
+            backdrop-filter: blur(12px);
+            transition: all 0.3s;
+        }
+
+        .search-bar:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 20px var(--primary-glow);
+        }
+
+        .category-filters {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .cat-btn {
+            padding: 8px 18px;
+            border-radius: 10px;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .cat-btn:hover, .cat-btn.active {
+            background: var(--primary);
+            color: #090d16;
+            border-color: var(--primary);
+            font-weight: 600;
+            box-shadow: 0 4px 14px var(--primary-glow);
+        }
+
+        /* Projects Grid */
+        .projects-grid {
+            max-width: 1300px;
+            margin: 0 auto;
+            padding: 0 24px 60px 24px;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 24px;
+        }
+
+        .project-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 18px;
+            padding: 24px;
+            backdrop-filter: blur(16px);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .project-card:hover {
+            transform: translateY(-6px);
+            border-color: rgba(56, 189, 248, 0.4);
+            box-shadow: 0 20px 30px -10px rgba(0, 0, 0, 0.6), 0 0 20px var(--primary-glow);
+        }
+
+        .card-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .proj-num {
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: var(--primary);
+            background: rgba(56, 189, 248, 0.1);
+            padding: 4px 10px;
+            border-radius: 6px;
+            border: 1px solid rgba(56, 189, 248, 0.2);
+        }
+
+        .proj-cat {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            background: rgba(255, 255, 255, 0.05);
+            padding: 4px 8px;
+            border-radius: 6px;
+        }
+
+        .proj-title {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 12px;
+            line-height: 1.3;
+        }
+
+        .card-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .btn-run {
+            flex: 1;
+            padding: 10px 14px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, var(--primary), #2563eb);
+            border: none;
+            color: #fff;
+            font-weight: 600;
+            font-size: 0.9rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+
+        .btn-run:hover {
+            opacity: 0.9;
+            transform: scale(1.02);
+        }
+
+        .btn-tab {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+            transition: all 0.2s;
+        }
+
+        .btn-tab:hover {
+            background: rgba(255, 255, 255, 0.15);
+            color: #fff;
+        }
+
+        /* Modal Preview */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(5, 8, 15, 0.85);
+            backdrop-filter: blur(12px);
+            z-index: 1000;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            padding: 24px;
+        }
+
+        .modal-content {
+            width: 100%;
+            max-width: 1280px;
+            height: 90vh;
+            background: #0f172a;
+            border-radius: 20px;
+            border: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8);
+        }
+
+        .modal-header {
+            padding: 16px 24px;
+            background: #1e293b;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .modal-controls {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .modal-btn {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            padding: 6px 14px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.2s;
+        }
+
+        .modal-btn:hover {
+            color: #fff;
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .btn-close {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+            border-color: rgba(239, 68, 68, 0.3);
+        }
+
+        .btn-close:hover {
+            background: #ef4444;
+            color: #fff;
+        }
+
+        iframe {
+            flex: 1;
+            width: 100%;
+            height: 100%;
+            border: none;
+            background: #fff;
+        }
+
+        footer {
+            text-align: center;
+            padding: 30px 24px;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            border-top: 1px solid var(--border-color);
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="badge-hero">
+            <i class="fa-solid fa-layer-group"></i> 50 Frontend Projects Suite
+        </div>
+        <h1>Run & Test All 50 Frontend Projects</h1>
+        <p>A complete collection of 50 frontend projects built with HTML, CSS, JavaScript, and Web APIs. Click "Run Project" on any card to preview instantly!</p>
+    </header>
+
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="num">50</div>
+            <div class="label">Total Projects</div>
+        </div>
+        <div class="stat-card">
+            <div class="num">100%</div>
+            <div class="label">Fully Functional</div>
+        </div>
+        <div class="stat-card">
+            <div class="num">0</div>
+            <div class="label">Dependencies Needed</div>
+        </div>
+    </div>
+
+    <div class="controls-section">
+        <div class="search-wrapper">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input type="text" id="search-bar" class="search-bar" placeholder="Search project name or number (e.g. Weather, Piano, 17)...">
+        </div>
+        <div class="category-filters" id="category-filters">
+            <button class="cat-btn active" data-cat="all">All (50)</button>
+            <button class="cat-btn" data-cat="apps">Web Apps & Tools</button>
+            <button class="cat-btn" data-cat="games">Games</button>
+            <button class="cat-btn" data-cat="sites">Landing Pages & Portfolios</button>
+            <button class="cat-btn" data-cat="utility">Utilities</button>
+        </div>
+    </div>
+
+    <div class="projects-grid" id="projects-grid">
+        <!-- Dynamic Cards -->
+    </div>
+
+    <footer>
+        <p>The 50 Front-end Projects Suite • Built & Optimized for Instant Local Execution</p>
+    </footer>
+
+    <!-- Modal Preview Runner -->
+    <div class="modal-overlay" id="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title" id="modal-title">
+                    <i class="fa-solid fa-circle-play" style="color: var(--primary);"></i> Project Preview
+                </div>
+                <div class="modal-controls">
+                    <a href="#" id="modal-newtab" target="_blank" class="modal-btn">
+                        <i class="fa-solid fa-arrow-up-right-from-square"></i> Open in Full Page
+                    </a>
+                    <button class="modal-btn btn-close" id="modal-close">
+                        <i class="fa-solid fa-xmark"></i> Close
+                    </button>
+                </div>
+            </div>
+            <iframe id="project-iframe" src="about:blank"></iframe>
+        </div>
+    </div>
+
+    <script>
+        const projects = [
+            { id: '01', name: 'Company Portfolio', dir: '01.Company-Portfolio', cat: 'sites' },
+            { id: '02', name: 'Blog Website (With Admin Panel)', dir: '02.Blog-Website(With Admin Panel)', cat: 'sites' },
+            { id: '03', name: 'E-Book Site', dir: '03.E-Book Site', cat: 'sites' },
+            { id: '04', name: 'Ecommerce Site', dir: '04.Ecommerce-site', cat: 'sites' },
+            { id: '05', name: 'Restaurant Website', dir: '05.Restaurant Website', cat: 'sites' },
+            { id: '06', name: 'Hotel Website', dir: '06.Hotel Website', cat: 'sites' },
+            { id: '07', name: 'Photography Portfolio', dir: '07.Photography Portfolio Website', cat: 'sites' },
+            { id: '08', name: 'Fitness Website', dir: '08.Fitness Website', cat: 'sites' },
+            { id: '09', name: 'Password Generator', dir: '09.Password Generator', cat: 'apps' },
+            { id: '10', name: 'QR Code Reader', dir: '10.QR code Reader', cat: 'apps' },
+            { id: '11', name: 'Weather App', dir: '11.Weather App', cat: 'apps' },
+            { id: '12', name: 'Tic-Tac-Toe Game', dir: '12.Tic-tac-toe Game', cat: 'games' },
+            { id: '13', name: 'Link Shortener Website', dir: '13.Link-Shorten-Website', cat: 'apps' },
+            { id: '14', name: 'Drawing App', dir: '14.Drawing App', cat: 'apps' },
+            { id: '15', name: 'Alarm Clock', dir: '15.Alarm Clock', cat: 'apps' },
+            { id: '16', name: 'Meme Generator', dir: '16.Meme-Generator', cat: 'apps' },
+            { id: '17', name: 'Chatting Web App', dir: '17.Chatting-App', cat: 'apps' },
+            { id: '18', name: 'Online Form', dir: '18.Online-Form', cat: 'utility' },
+            { id: '19', name: 'Language Translator', dir: '19.Translator', cat: 'apps' },
+            { id: '20', name: 'Playable Piano', dir: '20.Playable-Piano', cat: 'games' },
+            { id: '21', name: 'Image Resizer', dir: '21.Image Resizer', cat: 'utility' },
+            { id: '22', name: 'Dynamic Calendar', dir: '22.Dynamic Calander', cat: 'apps' },
+            { id: '23', name: 'File Downloader', dir: '23.File Downloader', cat: 'utility' },
+            { id: '24', name: 'Chess Game', dir: '24.Chess Game', cat: 'games' },
+            { id: '25', name: 'Car Racing Game', dir: '25.Car-Racing', cat: 'games' },
+            { id: '26', name: 'Connect 4 Game', dir: '26.Connect-Game', cat: 'games' },
+            { id: '27', name: 'Snake and Ladder', dir: '27.Snake and Ladder', cat: 'games' },
+            { id: '28', name: 'Spelling Bee Game', dir: '28.Spelling game', cat: 'games' },
+            { id: '29', name: 'Analog Watch', dir: '29.Analog Watch', cat: 'utility' },
+            { id: '30', name: 'Photo Editor', dir: '30.Photo Editor', cat: 'apps' },
+            { id: '31', name: 'Music Player', dir: '31.Music Player', cat: 'apps' },
+            { id: '32', name: 'Calculator', dir: '32.Calculator', cat: 'utility' },
+            { id: '33', name: 'Rock Paper Scissors', dir: '33.Rock-Paper-Scissors Game', cat: 'games' },
+            { id: '34', name: 'Notes App', dir: '34.Note-App', cat: 'apps' },
+            { id: '35', name: 'Text File Saver', dir: '35.Text-File saver(all extention)', cat: 'utility' },
+            { id: '36', name: 'Dictionary App', dir: '36.Dictionary App', cat: 'apps' },
+            { id: '37', name: 'Snake Game', dir: '37.Snake Game', cat: 'games' },
+            { id: '38', name: 'Stock Trading App', dir: '38.Stock Trading App', cat: 'apps' },
+            { id: '39', name: 'Stopwatch', dir: '39.Stop watch', cat: 'utility' },
+            { id: '40', name: 'Text to Speech Converter', dir: '40.Text To Word Convertor', cat: 'utility' },
+            { id: '41', name: 'Todo List App', dir: '41.Todo list app', cat: 'apps' },
+            { id: '42', name: 'Twitter Clone', dir: '42.Twitter Clone', cat: 'sites' },
+            { id: '43', name: 'Typing Speed Test', dir: '43.Typing-Speed-test app', cat: 'apps' },
+            { id: '44', name: 'Admin Panel Dashboard', dir: '44.Admin panel Dashboard', cat: 'sites' },
+            { id: '45', name: 'WhatsApp Clone', dir: '45.Whatsapp Clone', cat: 'sites' },
+            { id: '46', name: 'Video 2 Audio Converter', dir: '46.Video 2 Audio Converter', cat: 'utility' },
+            { id: '47', name: 'Random Quote Generator', dir: '47.Random Qoute Generator', cat: 'apps' },
+            { id: '48', name: 'Online Quiz Website', dir: '48.Online Quiz Website', cat: 'apps' },
+            { id: '49', name: 'Dragon / Dino Game', dir: '49.Dragon Game', cat: 'games' },
+            { id: '50', name: 'Drag & Drop File Upload', dir: '50.Drag&Drop Image file', cat: 'utility' }
+        ];
+
+        const grid = document.getElementById('projects-grid');
+        const searchInput = document.getElementById('search-bar');
+        const filterBtns = document.querySelectorAll('.cat-btn');
+        const modalOverlay = document.getElementById('modal-overlay');
+        const modalTitle = document.getElementById('modal-title');
+        const modalNewtab = document.getElementById('modal-newtab');
+        const modalClose = document.getElementById('modal-close');
+        const iframe = document.getElementById('project-iframe');
+
+        let currentCat = 'all';
+        let searchQuery = '';
+
+        function renderProjects() {
+            grid.innerHTML = '';
+            const filtered = projects.filter(p => {
+                const matchesCat = currentCat === 'all' || p.cat === currentCat;
+                const matchesSearch = p.name.toLowerCase().includes(searchQuery) || p.id.includes(searchQuery);
+                return matchesCat && matchesSearch;
+            });
+
+            if (filtered.length === 0) {
+                grid.innerHTML = `<div style="grid-column: 1/-1; text-align: center; color: var(--text-muted); padding: 40px;">No projects found matching your search.</div>`;
+                return;
+            }
+
+            filtered.forEach(p => {
+                const card = document.createElement('div');
+                card.className = 'project-card';
+                const indexPath = `${encodeURIComponent(p.dir)}/index.html`;
+
+                card.innerHTML = `
+                    <div>
+                        <div class="card-top">
+                            <span class="proj-num">#${p.id}</span>
+                            <span class="proj-cat">${p.cat.toUpperCase()}</span>
+                        </div>
+                        <h3 class="proj-title">${p.name}</h3>
+                    </div>
+                    <div class="card-actions">
+                        <button class="btn-run" onclick="openModal('#${p.id} ${p.name}', '${indexPath}')">
+                            <i class="fa-solid fa-play"></i> Run Project
+                        </button>
+                        <a href="${indexPath}" target="_blank" class="btn-tab" title="Open in new tab">
+                            <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                        </a>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function openModal(title, url) {
+            modalTitle.innerHTML = `<i class="fa-solid fa-circle-play" style="color: var(--primary);"></i> ${title}`;
+            modalNewtab.href = url;
+            iframe.src = url;
+            modalOverlay.style.display = 'flex';
+        }
+
+        function closeModal() {
+            modalOverlay.style.display = 'none';
+            iframe.src = 'about:blank';
+        }
+
+        modalClose.addEventListener('click', closeModal);
+        modalOverlay.addEventListener('click', (e) => {
+            if (e.target === modalOverlay) closeModal();
+        });
+
+        searchInput.addEventListener('input', (e) => {
+            searchQuery = e.target.value.toLowerCase().trim();
+            renderProjects();
+        });
+
+        filterBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                filterBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentCat = btn.getAttribute('data-cat');
+                renderProjects();
+            });
+        });
+
+        // Initialize
+        renderProjects();
+    </script>
+</body>
+</html>

@@ -109,7 +109,7 @@ export default function Services() {
               <div className="md:w-1/3 w-full flex justify-center md:justify-end">
                 <Link
                   to="/contact"
-                  className="px-6 py-3 bg-primary text-black font-semibold rounded-md hover:brightness-110 hover:shadow-[0_0_20px_rgba(0,209,255,0.4)] transition-all active:scale-95 text-sm"
+                  className="px-6 py-3 bg-primary text-white dark:text-black font-semibold rounded-md hover:brightness-110 hover:shadow-[0_0_20px_rgba(0,209,255,0.4)] transition-all active:scale-95 text-sm"
                 >
                   Request Consultation
                 </Link>

@@ -1,0 +1,19 @@
+{
+  "name": "the-50-frontend-projects",
+  "version": "1.0.0",
+  "description": "50 Frontend Web Projects Suite",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "frontend",
+    "html",
+    "css",
+    "javascript",
+    "projects"
+  ],
+  "author": "",
+  "license": "ISC"
+}

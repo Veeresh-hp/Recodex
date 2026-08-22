@@ -63,11 +63,12 @@ export async function getProjects(category?: string, search?: string): Promise<P
     // Map backend response fields to frontend format (imageUrl -> image)
     return data.map((item: any) => ({
       id: item.id,
+      dir: MOCK_PROJECTS.find((m) => m.id === item.id)?.dir || item.dir || item.id,
       title: item.title,
       description: item.description,
       longDescription: item.longDescription,
       status: item.status,
-      image: item.imageUrl,
+      image: item.imageUrl || item.image,
       category: item.category,
       tags: item.tags,
       devsCount: item.devsCount,
