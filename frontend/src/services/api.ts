@@ -47,12 +47,17 @@ export async function getProjects(category?: string, search?: string): Promise<P
       url.searchParams.append("search", search);
     }
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 1200);
+
     const response = await fetch(url.toString(), {
       method: "GET",
       headers: {
         "Accept": "application/json",
       },
+      signal: controller.signal,
     });
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       throw new Error(`HTTP server error: Status ${response.status}`);
@@ -152,6 +157,35 @@ export async function syncUser(userData: {
   profileImage?: string;
 }): Promise<any> {
   try {
+    if (typeof window !== "undefined" && userData.email) {
+      const raw = localStorage.getItem("recodex_synced_users");
+      const list: any[] = raw ? JSON.parse(raw) : [];
+      const index = list.findIndex((u) => u.email.toLowerCase() === userData.email.toLowerCase());
+      const newUserObj = {
+        id: userData.id || `usr-${Date.now()}`,
+        name: userData.name || userData.email.split("@")[0],
+        email: userData.email,
+        role: userData.role || (userData.email === "veereshhp2004@gmail.com" ? "admin" : "developer"),
+        profileImage: userData.profileImage || "",
+        status: "Active",
+        createdAt: new Date().toISOString()
+      };
+
+      if (index >= 0) {
+        list[index] = { ...list[index], ...newUserObj };
+      } else {
+        list.unshift(newUserObj);
+      }
+
+      localStorage.setItem("recodex_synced_users", JSON.stringify(list));
+      window.dispatchEvent(new Event("recodex-user-registered"));
+      window.dispatchEvent(new Event("storage"));
+    }
+  } catch (e) {
+    console.error("Local user sync error:", e);
+  }
+
+  try {
     const response = await fetch(`${API_BASE_URL}/users/sync`, {
       method: "POST",
       headers: {
@@ -166,7 +200,7 @@ export async function syncUser(userData: {
 
     return await response.json();
   } catch (backendError) {
-    console.error("[RECODEX API] User identity sync completely failed:", backendError);
+    console.warn("[RECODEX API] User identity sync backend warning:", backendError);
     return null;
   }
 }
@@ -235,9 +269,13 @@ export async function joinProject(projectId: string, token: string): Promise<any
 
 /**
  * Fetches all ecosystem users from the backend database.
- * Falls back to static local mock data if the server is offline.
+ * Falls back to static local mock data + synced users if offline.
  */
 export async function getUsers(): Promise<any[]> {
+  const localSyncedRaw = typeof window !== "undefined" ? localStorage.getItem("recodex_synced_users") : null;
+  const localSynced: any[] = localSyncedRaw ? JSON.parse(localSyncedRaw) : [];
+
+  let backendUsers: any[] = [];
   try {
     const response = await fetch(`${API_BASE_URL}/users`, {
       method: "GET",
@@ -246,21 +284,35 @@ export async function getUsers(): Promise<any[]> {
       },
     });
 
-    if (!response.ok) {
-      throw new Error(`HTTP server error: Status ${response.status}`);
+    if (response.ok) {
+      backendUsers = await response.json();
     }
-
-    return await response.json();
   } catch (error) {
     console.warn("[RECODEX API] Local server unreachable. Reverting to static user directory mock nodes.", error);
-    // Return mock static users
-    return [
+    backendUsers = [
       { id: "usr-01", name: "Veeresh H P", email: "veereshhp2004@gmail.com", role: "admin", status: "Active", createdAt: new Date(Date.now() - 3600 * 1000 * 24 * 10).toISOString() },
       { id: "usr-02", name: "John Doe", email: "john.doe@recodex.io", role: "developer", status: "Active", createdAt: new Date(Date.now() - 3600 * 1000 * 24 * 5).toISOString() },
       { id: "usr-03", name: "Sarah Connor", email: "sarah@skynet.com", role: "client", status: "Pending", createdAt: new Date(Date.now() - 3600 * 1000 * 24).toISOString() },
       { id: "usr-04", name: "Alice Vance", email: "vance@blackmesa.org", role: "developer", status: "Active", createdAt: new Date(Date.now() - 3600 * 1000 * 2).toISOString() }
     ];
   }
+
+  const userMap = new Map<string, any>();
+  backendUsers.forEach((u: any) => {
+    if (u && u.email) userMap.set(u.email.toLowerCase(), u);
+  });
+  localSynced.forEach((u: any) => {
+    if (u && u.email) {
+      const existing = userMap.get(u.email.toLowerCase());
+      if (existing) {
+        userMap.set(u.email.toLowerCase(), { ...existing, ...u });
+      } else {
+        userMap.set(u.email.toLowerCase(), u);
+      }
+    }
+  });
+
+  return Array.from(userMap.values());
 }
 
 /**

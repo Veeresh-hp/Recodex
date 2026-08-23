@@ -155,33 +155,33 @@ export default function Categories() {
   // Complete Technical Dataset
   const techStacks = [
     // Frontend
-    { name: "React.js", category: "Frontend", projectsCount: 2400, description: "High-performance UI components with virtual DOM efficiency.", tags: ["NEXT.JS", "TAILWIND", "REDUX"], iconType: "code" },
-    { name: "Vue.js", category: "Frontend", projectsCount: 1100, description: "The progressive framework for building modern user interfaces.", tags: ["NUXT.JS", "PINIA", "VITE"], iconType: "send" },
-    { name: "Angular", category: "Frontend", projectsCount: 840, description: "The platform for building enterprise-grade mobile & web apps.", tags: ["RXJS", "TYPESCRIPT", "NGRX"], iconType: "compass" },
+    { name: "React.js", category: "Frontend", projectsCount: 26, description: "High-performance UI components with virtual DOM efficiency.", tags: ["NEXT.JS", "TAILWIND", "REDUX"], iconType: "code" },
+    { name: "Vue.js", category: "Frontend", projectsCount: 11, description: "The progressive framework for building modern user interfaces.", tags: ["NUXT.JS", "PINIA", "VITE"], iconType: "send" },
+    { name: "Angular", category: "Frontend", projectsCount: 8, description: "The platform for building enterprise-grade mobile & web apps.", tags: ["RXJS", "TYPESCRIPT", "NGRX"], iconType: "compass" },
     
     // Backend
-    { name: "Node.js / Express", category: "Backend", projectsCount: 3200, description: "Scale with event-driven architecture. The backbone of real-time apps.", tags: ["TS", "MONGO", "REDIS"], iconType: "server" },
-    { name: "Python / Django", category: "Backend", projectsCount: 1500, description: "Rapid development with a focus on clean, pragmatic design.", tags: ["PYTHON", "POSTGRES", "REST"], iconType: "terminal" },
-    { name: "Go / Gin", category: "Backend", projectsCount: 950, description: "Extremely fast concurrent systems backed by Google guidelines.", tags: ["GO", "GIN", "DOCKER"], iconType: "cpu" },
+    { name: "Node.js / Express", category: "Backend", projectsCount: 32, description: "Scale with event-driven architecture. The backbone of real-time apps.", tags: ["TS", "MONGO", "REDIS"], iconType: "server" },
+    { name: "Python / Django", category: "Backend", projectsCount: 15, description: "Rapid development with a focus on clean, pragmatic design.", tags: ["PYTHON", "POSTGRES", "REST"], iconType: "terminal" },
+    { name: "Go / Gin", category: "Backend", projectsCount: 9, description: "Extremely fast concurrent systems backed by Google guidelines.", tags: ["GO", "GIN", "DOCKER"], iconType: "cpu" },
     
     // Mobile Development
-    { name: "Flutter", category: "Mobile Development", projectsCount: 1800, description: "Google's UI toolkit for crafting natively compiled mobile apps.", tags: ["DART", "MOBX", "FIREBASE"], iconType: "smartphone" },
-    { name: "React Native", category: "Mobile Development", projectsCount: 1600, description: "Build native apps using React. Efficient across iOS and Android.", tags: ["JS", "EXPO", "REANIMATED"], iconType: "smartphone" },
-    { name: "Kotlin Multiplatform", category: "Mobile Development", projectsCount: 650, description: "Share logic across platforms with native Kotlin performance.", tags: ["KOTLIN", "ANDROID", "IOS"], iconType: "smartphone" },
+    { name: "Flutter", category: "Mobile Development", projectsCount: 18, description: "Google's UI toolkit for crafting natively compiled mobile apps.", tags: ["DART", "MOBX", "FIREBASE"], iconType: "smartphone" },
+    { name: "React Native", category: "Mobile Development", projectsCount: 16, description: "Build native apps using React. Efficient across iOS and Android.", tags: ["JS", "EXPO", "REANIMATED"], iconType: "smartphone" },
+    { name: "Kotlin Multiplatform", category: "Mobile Development", projectsCount: 6, description: "Share logic across platforms with native Kotlin performance.", tags: ["KOTLIN", "ANDROID", "IOS"], iconType: "smartphone" },
     
     // Cloud & DevOps
-    { name: "Kubernetes", category: "Cloud & DevOps", projectsCount: 1400, description: "Automate service orchestration and rolling container updates.", tags: ["K8S", "HELM", "DOCKER"], iconType: "cloud" },
-    { name: "Docker", category: "Cloud & DevOps", projectsCount: 2200, description: "Package applications into isolated sandboxed environments.", tags: ["CONTAINERS", "IMAGES", "COMPOSE"], iconType: "box" },
-    { name: "Terraform", category: "Cloud & DevOps", projectsCount: 750, description: "Provision cloud architectures predictably using declarative code.", tags: ["IAC", "AWS", "GCP"], iconType: "sliders" },
+    { name: "Kubernetes", category: "Cloud & DevOps", projectsCount: 14, description: "Automate service orchestration and rolling container updates.", tags: ["K8S", "HELM", "DOCKER"], iconType: "cloud" },
+    { name: "Docker", category: "Cloud & DevOps", projectsCount: 22, description: "Package applications into isolated sandboxed environments.", tags: ["CONTAINERS", "IMAGES", "COMPOSE"], iconType: "box" },
+    { name: "Terraform", category: "Cloud & DevOps", projectsCount: 7, description: "Provision cloud architectures predictably using declarative code.", tags: ["IAC", "AWS", "GCP"], iconType: "sliders" },
     
     // Data & AI
-    { name: "PyTorch", category: "Data & AI", projectsCount: 1200, description: "An open source machine learning framework accelerating model design.", tags: ["DL", "CUDA", "LLM"], iconType: "cpu" },
-    { name: "TensorBoard", category: "Data & AI", projectsCount: 800, description: "Visualization and debugging tools for machine learning runs.", tags: ["ML", "STATS", "GRAPHS"], iconType: "sliders" },
-    { name: "PostgreSQL", category: "Data & AI", projectsCount: 1900, description: "The world's most advanced open source relational database.", tags: ["SQL", "ACID", "RELATIONAL"], iconType: "database" },
+    { name: "PyTorch", category: "Data & AI", projectsCount: 12, description: "An open source machine learning framework accelerating model design.", tags: ["DL", "CUDA", "LLM"], iconType: "cpu" },
+    { name: "TensorBoard", category: "Data & AI", projectsCount: 8, description: "Visualization and debugging tools for machine learning runs.", tags: ["ML", "STATS", "GRAPHS"], iconType: "sliders" },
+    { name: "PostgreSQL", category: "Data & AI", projectsCount: 19, description: "The world's most advanced open source relational database.", tags: ["SQL", "ACID", "RELATIONAL"], iconType: "database" },
     
     // Productivity Tools
-    { name: "Slack API", category: "Productivity Tools", projectsCount: 600, description: "Build collaborative bots, custom notifications, and chat alerts.", tags: ["BOTS", "WEBHOOKS", "CHAT"], iconType: "message" },
-    { name: "Jira Automation", category: "Productivity Tools", projectsCount: 450, description: "Sync issue pipelines, project workflows, and automated releases.", tags: ["SCRUM", "API", "WEBHOOKS"], iconType: "sliders" }
+    { name: "Slack API", category: "Productivity Tools", projectsCount: 6, description: "Build collaborative bots, custom notifications, and chat alerts.", tags: ["BOTS", "WEBHOOKS", "CHAT"], iconType: "message" },
+    { name: "Jira Automation", category: "Productivity Tools", projectsCount: 4, description: "Sync issue pipelines, project workflows, and automated releases.", tags: ["SCRUM", "API", "WEBHOOKS"], iconType: "sliders" }
   ];
 
   const sidebarItems = [
@@ -197,39 +197,39 @@ export default function Categories() {
   // Dynamic Stack Masters according to selected Active Category
   const stackMasters = {
     "All Stacks": [
-      { name: "@alex_dev", role: "FRONTEND", image: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=80&q=80" },
-      { name: "@sam_arch", role: "BACKEND", image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=80&q=80" },
-      { name: "@sarah_ops", role: "CLOUD", image: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=80&q=80" }
+      { name: "@uday_arch", role: "FRONTEND", image: "/Uday_photo.jpeg" },
+      { name: "@adi_core", role: "BACKEND", image: "/Adi_photo.jpeg" },
+      { name: "@veeresh_hp", role: "LEAD ARCHITECT", image: "/veeresh_photo.jpg" }
     ],
     "Frontend": [
-      { name: "@alex_dev", role: "FRONTEND", image: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=80&q=80" },
-      { name: "@lucas_ui", role: "FRONTEND", image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=80&q=80" },
-      { name: "@sophie_front", role: "UX/UI", image: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=80&q=80" }
+      { name: "@uday_arch", role: "UI/UX LEAD", image: "/Uday_photo.jpeg" },
+      { name: "@adi_core", role: "REACT DEV", image: "/Adi_photo.jpeg" },
+      { name: "@veeresh_hp", role: "FULLSTACK", image: "/veeresh_photo.jpg" }
     ],
     "Backend": [
-      { name: "@sam_arch", role: "BACKEND", image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=80&q=80" },
-      { name: "@elena_core", role: "ARCHITECT", image: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=80&q=80" },
-      { name: "@david_go", role: "ENGINEER", image: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=80&q=80" }
+      { name: "@uday_arch", role: "API DEV", image: "/Uday_photo.jpeg" },
+      { name: "@adi_core", role: "ARCHITECT", image: "/Adi_photo.jpeg" },
+      { name: "@veeresh_hp", role: "SYSTEMS LEAD", image: "/veeresh_photo.jpg" }
     ],
     "Mobile Development": [
-      { name: "@john_native", role: "MOBILE", image: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=80&q=80" },
-      { name: "@clara_flutter", role: "DART", image: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=80&q=80" },
-      { name: "@peter_kmp", role: "IOS/AND", image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=80&q=80" }
+      { name: "@uday_arch", role: "FLUTTER", image: "/Uday_photo.jpeg" },
+      { name: "@adi_core", role: "REACT NATIVE", image: "/Adi_photo.jpeg" },
+      { name: "@veeresh_hp", role: "MOBILE ARCHITECT", image: "/veeresh_photo.jpg" }
     ],
     "Cloud & DevOps": [
-      { name: "@sarah_ops", role: "CLOUD", image: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=80&q=80" },
-      { name: "@tom_devops", role: "IAC", image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=80&q=80" },
-      { name: "@marcus_infra", role: "K8S", image: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=80&q=80" }
+      { name: "@uday_arch", role: "DEVOPS", image: "/Uday_photo.jpeg" },
+      { name: "@adi_core", role: "CLOUD ENG", image: "/Adi_photo.jpeg" },
+      { name: "@veeresh_hp", role: "INFRASTRUCTURE", image: "/veeresh_photo.jpg" }
     ],
     "Data & AI": [
-      { name: "@liam_ai", role: "MLOPS", image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=80&q=80" },
-      { name: "@anna_model", role: "CUDA", image: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=80&q=80" },
-      { name: "@sanjay_db", role: "SQL", image: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=80&q=80" }
+      { name: "@uday_arch", role: "DATA ENG", image: "/Uday_photo.jpeg" },
+      { name: "@adi_core", role: "AI MODELER", image: "/Adi_photo.jpeg" },
+      { name: "@veeresh_hp", role: "MLOPS LEAD", image: "/veeresh_photo.jpg" }
     ],
     "Productivity Tools": [
-      { name: "@emma_slack", role: "INTEGRATION", image: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=80&q=80" },
-      { name: "@kevin_jira", role: "API", image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=80&q=80" },
-      { name: "@noah_trello", role: "AGILE", image: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=80&q=80" }
+      { name: "@uday_arch", role: "WORKFLOWS", image: "/Uday_photo.jpeg" },
+      { name: "@adi_core", role: "INTEGRATIONS", image: "/Adi_photo.jpeg" },
+      { name: "@veeresh_hp", role: "SYSTEMS", image: "/veeresh_photo.jpg" }
     ]
   };
 
@@ -447,7 +447,7 @@ export default function Categories() {
                     key={idx}
                     className="glass-card rounded-2xl p-6 flex flex-col items-center text-center hover:border-primary/20 transition-all"
                   >
-                    <div className="w-14 h-14 rounded-full overflow-hidden border border-black/5 dark:border-zinc-800 bg-black/5 dark:bg-zinc-900 flex items-center justify-center filter grayscale contrast-[1.1] shadow-inner">
+                    <div className="w-14 h-14 rounded-full overflow-hidden border border-black/10 dark:border-zinc-800 bg-black/5 dark:bg-zinc-900 flex items-center justify-center shadow-inner">
                       <img 
                         src={master.image} 
                         alt={master.name} 

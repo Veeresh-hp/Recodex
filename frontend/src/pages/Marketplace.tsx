@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
-import { Project } from "@/data/mockData";
+import { Project, MOCK_PROJECTS } from "@/data/mockData";
 import { getProjects } from "@/services/api";
 import { Star, GitFork, Search, Shield, CheckCircle2, ChevronRight } from "lucide-react";
 import { useTheme } from "@/context/ThemeContext";
@@ -9,8 +9,8 @@ import SubNavbar from "@/components/SubNavbar";
 export default function Marketplace() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [projects, setProjects] = useState<Project[]>(MOCK_PROJECTS);
+  const [loading, setLoading] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const { theme } = useTheme();
 
@@ -132,14 +132,12 @@ export default function Marketplace() {
   // Fetch projects from the backend (with graceful fallback to mock data)
   useEffect(() => {
     let active = true;
-    setLoading(true);
     getProjects(
       selectedCategory === "All" ? undefined : selectedCategory,
       searchQuery
     ).then((data) => {
-      if (active) {
+      if (active && data && data.length > 0) {
         setProjects(data);
-        setLoading(false);
       }
     });
     return () => {
@@ -214,13 +212,13 @@ export default function Marketplace() {
   const categoriesList = ["All", ...globalCategories];
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col justify-start relative overflow-hidden font-sans select-none bg-grid-layout">
+    <div className="min-h-screen bg-background text-foreground flex flex-col justify-start relative font-sans select-none bg-grid-layout">
       {/* Background Constellation Mesh */}
       <canvas ref={canvasRef} className="absolute inset-0 pointer-events-none z-0 opacity-40" />
 
       {/* Ambient background glows */}
-      <div className="absolute top-[25%] left-[-15%] w-[600px] h-[600px] bg-primary/5 rounded-full blur-[160px] pointer-events-none z-0"></div>
-      <div className="absolute bottom-[20%] right-[-10%] w-[500px] h-[500px] bg-secondary-container/5 rounded-full blur-[140px] pointer-events-none z-0"></div>
+      <div className="absolute top-[25%] left-[-15%] w-[600px] h-[600px] bg-primary/5 rounded-full blur-[160px] pointer-events-none z-0 overflow-hidden"></div>
+      <div className="absolute bottom-[20%] right-[-10%] w-[500px] h-[500px] bg-secondary-container/5 rounded-full blur-[140px] pointer-events-none z-0 overflow-hidden"></div>
 
       {/* Header */}
       <SubNavbar />
@@ -229,7 +227,7 @@ export default function Marketplace() {
       <main className="relative z-10 flex-grow max-w-7xl mx-auto w-full px-6 md:px-12 xl:px-24 pt-4 pb-12 md:pt-6 md:pb-16 flex flex-col lg:flex-row gap-10 items-start select-text">
         
         {/* Left Sidebar (Filters & Search) */}
-        <aside className="w-full lg:w-64 space-y-8 lg:sticky lg:top-24">
+        <aside className="w-full lg:w-64 shrink-0 space-y-8 sticky top-[136px] self-start z-20">
           
           {/* Search box */}
           <div className="space-y-2">
@@ -367,7 +365,7 @@ export default function Marketplace() {
                     </div>
 
                     <Link
-                      to={`/showcase?repo=${project.id}`}
+                      to={`/projects?run=${project.id}`}
                       className="px-3.5 py-1.5 border border-black/10 dark:border-zinc-800 hover:border-primary/40 rounded text-[9px] font-mono font-bold tracking-widest uppercase text-zinc-700 dark:text-zinc-300 hover:text-foreground hover:bg-primary/5 transition-all flex items-center gap-1 cursor-pointer"
                     >
                       Explore Stack

@@ -14,6 +14,7 @@ import Projects from "./pages/Projects";
 import Services from "./pages/Services";
 import Showcase from "./pages/Showcase";
 import Solutions from "./pages/Solutions";
+import Docs from "./pages/Docs";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
 import Profile from "./pages/Profile";
@@ -131,14 +132,16 @@ export default function App() {
               <Route path="/marketplace" element={<Marketplace />} />
               <Route path="/projects" element={<Projects />} />
               <Route path="/services" element={<Services />} />
-              <Route path="/showcase" element={<Showcase />} />
+              <Route path="/showcase" element={<Navigate to="/projects" replace />} />
               <Route path="/solutions" element={<Solutions />} />
+              <Route path="/docs" element={<Docs />} />
               <Route path="/terms" element={<Terms />} />
               <Route path="/privacy" element={<Privacy />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/announcements" element={<Announcements />} />
             </Route>
             <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Router>
       </LoginModalProvider>

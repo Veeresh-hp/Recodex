@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Megaphone, Bell, Calendar, ShieldAlert } from "lucide-react";
 
 interface Announcement {
@@ -11,23 +11,40 @@ interface Announcement {
 
 const formatRelativeTime = (timestampStr: string): string => {
   if (!timestampStr) return "";
-  if (timestampStr.includes("ago") || timestampStr.toLowerCase() === "just now") {
-    return timestampStr;
+  let date = new Date(timestampStr);
+
+  if (isNaN(date.getTime())) {
+    const match = timestampStr.match(/^(\d+)\s*([a-z]+)\s*ago$/i);
+    if (match) {
+      const val = parseInt(match[1], 10);
+      const unit = match[2].toLowerCase();
+      const nowMs = Date.now();
+      if (unit.startsWith("m") && !unit.startsWith("mo")) date = new Date(nowMs - val * 60 * 1000);
+      else if (unit.startsWith("h")) date = new Date(nowMs - val * 3600 * 1000);
+      else if (unit.startsWith("d")) date = new Date(nowMs - val * 86400 * 1000);
+      else if (unit.startsWith("mo")) date = new Date(nowMs - val * 30 * 86400 * 1000);
+      else if (unit.startsWith("y")) date = new Date(nowMs - val * 365 * 86400 * 1000);
+      else return timestampStr;
+    } else {
+      return timestampStr;
+    }
   }
-  const date = new Date(timestampStr);
-  if (isNaN(date.getTime())) return timestampStr;
-  
+
   const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
+  const diffMs = Math.max(0, now.getTime() - date.getTime());
   const diffSec = Math.floor(diffMs / 1000);
   const diffMin = Math.floor(diffSec / 60);
   const diffHour = Math.floor(diffMin / 60);
   const diffDay = Math.floor(diffHour / 24);
+  const diffMonth = Math.floor(diffDay / 30);
+  const diffYear = Math.floor(diffDay / 365);
 
-  if (diffSec < 60) return "Just now";
-  if (diffMin < 60) return `${diffMin}m ago`;
+  if (diffSec < 45) return "Just now";
+  if (diffMin < 60) return `${Math.max(1, diffMin)}m ago`;
   if (diffHour < 24) return `${diffHour}h ago`;
-  return `${diffDay}d ago`;
+  if (diffDay < 30) return `${diffDay}d ago`;
+  if (diffMonth < 12) return `${diffMonth}mo ago`;
+  return `${diffYear}y ago`;
 };
 
 const getAnnouncementMessage = (ann: Announcement): string => {
@@ -46,14 +63,12 @@ const getAnnouncementMessage = (ann: Announcement): string => {
 };
 
 export default function Announcements() {
-  const [announcements] = useState<Announcement[]>(() => {
+  const [announcements, setAnnouncements] = useState<Announcement[]>(() => {
     const stored = localStorage.getItem("recodex_global_announcements");
     if (stored) return JSON.parse(stored);
 
     const now = new Date();
-    // 3 hours ago
     const betaDate = new Date(now.getTime() - 3 * 60 * 60 * 1000).toISOString();
-    // 4 days ago (matches the 4d ago relative tag)
     const maintenanceDate = new Date(now.getTime() - 4 * 24 * 60 * 60 * 1000).toISOString();
     const maintenanceDateObj = new Date(maintenanceDate);
     const maintenanceMonth = maintenanceDateObj.toLocaleString("en-US", { month: "long" });
@@ -80,6 +95,34 @@ export default function Announcements() {
     localStorage.setItem("recodex_global_announcements", JSON.stringify(initialAnnouncements));
     return initialAnnouncements;
   });
+
+  const [, setTick] = useState(0);
+
+  useEffect(() => {
+    const syncAnnouncements = () => {
+      try {
+        const stored = localStorage.getItem("recodex_global_announcements");
+        if (stored) {
+          setAnnouncements(JSON.parse(stored));
+        }
+      } catch (err) {
+        console.error("Failed to sync announcements:", err);
+      }
+    };
+
+    window.addEventListener("storage", syncAnnouncements);
+    window.addEventListener("recodex-announcements-update", syncAnnouncements);
+
+    const timer = setInterval(() => {
+      setTick((t) => t + 1);
+    }, 30000);
+
+    return () => {
+      window.removeEventListener("storage", syncAnnouncements);
+      window.removeEventListener("recodex-announcements-update", syncAnnouncements);
+      clearInterval(timer);
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col justify-between font-sans select-none">

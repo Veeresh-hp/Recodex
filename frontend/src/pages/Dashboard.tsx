@@ -55,23 +55,40 @@ interface Announcement {
 
 const formatRelativeTime = (timestampStr: string): string => {
   if (!timestampStr) return "";
-  if (timestampStr.includes("ago") || timestampStr.toLowerCase() === "just now") {
-    return timestampStr;
+  let date = new Date(timestampStr);
+
+  if (isNaN(date.getTime())) {
+    const match = timestampStr.match(/^(\d+)\s*([a-z]+)\s*ago$/i);
+    if (match) {
+      const val = parseInt(match[1], 10);
+      const unit = match[2].toLowerCase();
+      const nowMs = Date.now();
+      if (unit.startsWith("m") && !unit.startsWith("mo")) date = new Date(nowMs - val * 60 * 1000);
+      else if (unit.startsWith("h")) date = new Date(nowMs - val * 3600 * 1000);
+      else if (unit.startsWith("d")) date = new Date(nowMs - val * 86400 * 1000);
+      else if (unit.startsWith("mo")) date = new Date(nowMs - val * 30 * 86400 * 1000);
+      else if (unit.startsWith("y")) date = new Date(nowMs - val * 365 * 86400 * 1000);
+      else return timestampStr;
+    } else {
+      return timestampStr;
+    }
   }
-  const date = new Date(timestampStr);
-  if (isNaN(date.getTime())) return timestampStr;
-  
+
   const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
+  const diffMs = Math.max(0, now.getTime() - date.getTime());
   const diffSec = Math.floor(diffMs / 1000);
   const diffMin = Math.floor(diffSec / 60);
   const diffHour = Math.floor(diffMin / 60);
   const diffDay = Math.floor(diffHour / 24);
+  const diffMonth = Math.floor(diffDay / 30);
+  const diffYear = Math.floor(diffDay / 365);
 
-  if (diffSec < 60) return "Just now";
-  if (diffMin < 60) return `${diffMin}m ago`;
+  if (diffSec < 45) return "Just now";
+  if (diffMin < 60) return `${Math.max(1, diffMin)}m ago`;
   if (diffHour < 24) return `${diffHour}h ago`;
-  return `${diffDay}d ago`;
+  if (diffDay < 30) return `${diffDay}d ago`;
+  if (diffMonth < 12) return `${diffMonth}mo ago`;
+  return `${diffYear}y ago`;
 };
 
 const getAnnouncementMessage = (ann: Announcement): string => {
@@ -230,6 +247,14 @@ export default function Dashboard() {
     return initialAnnouncements;
   });
 
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTick((t) => t + 1);
+    }, 30000);
+    return () => clearInterval(timer);
+  }, []);
+
   useEffect(() => {
     localStorage.setItem("recodex_global_categories", JSON.stringify(categories));
   }, [categories]);
@@ -244,6 +269,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     localStorage.setItem("recodex_global_announcements", JSON.stringify(announcements));
+    window.dispatchEvent(new Event("recodex-announcements-update"));
   }, [announcements]);
 
   const [newAnnTitle, setNewAnnTitle] = useState("");
@@ -331,9 +357,7 @@ export default function Dashboard() {
   const fetchUsers = async () => {
     try {
       const data = await getUsers();
-      const real = data.filter((u: any) => !u.id.startsWith("usr-"));
-      const targetData = real.length > 0 ? real : data;
-      const mapped = targetData.map((u: any) => {
+      const mapped = data.map((u: any) => {
         if (u.email === "veereshhp2004@gmail.com") {
           return { ...u, role: "admin" };
         }
@@ -427,6 +451,26 @@ export default function Dashboard() {
     fetchUsers();
     fetchInquiries();
   }, [userId]);
+
+  // Live user registration sync & 10s telemetry polling
+  useEffect(() => {
+    const syncUsers = () => {
+      fetchUsers();
+    };
+
+    window.addEventListener("recodex-user-registered", syncUsers);
+    window.addEventListener("recodex-auth-update", syncUsers);
+    window.addEventListener("storage", syncUsers);
+
+    const userPollTimer = setInterval(syncUsers, 10000);
+
+    return () => {
+      window.removeEventListener("recodex-user-registered", syncUsers);
+      window.removeEventListener("recodex-auth-update", syncUsers);
+      window.removeEventListener("storage", syncUsers);
+      clearInterval(userPollTimer);
+    };
+  }, []);
 
   // Auto-select first loaded inquiry if none selected
   useEffect(() => {
@@ -680,7 +724,7 @@ export default function Dashboard() {
     e.preventDefault();
     if (!newAnnTitle || !newAnnMessage) return;
     const newAnn: Announcement = {
-      id: `ann-0${announcements.length + 1}`,
+      id: `ann-${Date.now()}`,
       title: newAnnTitle,
       message: newAnnMessage,
       type: newAnnType,

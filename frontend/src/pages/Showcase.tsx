@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Project, MOCK_PROJECTS } from "../data/mockData";
 import { getProjects } from "../services/api";
-import { Star, GitFork, ChevronRight, Terminal, Eye, FileCode, Shield, CheckCircle2 } from "lucide-react";
+import { Star, GitFork, ChevronRight, Terminal, Eye, FileCode, Shield, CheckCircle2, Copy, Check, Play } from "lucide-react";
 import SubNavbar from "../components/SubNavbar";
 
 function ShowcaseContent() {
@@ -10,6 +10,7 @@ function ShowcaseContent() {
   const initialRepoId = searchParams.get("repo") || MOCK_PROJECTS[0].id;
 
   const [repos, setRepos] = useState<Project[]>(MOCK_PROJECTS);
+  const [copied, setCopied] = useState(false);
   
   // Filter out soft-deleted projects
   const [softDeletedProjectIds, setSoftDeletedProjectIds] = useState<string[]>(() => {
@@ -271,6 +272,14 @@ function ShowcaseContent() {
               <Eye size={12} className="text-[#00d1ff]" />
               <span>Workspace / {selectedRepo.id}</span>
             </div>
+
+            <Link
+              to={`/projects?run=${selectedRepo.id}`}
+              className="px-3.5 py-1.5 bg-primary/10 border border-primary/25 text-primary hover:bg-primary hover:text-white dark:hover:text-black rounded-lg transition-all flex items-center gap-1.5 text-xs font-mono font-bold uppercase tracking-wider cursor-pointer shadow-sm"
+            >
+              <Play size={12} />
+              <span>Run Project</span>
+            </Link>
           </div>
 
           {/* Interactive Code Editor Console */}
@@ -302,26 +311,58 @@ function ShowcaseContent() {
                 ))}
               </div>
 
-              <div className="text-[9px] text-zinc-600 font-bold uppercase tracking-widest hidden sm:block">
-                RecodeX terminal_v1.0
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => {
+                    if (selectedRepo.files[selectedFile]) {
+                      const cleanText = selectedRepo.files[selectedFile].replace(/\r\n/g, "\n");
+                      navigator.clipboard.writeText(cleanText);
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 2000);
+                    }
+                  }}
+                  className="text-[10px] font-bold font-mono px-2.5 py-1 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 transition-all flex items-center gap-1 cursor-pointer"
+                >
+                  {copied ? (
+                    <>
+                      <Check size={11} className="text-emerald-400" />
+                      <span className="text-emerald-400">COPIED</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy size={11} className="text-zinc-400" />
+                      <span>COPY</span>
+                    </>
+                  )}
+                </button>
+
+                <div className="text-[9px] text-zinc-600 font-bold uppercase tracking-widest hidden sm:block">
+                  RecodeX terminal_v1.0
+                </div>
               </div>
             </div>
 
             {/* Code Output Area */}
-            <div className="p-5 overflow-auto max-h-[300px] text-xs leading-relaxed text-zinc-300 bg-[#030406]/60 select-text select-all font-mono min-h-[220px]">
+            <div className="p-5 overflow-auto max-h-[380px] text-xs leading-relaxed text-zinc-300 bg-[#030406]/60 select-text select-all font-mono min-h-[220px]">
               {selectedRepo.files[selectedFile] ? (
-                <div className="flex">
-                  {/* File Line Numbers */}
-                  <div className="text-zinc-700 text-right pr-4 border-r border-zinc-900 select-none w-6 shrink-0 flex flex-col font-bold">
-                    {selectedRepo.files[selectedFile].split("\n").map((_, i) => (
-                      <span key={i}>{i + 1}</span>
-                    ))}
-                  </div>
-                  {/* File Code text */}
-                  <pre className="pl-4 font-mono text-[11px] text-zinc-300 overflow-x-auto whitespace-pre">
-                    <code>{selectedRepo.files[selectedFile]}</code>
-                  </pre>
-                </div>
+                (() => {
+                  const formattedCode = selectedRepo.files[selectedFile].replace(/\r\n/g, "\n");
+                  const codeLines = formattedCode.split("\n");
+                  return (
+                    <div className="flex">
+                      {/* File Line Numbers */}
+                      <div className="text-zinc-700 text-right pr-4 border-r border-zinc-900 select-none w-6 shrink-0 flex flex-col font-bold">
+                        {codeLines.map((_, i) => (
+                          <span key={i}>{i + 1}</span>
+                        ))}
+                      </div>
+                      {/* File Code text */}
+                      <pre className="pl-4 font-mono text-[11px] text-zinc-300 overflow-x-auto whitespace-pre">
+                        <code>{formattedCode}</code>
+                      </pre>
+                    </div>
+                  );
+                })()
               ) : (
                 <span className="text-zinc-600">Selecting telemetry code assets...</span>
               )}

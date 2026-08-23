@@ -7,8 +7,7 @@ export default function SubNavbar() {
   const subNavItems = [
     { label: "Marketplace", href: "/marketplace" },
     { label: "Solutions", href: "/solutions" },
-    { label: "Showcase", href: "/showcase" },
-    { label: "Docs", href: "/terms" },
+    { label: "Docs", href: "/docs" },
   ];
 
   return (

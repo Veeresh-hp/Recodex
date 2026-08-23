@@ -11,7 +11,7 @@ function ProjectsContent() {
   
   const [searchQuery, setSearchQuery] = useState("");
   const [projects, setProjects] = useState<Project[]>(MOCK_PROJECTS);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [modalTab, setModalTab] = useState<"code" | "logs" | "output">("output");
 
@@ -75,22 +75,16 @@ function ProjectsContent() {
   // Fetch projects dynamically from the database
   useEffect(() => {
     let active = true;
-    const timer = setTimeout(() => {
-      setLoading(true);
-    }, 0);
     getProjects(
       selectedCategory === "All" ? undefined : selectedCategory,
       searchQuery
     ).then((data) => {
-      if (active) {
-        clearTimeout(timer);
+      if (active && data && data.length > 0) {
         setProjects(data);
-        setLoading(false);
       }
     });
     return () => {
       active = false;
-      clearTimeout(timer);
     };
   }, [selectedCategory, searchQuery]);
 

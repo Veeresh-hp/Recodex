@@ -38,8 +38,8 @@ export default function Footer() {
             <Link to="/marketplace" className="text-xs text-zinc-400 dark:text-zinc-400 hover:text-primary dark:hover:text-[#00d1ff] transition-all duration-200">
               Marketplace
             </Link>
-            <Link to="/showcase" className="text-xs text-zinc-400 dark:text-zinc-400 hover:text-primary dark:hover:text-[#00d1ff] transition-all duration-200">
-              Showcase
+            <Link to="/docs" className="text-xs text-zinc-400 dark:text-zinc-400 hover:text-primary dark:hover:text-[#00d1ff] transition-all duration-200">
+              Documentation
             </Link>
             <Link to="/categories" className="text-xs text-zinc-400 dark:text-zinc-400 hover:text-primary dark:hover:text-[#00d1ff] transition-all duration-200">
               Categories

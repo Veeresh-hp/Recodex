@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from "react";
+import { Link } from "react-router-dom";
 import { 
   Cpu, Shield, CheckCircle2, ShieldCheck, ArrowRight,
   Fingerprint, Lock, RefreshCw, Brain, Network, Braces, BarChart3
@@ -129,7 +130,7 @@ export default function Solutions() {
     <>
       <SubNavbar />
 
-      <main className="min-h-screen bg-background text-foreground relative overflow-hidden font-sans bg-grid-layout">
+      <main className="min-h-screen bg-background text-foreground relative font-sans bg-grid-layout">
         {/* Background Constellation Mesh */}
         <canvas ref={canvasRef} className="absolute inset-0 pointer-events-none z-0 opacity-40" />
 
@@ -153,13 +154,19 @@ export default function Solutions() {
                 Custom-engineered infrastructure, rigorous security auditing, and production-grade AI integration for organizations requiring 99.99% reliability.
               </p>
               <div className="pt-2 flex flex-wrap gap-4">
-                <button className="px-6 py-3.5 bg-primary text-white dark:text-black font-semibold rounded-lg shadow-lg hover:shadow-primary/20 hover:brightness-110 active:scale-95 transition-all flex items-center gap-2 text-sm">
+                <Link 
+                  to="/docs" 
+                  className="px-6 py-3.5 bg-primary text-white dark:text-black font-semibold rounded-lg shadow-lg hover:shadow-primary/20 hover:brightness-110 active:scale-95 transition-all flex items-center gap-2 text-sm"
+                >
                   View Engineering Docs
                   <ArrowRight size={16} />
-                </button>
-                <button className="px-6 py-3.5 bg-surface border border-outline-variant text-foreground font-semibold rounded-lg hover:bg-surface-container-low transition-all text-sm">
+                </Link>
+                <Link 
+                  to="/contact" 
+                  className="px-6 py-3.5 bg-surface border border-outline-variant text-foreground font-semibold rounded-lg hover:bg-surface-container-low transition-all text-sm flex items-center gap-2"
+                >
                   Speak with an Expert
-                </button>
+                </Link>
               </div>
             </div>
 
@@ -193,7 +200,7 @@ export default function Solutions() {
           <div className="max-w-7xl mx-auto px-6">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
               {/* Sticky Sidebar */}
-              <div className="lg:col-span-4 lg:sticky lg:top-32 space-y-6">
+              <div className="lg:col-span-4 sticky top-[136px] self-start z-20 space-y-6">
                 <div className="space-y-3">
                   <span className="font-mono text-[10px] text-primary tracking-widest uppercase font-bold block">Solution 01</span>
                   <h2 className="text-3xl font-black tracking-tight text-foreground">Custom Architecture</h2>
@@ -216,9 +223,12 @@ export default function Solutions() {
                   </li>
                 </ul>
                 <div className="pt-2">
-                  <button className="w-full py-3.5 bg-primary/10 border border-primary/20 text-primary hover:bg-primary hover:text-white dark:hover:text-black font-semibold rounded-lg active:scale-95 transition-all text-xs tracking-wider uppercase">
+                  <Link 
+                    to="/contact" 
+                    className="w-full inline-block text-center py-3.5 bg-primary/10 border border-primary/20 text-primary hover:bg-primary hover:text-white dark:hover:text-black font-semibold rounded-lg active:scale-95 transition-all text-xs tracking-wider uppercase"
+                  >
                     Request Proposal
-                  </button>
+                  </Link>
                 </div>
               </div>
 
@@ -300,9 +310,12 @@ export default function Solutions() {
                   </ul>
                 </div>
                 <div className="mt-8 z-10 relative">
-                  <button className="px-5 py-2.5 bg-[#1e2224] hover:bg-[#2d3133] dark:bg-white dark:hover:bg-gray-100 text-white dark:text-black font-semibold rounded-lg text-xs tracking-wider uppercase transition-all duration-200">
+                  <Link 
+                    to="/contact" 
+                    className="inline-block px-5 py-2.5 bg-[#1e2224] hover:bg-[#2d3133] dark:bg-white dark:hover:bg-gray-100 text-white dark:text-black font-semibold rounded-lg text-xs tracking-wider uppercase transition-all duration-200"
+                  >
                     Audit My Stack
-                  </button>
+                  </Link>
                 </div>
                 {/* Large Background Graphic Symbol */}
                 <div className="absolute right-[-40px] bottom-[-40px] text-primary/5 dark:text-white/5 pointer-events-none select-none opacity-40 group-hover:opacity-60 transition-opacity duration-500">
@@ -408,9 +421,12 @@ export default function Solutions() {
                 </div>
 
                 <div className="pt-6">
-                  <button className="px-6 py-3.5 bg-primary text-white dark:text-black font-semibold rounded-lg shadow-lg hover:shadow-primary/20 hover:brightness-110 active:scale-95 transition-all text-xs tracking-wider uppercase">
+                  <Link 
+                    to="/contact" 
+                    className="inline-block px-6 py-3.5 bg-primary text-white dark:text-black font-semibold rounded-lg shadow-lg hover:shadow-primary/20 hover:brightness-110 active:scale-95 transition-all text-xs tracking-wider uppercase"
+                  >
                     Integrate AI Today
-                  </button>
+                  </Link>
                 </div>
               </div>
             </div>
@@ -430,12 +446,18 @@ export default function Solutions() {
                   Our specialized engineering squads are ready to allocate on your most challenging infrastructure and compliance objectives.
                 </p>
                 <div className="flex flex-wrap justify-center gap-4 pt-4">
-                  <button className="px-6 py-3.5 bg-primary text-white dark:text-black font-semibold rounded-lg hover:brightness-110 active:scale-95 transition-all text-xs tracking-wider uppercase">
+                  <Link 
+                    to="/signup" 
+                    className="px-6 py-3.5 bg-primary text-white dark:text-black font-semibold rounded-lg hover:brightness-110 active:scale-95 transition-all text-xs tracking-wider uppercase"
+                  >
                     Start a Project
-                  </button>
-                  <button className="px-6 py-3.5 bg-transparent border border-gray-600 text-white hover:bg-white/5 font-semibold rounded-lg active:scale-95 transition-all text-xs tracking-wider uppercase">
+                  </Link>
+                  <Link 
+                    to="/contact" 
+                    className="px-6 py-3.5 bg-transparent border border-gray-600 text-white hover:bg-white/5 font-semibold rounded-lg active:scale-95 transition-all text-xs tracking-wider uppercase"
+                  >
                     Talk to Sales
-                  </button>
+                  </Link>
                 </div>
               </div>
             </div>
