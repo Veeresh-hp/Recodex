@@ -54,16 +54,16 @@ export default function Home() {
               <div className="flex items-center gap-4 pt-6 text-sm text-zinc-600 dark:text-zinc-400 font-mono">
                 <div className="flex -space-x-3">
                   <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-zinc-800 border-2 border-white dark:border-black flex items-center justify-center text-[10px] font-bold overflow-hidden">
-                    <img alt="Dev" className="w-full h-full object-cover" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=80&q=80" />
+                    <img alt="Uday" className="w-full h-full object-cover" src="/Uday_photo.jpeg" />
                   </div>
                   <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-zinc-800 border-2 border-white dark:border-black flex items-center justify-center text-[10px] font-bold overflow-hidden">
-                    <img alt="Dev" className="w-full h-full object-cover" src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=80&q=80" />
+                    <img alt="Adi" className="w-full h-full object-cover" src="/Adi_photo.jpeg" />
                   </div>
                   <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-zinc-800 border-2 border-white dark:border-black flex items-center justify-center text-[10px] font-bold overflow-hidden">
-                    <img alt="Dev" className="w-full h-full object-cover" src="https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=80&q=80" />
+                    <img alt="Veeresh" className="w-full h-full object-cover" src="/veeresh_photo.jpg" />
                   </div>
                 </div>
-                <p>Join 10,000+ elite engineers</p>
+                <p>Join 400+ elite engineers</p>
               </div>
             </div>
 
@@ -350,7 +350,7 @@ export default function Home() {
                 </div>
                 
                 <div className="glass-card p-8 rounded-xl flex flex-col items-center justify-center text-center border-b-4 border-b-gray-500 dark:border-b-zinc-800 shadow-lg">
-                  <div className="text-4xl lg:text-5xl font-extrabold text-foreground font-mono tracking-tight">5M+</div>
+                  <div className="text-4xl lg:text-5xl font-extrabold text-foreground font-mono tracking-tight">5K+</div>
                   <div className="text-xs text-zinc-600 dark:text-zinc-400 font-semibold uppercase tracking-wider font-mono mt-3">Lines Scanned</div>
                 </div>
               </div>
