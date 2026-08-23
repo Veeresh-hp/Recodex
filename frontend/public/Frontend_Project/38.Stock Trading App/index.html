@@ -1,134 +1,120 @@
 <!DOCTYPE html>
-<html>
-    <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="initial-scale=1, maximum-scale=1, user-scalable=no, width=device-width">
-        <title>Trading App - UI Design</title>
-		<link href="css/bootstrap.min.css" rel="stylesheet" type="text/css"/>
-        <link href="css/font-awesome.min.css" rel="stylesheet" type="text/css"/>
-        <link href="css/custom.css" rel="stylesheet" type="text/css"/>
-    </head>
-    <body>
-        
-        <div id="ta_app" class="container-fluid">
-           
-		    <!-- Start Section Header 1 -->
-		    <section id="ta_header" class="row">
-		    	
-		    	<div class="col-12">
-		    		<div class="name">
-		    			Your Balance
-		    		</div>
-	    		</div>
-	    		<div class="col-12">
-		    		<div class="caption">
-		    			9.086 BTC
-		    			<i class="fa fa-caret-up text-success mr-1 ml-2"></i>
-		    			<span>
-		    				7.62% (+900$)
-		    			</span>
-		    		</div>
-	    		</div>
-		      	
-		    </section>
-		    <!-- End Section Header 1 -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Trade Studio Pro 📈 | High-Frequency Trading Platform</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+  <link rel="stylesheet" href="css/custom.css">
+</head>
+<body>
 
-		    <!-- Start Section Body -->
-		    <section id="ta_body_chart" class="row">
-		    	
-		    	<div id="chartContainer" style="height: 300px; " class="col-12 pl-0 text-center">
-		    		
-		    	</div>
-		      	
-		    </section>
-		    <!-- End Section Body -->
+  <div class="app-wrapper">
+    <main class="app-card">
 
-		    <!-- Start Section Body -->
-		    <section id="ta_action_btns" class="row">
-		    	
-		    	<div class="col-6 text-center pr-2">
-		    		<button class="btn ta_btn_buy w-100">
-		    			<i class="fa fa-long-arrow-down"></i> BUY
-		    		</button>
-		    	</div>
-		    	<div class="col-6 text-center pl-2">
-		    		<button class="btn ta_btn_sell bg-success w-100">
-		    			<i class="fa fa-long-arrow-up"></i> SELL
-		    		</button>
-		    	</div>
-		      	
-		    </section>
-		    <!-- End Section Body -->
-
-		    <!-- Start Section Body -->
-		    <section id="ta_body_transactions" class="row">
-		    	
-		    	<div class="col-12 text-center">
-		    		<div class="body_title text-left">
-		    			Recent transaction
-		    		</div>
-		    		<div class="transactions_list">
-			    		<div class="row">
-			    			<div class="col-2 justify-content-center align-self-center transactions_thumb">
-			    				<i class="fa fa-long-arrow-down"></i>
-			    			</div>
-			    			<div class="col-6 text-left pl-2 justify-content-center align-self-center">
-			    				<span class="transaction_title">
-			    					Received
-			    				</span>
-			    				<span class="transaction_caption">
-			    					June 7, 2022 01:55 PM 
-			    				</span>
-			    			</div>
-			    			<div class="col-4 justify-content-center align-self-center text-right transaction_amount">
-			    				+ 0.085 BTC
-			    			</div>
-			    		</div>
-			    		<div class="row">
-			    			<div class="col-2 justify-content-center align-self-center transactions_thumb">
-			    				<i class="fa fa-long-arrow-up"></i>
-			    			</div>
-			    			<div class="col-6 text-left pl-2 justify-content-center align-self-center">
-			    				<span class="transaction_title">
-			    					Sent
-			    				</span>
-			    				<span class="transaction_caption">
-			    					June 7, 2022 03:14 PM 
-			    				</span>
-			    			</div>
-			    			<div class="col-4 justify-content-center align-self-center text-right transaction_amount amount_sent">
-			    				- 0.032 BTC
-			    			</div>
-			    		</div>
-			    		<div class="row">
-			    			<div class="col-2 justify-content-center align-self-center transactions_thumb">
-			    				<i class="fa fa-long-arrow-down"></i>
-			    			</div>
-			    			<div class="col-6 text-left pl-2 justify-content-center align-self-center">
-			    				<span class="transaction_title">
-			    					Received
-			    				</span>
-			    				<span class="transaction_caption">
-			    					June 7, 2022 05:38 PM 
-			    				</span>
-			    			</div>
-			    			<div class="col-4 justify-content-center align-self-center text-right transaction_amount">
-			    				+ 1.065 BTC
-			    			</div>
-			    		</div>
-		    		</div>
-		    	</div>
-		      	
-		    </section>
-		    <!-- End Section Body -->
-
-
+      <!-- Left Watchlist Sidebar -->
+      <aside class="watchlist-sidebar">
+        <div class="sidebar-header">
+          <div class="logo">
+            <i class="fas fa-chart-line logo-icon"></i>
+            <h1>TRADE<span class="highlight">PRO</span></h1>
+          </div>
+          
+          <div class="balance-card">
+            <span class="bal-label">Portfolio Balance</span>
+            <h2 class="bal-amount" id="portfolio-btc">9.086 BTC</h2>
+            <span class="bal-usd" id="portfolio-usd">$545,160.00 <i class="fas fa-caret-up text-green"></i> +7.62%</span>
+          </div>
         </div>
 
+        <div class="search-box">
+          <div class="search-input-wrapper">
+            <i class="fas fa-magnifying-glass"></i>
+            <input type="text" id="search-input" placeholder="Search assets (BTC, ETH, NVDA)..." oninput="filterWatchlist()">
+          </div>
+        </div>
 
-	    <script src="js/jquery.min.js" type="text/javascript"></script>
-	    <script src="js/canvasjs.min.js" type="text/javascript"></script>
-	    <script src="js/data-chart.js" type="text/javascript"></script>
-        <script src="js/custom.js" type="text/javascript"></script>
-    </body>
+        <div class="watchlist-wrapper">
+          <label class="section-label">Market Watchlist</label>
+          <ul id="watchlist-ul">
+            <!-- Dynamic Assets Injected via JS -->
+          </ul>
+        </div>
+      </aside>
+
+      <!-- Right Trading Dashboard -->
+      <section class="trading-dashboard">
+        
+        <!-- Header Info -->
+        <header class="asset-header">
+          <div class="asset-title-group">
+            <h2 id="active-symbol">BTC / USD</h2>
+            <span class="asset-name-full" id="active-name">Bitcoin</span>
+          </div>
+
+          <div class="asset-price-group">
+            <h2 class="price-val" id="active-price">$60,000.00</h2>
+            <span class="change-badge" id="active-change"><i class="fas fa-arrow-trend-up"></i> +7.62%</span>
+          </div>
+
+          <div class="timeframe-selector">
+            <button class="tf-btn" onclick="setTimeframe('1D')">1D</button>
+            <button class="tf-btn active" onclick="setTimeframe('1W')">1W</button>
+            <button class="tf-btn" onclick="setTimeframe('1M')">1M</button>
+            <button class="tf-btn" onclick="setTimeframe('1Y')">1Y</button>
+          </div>
+        </header>
+
+        <!-- Real-Time Canvas Chart -->
+        <div class="chart-box">
+          <canvas id="trading-chart"></canvas>
+        </div>
+
+        <!-- Buy & Sell Action Controls -->
+        <div class="trading-actions">
+          <div class="trade-input-box">
+            <span class="input-prefix">Amount:</span>
+            <input type="number" id="trade-amount" value="0.05" step="0.01" min="0.001">
+            <span class="input-unit" id="trade-unit">BTC</span>
+          </div>
+
+          <div class="action-buttons">
+            <button class="btn-trade btn-buy" onclick="executeTrade('BUY')">
+              <i class="fas fa-arrow-down-long"></i> BUY
+            </button>
+            <button class="btn-trade btn-sell" onclick="executeTrade('SELL')">
+              <i class="fas fa-arrow-up-long"></i> SELL
+            </button>
+          </div>
+        </div>
+
+        <!-- Recent Transactions Log -->
+        <div class="transactions-section">
+          <div class="trans-header">
+            <h3><i class="fas fa-clock-rotate-left"></i> Recent Transactions</h3>
+            <span class="trans-count" id="trans-count">3 Trades</span>
+          </div>
+
+          <div class="transactions-list" id="transactions-list">
+            <!-- Dynamic Transactions Injected via JS -->
+          </div>
+        </div>
+
+      </section>
+
+    </main>
+  </div>
+
+  <!-- Toast Alert Popup -->
+  <div class="toast-message" id="toast" style="display: none;">
+    <i class="fas fa-circle-check" id="toast-icon"></i>
+    <span id="toast-text">Order executed successfully!</span>
+  </div>
+
+  <script src="js/custom.js"></script>
+
+</body>
 </html>

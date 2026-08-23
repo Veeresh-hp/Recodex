@@ -5,6 +5,7 @@
     <link rel="stylesheet" type="text/css" href="style.css">
   </head>
   <body>
+    <div id="status" class="status">Player X's Turn</div>
     <table id="board">
       <tr>
         <td id="cell-0"></td>
@@ -30,19 +31,16 @@
         <a href="https://veereshhp.vercel.app/" target="_blank"><i class="fab fa-github"></i></a>
         <a href="#">@Veeresh H P</a>
     </div>
-     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
-    <div id="icons">
-        <a href="https://veereshhp.vercel.app/" onclick="share()"><i class="fas fa-share-alt"></i></a>
-        <a href="https://veereshhp.vercel.app/" onclick="like()"><i class="fas fa-thumbs-up"></i></a>
-        <a href="https://veereshhp.vercel.app/" target="_blank"><i class="fas fa-user-plus"></i></a>
-    </div> 
+
     <div class="dropdown">
-        <button class="dropbtn">Settings</button>
+        <button class="dropbtn" id="dropbtn">Settings ⚙️</button>
         <div class="dropdown-content">
-          <a href="#">Easy</a>
-          <a href="#">Medium</a>
-          <a href="#">Hard</a>
-          <a href="#">Change Theme</a>
+          <a href="#" id="opt-pvp" class="dropdown-item active">👥 2 Players (PvP)</a>
+          <a href="#" id="opt-easy" class="dropdown-item">🤖 Easy AI</a>
+          <a href="#" id="opt-medium" class="dropdown-item">🧠 Medium AI</a>
+          <a href="#" id="opt-hard" class="dropdown-item">⚡ Hard AI</a>
+          <div class="dropdown-divider"></div>
+          <a href="#" id="opt-theme" class="dropdown-item">🎨 Change Theme</a>
         </div>
       </div>
       

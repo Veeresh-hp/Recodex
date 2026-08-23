@@ -4,54 +4,122 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Weather App With JavaScript</title>
+    <title>Weather Pro Studio 🌤️ | Live Forecast & Radar</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <div class="search-box">
-                <input type="text" placeholder="Enter your location" class="input-box">
 
-                <button class="fa-solid fa-magnifying-glass" id="searchBtn"></button>
+    <div class="app-wrapper">
+        <main class="app-card">
+
+            <!-- Search & Controls Bar -->
+            <header class="header-bar">
+                <div class="search-container">
+                    <div class="search-box">
+                        <i class="fas fa-magnifying-glass search-icon"></i>
+                        <input type="text" placeholder="Search city name..." id="input-city" value="Davangere" autocomplete="off" oninput="handleSearchInput()">
+                        <button id="searchBtn" title="Search"><i class="fas fa-arrow-right"></i></button>
+                        <button id="geoBtn" onclick="fetchGeoLocation()" title="Use Current Location"><i class="fas fa-location-arrow"></i></button>
+                    </div>
+
+                    <!-- Autocomplete Suggestions List -->
+                    <div class="suggestions-dropdown" id="suggestions-box" style="display: none;"></div>
+                </div>
+
+                <div class="unit-switcher">
+                    <button class="unit-btn active" id="btn-c" onclick="setUnit('C')">°C</button>
+                    <button class="unit-btn" id="btn-f" onclick="setUnit('F')">°F</button>
+                </div>
+            </header>
+
+            <!-- Popular Cities Quick Select Chips -->
+            <div class="city-chips">
+                <button class="chip" onclick="quickSearch('Davangere')">📍 Davangere</button>
+                <button class="chip" onclick="quickSearch('Bengaluru')">📍 Bengaluru</button>
+                <button class="chip" onclick="quickSearch('London')">London</button>
+                <button class="chip" onclick="quickSearch('New York')">New York</button>
+                <button class="chip" onclick="quickSearch('Tokyo')">Tokyo</button>
+                <button class="chip" onclick="quickSearch('Paris')">Paris</button>
             </div>
-        </div>
 
-        <div class="location-not-found">
-            <h1>Sorry, Location not found!!!</h1>
-            <img src="/assets/404.png" alt="404 Error">
-        </div>
-
-        <div class="weather-body">
-            <img src="/assets/cloud.png" alt="Weather Image" class="weather-img">
-
-            <div class="weather-box">
-                <p class="temperature">0 <sup>°C</sup></p>
-                <p class="description">light rain</p>
+            <!-- Error 404 View -->
+            <div class="location-not-found" id="location-not-found" style="display: none;">
+                <img src="assets/404.png" alt="404 Error" class="error-img">
+                <h2>Location Not Found!</h2>
+                <p>Please check city name spelling and try again.</p>
             </div>
 
-            <div class="weather-details">
-                <div class="humidity">
-                    <i class="fa-sharp fa-solid fa-droplet"></i>
-                    <div class="text">
-                        <span id="humidity">45%</span>
-                        <p>Humidity</p>
+            <!-- Main Weather Content -->
+            <div class="weather-body" id="weather-body">
+                
+                <!-- Hero Panel -->
+                <div class="hero-weather">
+                    <div class="city-info">
+                        <h2 id="city-name">Davangere, IN</h2>
+                        <p id="date-time">Today, --:--</p>
+                    </div>
+
+                    <div class="main-display">
+                        <img src="assets/cloud.png" alt="Weather Status" class="weather-img" id="weather-img">
+                        <div class="temp-box">
+                            <h1 id="main-temp">--°</h1>
+                            <p id="weather-desc">Loading Weather...</p>
+                        </div>
                     </div>
                 </div>
 
-                <div class="wind">
-                    <i class="fa-solid fa-wind"></i>
-                    <div class="text">
-                        <span id="wind-speed">12Km/H</span>
-                        <p>Wind Speed</p>
+                <!-- Extended Metrics Grid -->
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <i class="fas fa-droplet metric-icon" style="color: #38bdf8;"></i>
+                        <div class="metric-details">
+                            <span class="lbl">Humidity</span>
+                            <span class="val" id="val-humidity">--%</span>
+                        </div>
+                    </div>
+
+                    <div class="metric-card">
+                        <i class="fas fa-wind metric-icon" style="color: #a855f7;"></i>
+                        <div class="metric-details">
+                            <span class="lbl">Wind Speed</span>
+                            <span class="val" id="val-wind">-- km/h</span>
+                        </div>
+                    </div>
+
+                    <div class="metric-card">
+                        <i class="fas fa-temperature-three-quarters metric-icon" style="color: #f97316;"></i>
+                        <div class="metric-details">
+                            <span class="lbl">Feels Like</span>
+                            <span class="val" id="val-feelslike">--°</span>
+                        </div>
+                    </div>
+
+                    <div class="metric-card">
+                        <i class="fas fa-gauge-high metric-icon" style="color: #facc15;"></i>
+                        <div class="metric-details">
+                            <span class="lbl">Pressure</span>
+                            <span class="val" id="val-pressure">-- hPa</span>
+                        </div>
                     </div>
                 </div>
+
+                <!-- 5-Day Forecast Section -->
+                <div class="forecast-section">
+                    <span class="section-title"><i class="fas fa-calendar-days"></i> 5-Day Forecast</span>
+                    <div class="forecast-container" id="forecast-container">
+                        <!-- Dynamic Forecast Cards injected via JS -->
+                    </div>
+                </div>
+
             </div>
-        </div>
+
+        </main>
     </div>
 
-
     <script src="script.js"></script>
-    <script src="https://kit.fontawesome.com/595a890311.js" crossorigin="anonymous"></script>
 </body>
 </html>

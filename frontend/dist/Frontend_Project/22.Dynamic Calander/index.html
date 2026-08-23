@@ -1,37 +1,106 @@
 <!DOCTYPE html>
-<!-- Coding By CodingNepal - youtube.com/codingnepal -->
 <html lang="en" dir="ltr">
   <head>
     <meta charset="utf-8">
-    <title>Dynamic Calendar JavaScript | CodingNepal</title>
+    <title>Calendar Studio Pro 📅 | Event & Task Planner</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
     <link rel="stylesheet" href="style.css">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- Google Font Link for Icons -->
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
-    <script src="script.js" defer></script>
   </head>
   <body>
-    <div class="wrapper">
-      <header>
-        <p class="current-date"></p>
-        <div class="icons">
-          <span id="prev" class="material-symbols-rounded">chevron_left</span>
-          <span id="next" class="material-symbols-rounded">chevron_right</span>
-        </div>
-      </header>
-      <div class="calendar">
-        <ul class="weeks">
-          <li>Sun</li>
-          <li>Mon</li>
-          <li>Tue</li>
-          <li>Wed</li>
-          <li>Thu</li>
-          <li>Fri</li>
-          <li>Sat</li>
-        </ul>
-        <ul class="days"></ul>
-      </div>
+
+    <div class="app-wrapper">
+      <main class="app-card">
+
+        <!-- Left Panel: Calendar Board -->
+        <section class="calendar-section">
+          
+          <!-- Calendar Top Header -->
+          <header class="cal-header">
+            <div class="logo">
+              <i class="fas fa-calendar-days logo-icon"></i>
+              <h1>CALENDAR<span class="highlight">PRO</span></h1>
+            </div>
+
+            <h2 class="current-date" id="current-date">August 2026</h2>
+
+            <div class="header-nav">
+              <button class="btn-today" id="today-btn" onclick="jumpToToday()" title="Jump to Today">Today</button>
+              <div class="nav-icons">
+                <button class="nav-btn" id="prev" title="Previous Month"><i class="fas fa-chevron-left"></i></button>
+                <button class="nav-btn" id="next" title="Next Month"><i class="fas fa-chevron-right"></i></button>
+              </div>
+            </div>
+          </header>
+
+          <!-- Calendar Grid -->
+          <div class="calendar-grid">
+            <ul class="weeks">
+              <li>Sun</li>
+              <li>Mon</li>
+              <li>Tue</li>
+              <li>Wed</li>
+              <li>Thu</li>
+              <li>Fri</li>
+              <li>Sat</li>
+            </ul>
+            <ul class="days" id="days-container">
+              <!-- Dynamic Days Injected via JS -->
+            </ul>
+          </div>
+
+        </section>
+
+        <!-- Right Panel: Selected Date Agenda & Event Planner -->
+        <section class="agenda-section">
+          
+          <div class="agenda-header">
+            <div class="date-badge">
+              <i class="fas fa-clock-rotate-left"></i>
+              <span id="selected-date-title">Sunday, Aug 23, 2026</span>
+            </div>
+          </div>
+
+          <!-- Add Event Form -->
+          <form class="add-event-form" onsubmit="handleAddEvent(event)">
+            <label class="form-title"><i class="fas fa-plus-circle"></i> Add Event / Task</label>
+            <input type="text" id="event-title-input" placeholder="Event or task title..." required autocomplete="off">
+            
+            <div class="form-row">
+              <select id="event-category-select">
+                <option value="work" selected>🟢 Work</option>
+                <option value="personal">🟡 Personal</option>
+                <option value="deadline">🔴 Deadline</option>
+              </select>
+              <input type="text" id="event-time-input" placeholder="e.g. 10:00 AM" value="10:00 AM" required>
+            </div>
+
+            <button type="submit" class="btn-add-event"><i class="fas fa-plus"></i> Add to Agenda</button>
+          </form>
+
+          <!-- Events & Tasks List -->
+          <div class="agenda-list-wrapper">
+            <label class="section-label">Scheduled Agenda</label>
+            <div class="events-list" id="events-list">
+              <!-- Dynamic Events Injected via JS -->
+            </div>
+          </div>
+
+        </section>
+
+      </main>
     </div>
-    
+
+    <!-- Toast Alert Popup -->
+    <div class="toast-message" id="toast" style="display: none;">
+      <i class="fas fa-circle-check" id="toast-icon"></i>
+      <span id="toast-text">Event saved!</span>
+    </div>
+
+    <script src="script.js"></script>
+
   </body>
 </html>

@@ -1405,7 +1405,7 @@ export const MOCK_PROJECTS: Project[] = [
   },
   {
     "id": "27-snake-and-ladder",
-    "dir": "27.Snake and Ladder",
+    "dir": "27.Snake-and-Ladder",
     "title": "Snake & Ladder Board Game",
     "description": "Digital multiplayer board game featuring animated dice roll physics, audio feedback, and snake penalty/ladder boost routines.",
     "longDescription": "Digital multiplayer board game featuring animated dice roll physics, audio feedback, and snake penalty/ladder boost routines. Built cleanly with Vanilla HTML5, CSS3, and JavaScript as part of the 50 Frontend Projects Suite. Fully functional and runnable directly inside Recodex platform.",
@@ -1432,7 +1432,7 @@ export const MOCK_PROJECTS: Project[] = [
   },
   {
     "id": "28-spelling-game",
-    "dir": "28.Spelling game",
+    "dir": "28.Spelling-game",
     "title": "Spelling Bee Challenge",
     "description": "Educational word spelling game with audio pronunciation prompts, streak counters, and difficulty tiers.",
     "longDescription": "Educational word spelling game with audio pronunciation prompts, streak counters, and difficulty tiers. Built cleanly with Vanilla HTML5, CSS3, and JavaScript as part of the 50 Frontend Projects Suite. Fully functional and runnable directly inside Recodex platform.",

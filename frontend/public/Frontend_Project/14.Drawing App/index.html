@@ -1,74 +1,139 @@
 <!DOCTYPE html>
-<!-- Coding By CodingNepal - youtube.com/codingnepal -->
-<html lang="en" dir="ltr">
-  <head>
+<html lang="en">
+<head>
     <meta charset="utf-8">
-    <title>Drawing App JavaScript | CodingNepal</title>
+    <title>Paint Studio Pro 🎨 | Professional Digital Canvas</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <script src="script.js" defer></script>
-  </head>
-  <body>
-    <div class="container">
-      <section class="tools-board">
-        <div class="row">
-          <label class="title">Shapes</label>
-          <ul class="options">
-            <li class="option tool" id="rectangle">
-              <img src="icons/rectangle.svg" alt="">
-              <span>Rectangle</span>
-            </li>
-            <li class="option tool" id="circle">
-              <img src="icons/circle.svg" alt="">
-              <span>Circle</span>
-            </li>
-            <li class="option tool" id="triangle">
-              <img src="icons/triangle.svg" alt="">
-              <span>Triangle</span>
-            </li>
-            <li class="option">
-              <input type="checkbox" id="fill-color">
-              <label for="fill-color">Fill color</label>
-            </li>
-          </ul>
+</head>
+<body>
+
+    <div class="studio-container">
+        
+        <!-- Top Studio Control Header -->
+        <header class="studio-header">
+            <div class="logo">
+                <i class="fas fa-palette logo-icon"></i>
+                <h1>PAINT<span class="highlight">PRO</span></h1>
+            </div>
+
+            <!-- Header Middle Controls (Sliders & Fill) -->
+            <div class="header-controls">
+                <div class="option fill-option">
+                    <input type="checkbox" id="fill-color">
+                    <label for="fill-color"><i class="fas fa-fill-drip"></i> Fill Shape</label>
+                </div>
+
+                <div class="slider-group">
+                    <div class="slider-label">
+                        <span><i class="fas fa-ruler-horizontal"></i> Size</span>
+                        <b id="size-val">5px</b>
+                    </div>
+                    <input type="range" id="size-slider" min="1" max="50" value="5">
+                </div>
+
+                <div class="slider-group">
+                    <div class="slider-label">
+                        <span><i class="fas fa-eye"></i> Opacity</span>
+                        <b id="opacity-val">100%</b>
+                    </div>
+                    <input type="range" id="opacity-slider" min="10" max="100" value="100">
+                </div>
+            </div>
+
+            <!-- Header Action Buttons -->
+            <div class="header-actions">
+                <button class="btn-head" id="btn-undo" onclick="undo()" title="Undo (Ctrl+Z)">
+                    <i class="fas fa-rotate-left"></i> <span>Undo</span>
+                </button>
+                <button class="btn-head" id="btn-redo" onclick="redo()" title="Redo (Ctrl+Y)">
+                    <i class="fas fa-rotate-right"></i> <span>Redo</span>
+                </button>
+                <button class="btn-head btn-clear clear-canvas" title="Clear Canvas">
+                    <i class="fas fa-trash-can"></i> <span>Clear</span>
+                </button>
+                <button class="btn-head btn-save save-img" title="Save PNG">
+                    <i class="fas fa-download"></i> <span>Export PNG</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Studio Workspace Area -->
+        <div class="studio-body">
+
+            <!-- Left Dock: Drawing Tools -->
+            <aside class="tool-dock">
+                <span class="dock-title">TOOLS</span>
+                <button class="tool-btn active tool" id="brush" title="Brush (B)">
+                    <i class="fas fa-paint-brush"></i>
+                    <span>Brush</span>
+                </button>
+                <button class="tool-btn tool" id="eraser" title="Eraser (E)">
+                    <i class="fas fa-eraser"></i>
+                    <span>Eraser</span>
+                </button>
+                <button class="tool-btn tool" id="line" title="Straight Line">
+                    <i class="fas fa-slash"></i>
+                    <span>Line</span>
+                </button>
+                <button class="tool-btn tool" id="arrow" title="Arrow">
+                    <i class="fas fa-long-arrow-alt-right"></i>
+                    <span>Arrow</span>
+                </button>
+                <button class="tool-btn tool" id="rectangle" title="Rectangle">
+                    <i class="far fa-square"></i>
+                    <span>Rect</span>
+                </button>
+                <button class="tool-btn tool" id="circle" title="Circle">
+                    <i class="far fa-circle"></i>
+                    <span>Circle</span>
+                </button>
+                <button class="tool-btn tool" id="triangle" title="Triangle">
+                    <i class="fas fa-play" style="transform: rotate(-90deg); font-size: 0.7rem;"></i>
+                    <span>Triangle</span>
+                </button>
+                <button class="tool-btn tool" id="star" title="Star">
+                    <i class="far fa-star"></i>
+                    <span>Star</span>
+                </button>
+                <button class="tool-btn tool" id="text" title="Text Tool">
+                    <i class="fas fa-font"></i>
+                    <span>Text</span>
+                </button>
+            </aside>
+
+            <!-- Center Canvas Board -->
+            <main class="drawing-board">
+                <canvas id="canvas"></canvas>
+                <input type="text" id="canvas-text-input" placeholder="Type text here..." style="display: none; position: absolute;">
+            </main>
+
+            <!-- Right Dock: Color Palette Swatches -->
+            <aside class="color-dock">
+                <span class="dock-title">PALETTE</span>
+                <ul class="color-palette colors">
+                    <li class="option-color selected" style="background-color: #000000;" data-color="#000000" title="Black"></li>
+                    <li class="option-color" style="background-color: #10b981;" data-color="#10b981" title="Emerald"></li>
+                    <li class="option-color" style="background-color: #ef4444;" data-color="#ef4444" title="Red"></li>
+                    <li class="option-color" style="background-color: #f59e0b;" data-color="#f59e0b" title="Amber"></li>
+                    <li class="option-color" style="background-color: #8b5cf6;" data-color="#8b5cf6" title="Purple"></li>
+                    <li class="option-color" style="background-color: #ec4899;" data-color="#ec4899" title="Pink"></li>
+                    <li class="option-color" style="background-color: #ffffff; border: 1px solid #4b5563;" data-color="#ffffff" title="White"></li>
+                    <li class="option-color custom-picker-wrapper" title="Custom Color Picker">
+                        <i class="fas fa-eye-dropper picker-icon"></i>
+                        <input type="color" id="color-picker" value="#000000">
+                    </li>
+                </ul>
+            </aside>
+
         </div>
-        <div class="row">
-          <label class="title">Options</label>
-          <ul class="options">
-            <li class="option active tool" id="brush">
-              <img src="icons/brush.svg" alt="">
-              <span>Brush</span>
-            </li>
-            <li class="option tool" id="eraser">
-              <img src="icons/eraser.svg" alt="">
-              <span>Eraser</span>
-            </li>
-            <li class="option">
-              <input type="range" id="size-slider" min="1" max="30" value="5">
-            </li>
-          </ul>
-        </div>
-        <div class="row colors">
-          <label class="title">Colors</label>
-          <ul class="options">
-            <li class="option"></li>
-            <li class="option selected"></li>
-            <li class="option"></li>
-            <li class="option"></li>
-            <li class="option">
-              <input type="color" id="color-picker" value="#4A98F7">
-            </li>
-          </ul>
-        </div>
-        <div class="row buttons">
-          <button class="clear-canvas">Clear Canvas</button>
-          <button class="save-img">Save As Image</button>
-        </div>
-      </section>
-      <section class="drawing-board">
-        <canvas></canvas>
-      </section>
+
     </div>
-    
-  </body>
+
+    <script src="script.js"></script>
+</body>
 </html>

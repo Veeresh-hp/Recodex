@@ -1,81 +1,198 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>Connect 4 Pro 🔴🟡 | Modern Arcade</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="connect4.css">
 </head>
-
 <body>
 
+    <div class="app-container">
 
-    <div class="board">
+        <!-- Top Header -->
+        <header class="game-header">
+            <div class="logo">
+                <span class="logo-icon"><i class="fas fa-cubes-stacked"></i></span>
+                <h1>CONNECT<span class="highlight">4</span> PRO</h1>
+            </div>
+            
+            <div class="header-controls">
+                <div class="mode-selector">
+                    <button class="mode-btn active" id="mode-2p" onclick="setGameMode('2p')">
+                        <i class="fas fa-user-friends"></i> 2 Players
+                    </button>
+                    <button class="mode-btn" id="mode-ai" onclick="setGameMode('ai')">
+                        <i class="fas fa-robot"></i> vs AI
+                    </button>
+                </div>
 
-        <ul class="column" id="c1">
-            <p id="c1r6"></p>
-            <p id="c1r5"></p>
-            <p id="c1r4"></p>
-            <p id="c1r3"></p>
-            <p id="c1r2"></p>
-            <p id="c1r1"></p>
-        </ul>
-        <ul class="column" id="c2">
-            <p id="c2r6"></p>
-            <p id="c2r5"></p>
-            <p id="c2r4"></p>
-            <p id="c2r3"></p>
-            <p id="c2r2"></p>
-            <p id="c2r1"></p>
-        </ul>
-        <ul class="column" id="c3">
-            <p id="c3r6"></p>
-            <p id="c3r5"></p>
-            <p id="c3r4"></p>
-            <p id="c3r3"></p>
-            <p id="c3r2"></p>
-            <p id="c3r1"></p>
-        </ul>
-        <ul class="column" id="c4">
-            <p id="c4r6"></p>
-            <p id="c4r5"></p>
-            <p id="c4r4"></p>
-            <p id="c4r3"></p>
-            <p id="c4r2"></p>
-            <p id="c4r1"></p>
-        </ul>
-        <ul class="column" id="c5">
-            <p id="c5r6"></p>
-            <p id="c5r5"></p>
-            <p id="c5r4"></p>
-            <p id="c5r3"></p>
-            <p id="c5r2"></p>
-            <p id="c5r1"></p>
-        </ul>
-        <ul class="column" id="c6">
-            <p id="c6r6"></p>
-            <p id="c6r5"></p>
-            <p id="c6r4"></p>
-            <p id="c6r3"></p>
-            <p id="c6r2"></p>
-            <p id="c6r1"></p>
-        </ul>
-        <ul class="column" id="c7">
-            <p id="c7r6"></p>
-            <p id="c7r5"></p>
-            <p id="c7r4"></p>
-            <p id="c7r3"></p>
-            <p id="c7r2"></p>
-            <p id="c7r1"></p>
-        </ul>
+                <div class="difficulty-box" id="difficulty-box" style="display: none;">
+                    <select id="ai-difficulty" onchange="setDifficulty(this.value)">
+                        <option value="easy">Easy Bot</option>
+                        <option value="medium" selected>Medium Bot</option>
+                        <option value="hard">Unbeatable AI</option>
+                    </select>
+                </div>
 
+                <button class="icon-btn" id="btn-sound" onclick="toggleSound()" title="Toggle Sound">
+                    <i class="fas fa-volume-high"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Status HUD -->
+        <div class="status-hud">
+            <!-- Player 1 Box -->
+            <div class="player-card player-red active" id="card-red">
+                <div class="player-avatar red-avatar">
+                    <i class="fas fa-user"></i>
+                </div>
+                <div class="player-info">
+                    <span class="player-name" id="name-red">Player 1</span>
+                    <span class="score-value" id="score-red">0</span>
+                </div>
+            </div>
+
+            <!-- Turn Banner Indicator -->
+            <div class="turn-banner" id="turn-banner">
+                <div class="turn-disc red" id="turn-disc"></div>
+                <span class="turn-text" id="whosturn">Red's Turn</span>
+            </div>
+
+            <!-- Player 2 / AI Box -->
+            <div class="player-card player-yellow" id="card-yellow">
+                <div class="player-info align-right">
+                    <span class="player-name" id="name-yellow">Player 2</span>
+                    <span class="score-value" id="score-yellow">0</span>
+                </div>
+                <div class="player-avatar yellow-avatar" id="avatar-yellow">
+                    <i class="fas fa-user"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Interactive Board Container -->
+        <div class="board-wrapper">
+
+            <!-- Hover Disc Preview Layer -->
+            <div class="preview-layer" id="preview-layer">
+                <div class="preview-col" data-col="0"></div>
+                <div class="preview-col" data-col="1"></div>
+                <div class="preview-col" data-col="2"></div>
+                <div class="preview-col" data-col="3"></div>
+                <div class="preview-col" data-col="4"></div>
+                <div class="preview-col" data-col="5"></div>
+                <div class="preview-col" data-col="6"></div>
+            </div>
+
+            <!-- Main Connect 4 Grid -->
+            <div class="board" id="board">
+                <div class="column" id="c1" data-col="0">
+                    <div class="cell" id="c1r6" data-row="5" data-col="0"></div>
+                    <div class="cell" id="c1r5" data-row="4" data-col="0"></div>
+                    <div class="cell" id="c1r4" data-row="3" data-col="0"></div>
+                    <div class="cell" id="c1r3" data-row="2" data-col="0"></div>
+                    <div class="cell" id="c1r2" data-row="1" data-col="0"></div>
+                    <div class="cell" id="c1r1" data-row="0" data-col="0"></div>
+                </div>
+                <div class="column" id="c2" data-col="1">
+                    <div class="cell" id="c2r6" data-row="5" data-col="1"></div>
+                    <div class="cell" id="c2r5" data-row="4" data-col="1"></div>
+                    <div class="cell" id="c2r4" data-row="3" data-col="1"></div>
+                    <div class="cell" id="c2r3" data-row="2" data-col="1"></div>
+                    <div class="cell" id="c2r2" data-row="1" data-col="1"></div>
+                    <div class="cell" id="c2r1" data-row="0" data-col="1"></div>
+                </div>
+                <div class="column" id="c3" data-col="2">
+                    <div class="cell" id="c3r6" data-row="5" data-col="2"></div>
+                    <div class="cell" id="c3r5" data-row="4" data-col="2"></div>
+                    <div class="cell" id="c3r4" data-row="3" data-col="2"></div>
+                    <div class="cell" id="c3r3" data-row="2" data-col="2"></div>
+                    <div class="cell" id="c3r2" data-row="1" data-col="2"></div>
+                    <div class="cell" id="c3r1" data-row="0" data-col="2"></div>
+                </div>
+                <div class="column" id="c4" data-col="3">
+                    <div class="cell" id="c4r6" data-row="5" data-col="3"></div>
+                    <div class="cell" id="c4r5" data-row="4" data-col="3"></div>
+                    <div class="cell" id="c4r4" data-row="3" data-col="3"></div>
+                    <div class="cell" id="c4r3" data-row="2" data-col="3"></div>
+                    <div class="cell" id="c4r2" data-row="1" data-col="3"></div>
+                    <div class="cell" id="c4r1" data-row="0" data-col="3"></div>
+                </div>
+                <div class="column" id="c5" data-col="4">
+                    <div class="cell" id="c5r6" data-row="5" data-col="4"></div>
+                    <div class="cell" id="c5r5" data-row="4" data-col="4"></div>
+                    <div class="cell" id="c5r4" data-row="3" data-col="4"></div>
+                    <div class="cell" id="c5r3" data-row="2" data-col="4"></div>
+                    <div class="cell" id="c5r2" data-row="1" data-col="4"></div>
+                    <div class="cell" id="c5r1" data-row="0" data-col="4"></div>
+                </div>
+                <div class="column" id="c6" data-col="5">
+                    <div class="cell" id="c6r6" data-row="5" data-col="5"></div>
+                    <div class="cell" id="c6r5" data-row="4" data-col="5"></div>
+                    <div class="cell" id="c6r4" data-row="3" data-col="5"></div>
+                    <div class="cell" id="c6r3" data-row="2" data-col="5"></div>
+                    <div class="cell" id="c6r2" data-row="1" data-col="5"></div>
+                    <div class="cell" id="c6r1" data-row="0" data-col="5"></div>
+                </div>
+                <div class="column" id="c7" data-col="6">
+                    <div class="cell" id="c7r6" data-row="5" data-col="6"></div>
+                    <div class="cell" id="c7r5" data-row="4" data-col="6"></div>
+                    <div class="cell" id="c7r4" data-row="3" data-col="6"></div>
+                    <div class="cell" id="c7r3" data-row="2" data-col="6"></div>
+                    <div class="cell" id="c7r2" data-row="1" data-col="6"></div>
+                    <div class="cell" id="c7r1" data-row="0" data-col="6"></div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Action Toolbar -->
+        <div class="action-bar">
+            <button class="btn-action" id="btn-undo" onclick="undoMove()">
+                <i class="fas fa-rotate-left"></i> Undo
+            </button>
+            <button class="btn-action btn-primary" onclick="restartGame()">
+                <i class="fas fa-arrows-rotate"></i> Restart Match
+            </button>
+            <button class="btn-action" onclick="resetScores()">
+                <i class="fas fa-trash-can"></i> Reset Scores
+            </button>
+        </div>
 
     </div>
 
+    <!-- Victory / Draw Modal -->
+    <div class="modal-overlay" id="win-modal" style="display: none;">
+        <div class="modal-card">
+            <div class="modal-banner" id="modal-banner">
+                <div class="winner-icon" id="modal-disc"></div>
+            </div>
+            <h2 class="modal-title" id="modal-title">RED WINS!</h2>
+            <p class="modal-subtitle" id="modal-subtitle">Connected 4 discs in a row!</p>
+            
+            <div class="modal-stats">
+                <div class="stat-box">
+                    <span class="stat-label">Total Moves</span>
+                    <span class="stat-val" id="stat-moves">0</span>
+                </div>
+                <div class="stat-box">
+                    <span class="stat-label">Winner</span>
+                    <span class="stat-val" id="stat-winner">Player 1</span>
+                </div>
+            </div>
 
+            <button class="btn-modal-primary" onclick="closeModalAndRestart()">
+                <i class="fas fa-play"></i> PLAY AGAIN
+            </button>
+        </div>
+    </div>
+
+    <script src="connect4.js"></script>
 </body>
-<script src="./connect4.js"></script>
-
 </html>

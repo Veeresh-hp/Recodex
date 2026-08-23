@@ -3,43 +3,73 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>URL Link Shortener</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@500;700&family=Raleway:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
-    <title>Link Shortener</title>
 </head>
 <body>
-    <div class="container">
-        <div class="text__container">
+
+    <div class="main-card">
+        
+        <!-- Top Cyan Banner -->
+        <header class="text__container">
             <h2>Short your link</h2>
             <p>Paste your link here we will provide you with a shorter version that you will be able to use anywhere.</p>
+        </header>
+
+        <!-- Form Section -->
+        <section class="form-wrapper">
+            <form class="shortener__container" id="shortener-form" onsubmit="handleShortenSubmit(event)">
+                <div class="input__container">
+                    <input type="text" id="shortener" placeholder="Paste your link here" autocomplete="off">
+                    <button type="submit" id="submit__btn">Short it!</button>
+                </div>
+            </form>
+        </section>
+
+        <!-- Toast Notification / Error Message -->
+        <div class="toast-message" id="toast" style="display: none;">
+            <i class="fas fa-circle-check" id="toast-icon"></i> <span id="toast-text">Link shortened successfully!</span>
         </div>
 
-        <div class="error__msg">
-            <span id="error">You must paste a valed URL</span>
-        </div>
-
-        <form class="shortener__container">
-            <div class="back__color"></div>
-            <div class="input__container">
-                <input type="text" id="shortener" placeholder="Paste your link here">
-                <button id="submit__btn">Short it!</button>
+        <!-- Links List (Bottom White Area) -->
+        <section class="history-wrapper">
+            <div class="section-top">
+                <span class="sec-title"><i class="fas fa-clock-rotate-left"></i> Shortened Links</span>
+                <button class="btn-clear-all" id="clear-history-btn" onclick="clearAllHistory()" style="display: none;">
+                    <i class="fas fa-trash"></i> Clear All
+                </button>
             </div>
-        </form>
 
-        <div class="links__container">
-            <!-- <div class="link">
-                <span class="long__link">www.hello.com</span>
-                <span class="short__link">http://sho/link/j8t5</span>
-                <button class="copy__btn">Copy</button>
-            </div> -->
+            <div class="links__container" id="links-container">
+                <!-- Dynamic Link Cards injected via JS -->
+            </div>
+        </section>
 
-            <!-- <div class="link">
-                <span class="long__link">www.bye.com</span>
-                <span class="short__link">http://sho/link/7hk9</span>
-                <button class="copy__btn">Copy</button>
-            </div> -->
+    </div>
+
+    <!-- QR Code View Modal -->
+    <div class="modal-overlay" id="qr-modal" style="display: none;">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3><i class="fas fa-qrcode"></i> QR Code</h3>
+                <button class="modal-close" onclick="closeQrModal()"><i class="fas fa-xmark"></i></button>
+            </div>
+            <p class="modal-sub" id="modal-short-url">http://short.link/...</p>
+            <div class="qr-canvas-box" id="modal-qr-body"></div>
+            <div class="modal-actions">
+                <a href="#" id="download-qr-btn" class="btn-modal-download" download="ShortLink_QR.png">
+                    <i class="fas fa-download"></i> Download QR PNG
+                </a>
+            </div>
         </div>
     </div>
-    
+
+    <!-- QR Code Generator Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="main.js"></script>
 </body>
 </html>

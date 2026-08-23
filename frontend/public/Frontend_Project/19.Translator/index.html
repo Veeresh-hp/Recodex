@@ -1,40 +1,65 @@
 <!DOCTYPE html>
-<!-- Coding By CodingNepal - youtube.com/codingnepal -->
 <html lang="en" dir="ltr">
   <head>
     <meta charset="utf-8">  
-    <title>Language Translator | CodingNepal</title>
+    <title>Universal Language Translator</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
     <link rel="stylesheet" href="style.css">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- Font Awesome CDN Link for Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css"/>
   </head>
   <body>
+
     <div class="container">
       <div class="wrapper">
+
+        <!-- Split Text Inputs -->
         <div class="text-input">
-          <textarea spellcheck="false" class="from-text" placeholder="Enter text"></textarea>
-          <textarea spellcheck="false" readonly disabled class="to-text" placeholder="Translation"></textarea>
+          <textarea spellcheck="false" class="from-text" id="from-text" placeholder="Enter text"></textarea>
+          <textarea spellcheck="false" readonly disabled class="to-text" id="to-text" placeholder="Translation"></textarea>
         </div>
+
+        <!-- Controls Bar -->
         <ul class="controls">
+          
+          <!-- Source Language Controls -->
           <li class="row from">
             <div class="icons">
-              <i id="from" class="fas fa-volume-up"></i>
-              <i id="from" class="fas fa-copy"></i>
+              <i id="btn-listen-from" class="fas fa-volume-up" onclick="speakText('from')" title="Listen"></i>
+              <i id="btn-copy-from" class="fas fa-copy" onclick="copyText('from')" title="Copy"></i>
+              <i id="btn-mic" class="fas fa-microphone" onclick="toggleVoiceDictation()" title="Voice Dictation"></i>
             </div>
-            <select></select>
+            <select class="from-select" id="from-select"></select>
           </li>
-          <li class="exchange"><i class="fas fa-exchange-alt"></i></li>
+
+          <!-- Exchange Language Swap Button -->
+          <li class="exchange" onclick="swapLanguages()" title="Swap Languages">
+            <i class="fas fa-exchange-alt"></i>
+          </li>
+
+          <!-- Target Language Controls -->
           <li class="row to">
-            <select></select>
+            <select class="to-select" id="to-select"></select>
             <div class="icons">
-              <i id="to" class="fas fa-volume-up"></i>
-              <i id="to" class="fas fa-copy"></i>
+              <i id="btn-listen-to" class="fas fa-volume-up" onclick="speakText('to')" title="Listen"></i>
+              <i id="btn-copy-to" class="fas fa-copy" onclick="copyText('to')" title="Copy"></i>
             </div>
           </li>
+
         </ul>
+
       </div>
-      <button>Translate Text</button>
+
+      <!-- Translate Button -->
+      <button class="translate-btn" id="btn-translate" onclick="performTranslation()">Translate Text</button>
+    </div>
+
+    <!-- Toast Alert Popup -->
+    <div class="toast-message" id="toast" style="display: none;">
+      <i class="fas fa-circle-check" id="toast-icon"></i>
+      <span id="toast-text">Copied to clipboard!</span>
     </div>
 
     <script src="countries.js"></script>

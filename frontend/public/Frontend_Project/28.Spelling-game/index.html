@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spelling Bee Challenge</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div class="all">
+        <!-- Prominent Bee Mascot -->
+        <div class="bee-box">
+            <img src="bee.png" alt="Spelling Bee" id="bee-img">
+        </div>
+
+        <!-- Classic Title -->
+        <h1 class="game-title">SPELLING<span class="highlight">BEE</span></h1>
+
+        <!-- Score & Streak Bar -->
+        <div class="score-bar">
+            <span class="score-pill"><i class="fas fa-trophy" style="color: #facc15;"></i> Score: <b id="score-val">0</b></span>
+            <span class="score-pill"><i class="fas fa-bolt" style="color: #38bdf8;"></i> Streak: <b id="streak-val">0</b></span>
+        </div>
+
+        <!-- Spelling Input -->
+        <input type="text" id="inp" placeholder="Type your spelling here..." autocomplete="off" spellcheck="false">
+
+        <!-- Primary Action: Generate New Word -->
+        <button id="btn">
+            <i class="fas fa-arrows-rotate"></i> Generate a new word
+        </button>
+
+        <!-- Secondary Actions: Speak & Submit -->
+        <div class="cont">
+            <button id="speak" class="btn2">
+                <i class="fas fa-volume-high"></i> Speak
+            </button>
+            <button id="sub" class="btn2">
+                <i class="fas fa-paper-plane"></i> Submit
+            </button>
+        </div>
+
+        <!-- Result Feedback Banner -->
+        <div id="feedback" class="feedback-banner" style="display: none;"></div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

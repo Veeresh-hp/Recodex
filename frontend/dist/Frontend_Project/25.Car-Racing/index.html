@@ -1,354 +1,909 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>Turbo Speed Racer 🏎️</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Outfit', sans-serif;
+            user-select: none;
+        }
+
+        body {
+            background: linear-gradient(rgba(15, 23, 42, 0.88), rgba(15, 23, 42, 0.96)), url('27471.jpg') no-repeat center center fixed;
+            background-size: cover;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #f8fafc;
+        }
+
+        .game-wrapper {
+            position: relative;
+            width: 100%;
+            max-width: 1100px;
+            height: 98vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* Large Road Track Area */
+        .track-container {
+            position: relative;
+            width: 680px;
+            height: 96vh;
+            background: #111827;
+            border-left: 10px solid #f59e0b;
+            border-right: 10px solid #f59e0b;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 0 60px rgba(0, 0, 0, 0.9), inset 0 0 100px rgba(0,0,0,0.5);
+        }
+
+        /* Smooth Non-Distracting Lane Dashes */
+        .lane-lines-wrapper {
+            position: absolute;
+            width: 100%;
+            height: 200%;
+            top: -100%;
+            left: 0;
+            display: flex;
+            justify-content: space-evenly;
+        }
+
+        .lane-line {
+            width: 6px;
+            height: 100%;
+            background: repeating-linear-gradient(
+                to bottom,
+                rgba(255, 255, 255, 0.4) 0px,
+                rgba(255, 255, 255, 0.4) 40px,
+                transparent 40px,
+                transparent 90px
+            );
+        }
+
+        .animate-road {
+            animation: scrollLanes 0.45s linear infinite;
+        }
+
+        @keyframes scrollLanes {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(130px); }
+        }
+
+        /* Top Overlay HUD Bar */
+        .top-hud {
+            position: absolute;
+            top: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 92%;
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(14px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 16px;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 50;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        .hud-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .hud-icon {
+            font-size: 1.3rem;
+            color: #38bdf8;
+        }
+
+        .hud-text {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .hud-label {
+            font-size: 0.75rem;
+            color: #94a3b8;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .hud-value {
+            font-size: 1.3rem;
+            font-weight: 800;
+            color: #ffffff;
+        }
+
+        /* Fuel Progress Bar */
+        .fuel-bar-box {
+            width: 110px;
+            height: 10px;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 4px;
+        }
+
+        .fuel-bar-fill {
+            height: 100%;
+            width: 100%;
+            background: linear-gradient(90deg, #22c55e, #eab308);
+            transition: width 0.2s linear;
+        }
+
+        /* Game Objects */
+        .game-object {
+            position: absolute;
+            will-change: transform, top, left;
+        }
+
+        .player-car {
+            width: 72px;
+            height: 120px;
+            z-index: 20;
+            filter: drop-shadow(0 12px 20px rgba(0,0,0,0.7));
+            transition: transform 0.05s ease-out;
+        }
+
+        .enemy-car {
+            width: 68px;
+            height: 115px;
+            z-index: 10;
+            filter: drop-shadow(0 8px 15px rgba(0,0,0,0.6));
+        }
+
+        .collectible {
+            width: 44px;
+            height: 44px;
+            z-index: 15;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 2.2rem;
+            animation: pulseGlow 0.8s infinite alternate;
+        }
+
+        @keyframes pulseGlow {
+            0% { transform: scale(0.95); }
+            100% { transform: scale(1.18); }
+        }
+
+        /* Modal Overlays */
+        .modal-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.93);
+            backdrop-filter: blur(16px);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 30px;
+            text-align: center;
+            gap: 22px;
+            border-radius: 20px;
+        }
+
+        .modal-title {
+            font-size: 2.6rem;
+            font-weight: 900;
+            letter-spacing: 1px;
+            background: linear-gradient(135deg, #f43f5e, #fb923c, #facc15);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .modal-subtitle {
+            font-size: 1rem;
+            color: #94a3b8;
+            max-width: 380px;
+        }
+
+        /* Car Selector */
+        .car-selector {
+            display: flex;
+            gap: 20px;
+            margin: 10px 0;
+        }
+
+        .car-option {
+            width: 90px;
+            height: 120px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid rgba(255, 255, 255, 0.12);
+            border-radius: 16px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .car-option img {
+            width: 60px;
+            height: 95px;
+            object-fit: contain;
+        }
+
+        .car-option.selected {
+            border-color: #38bdf8;
+            background: rgba(56, 189, 248, 0.2);
+            box-shadow: 0 0 20px rgba(56, 189, 248, 0.5);
+            transform: scale(1.1);
+        }
+
+        /* Primary Button */
+        .btn-primary {
+            background: linear-gradient(135deg, #38bdf8, #3b82f6);
+            color: #ffffff;
+            font-size: 1.2rem;
+            font-weight: 800;
+            padding: 16px 42px;
+            border-radius: 35px;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 10px 30px rgba(59, 130, 246, 0.5);
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-3px) scale(1.05);
+            box-shadow: 0 14px 35px rgba(59, 130, 246, 0.7);
+        }
+
+        /* HUD Buttons (Pause/Play) */
+        .hud-btn {
+            background: rgba(255, 255, 255, 0.12);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            color: #ffffff;
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+
+        .hud-btn:hover {
+            background: rgba(56, 189, 248, 0.35);
+            border-color: #38bdf8;
+            transform: scale(1.12);
+            box-shadow: 0 0 15px rgba(56, 189, 248, 0.6);
+        }
+
+        /* Custom Collectibles Styling */
+        .collectible {
+            width: 44px;
+            height: 44px;
+            z-index: 15;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            will-change: transform, top, left;
+        }
+
+        .coin-item {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 35% 35%, #ffe066, #f59e0b 65%, #b45309 100%);
+            border: 2px solid #fff3bf;
+            box-shadow: 0 0 16px rgba(245, 158, 11, 0.95), inset 0 0 6px rgba(255,255,255,0.9);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #78350f;
+            font-size: 1.3rem;
+            animation: coinRotate 1.4s linear infinite;
+        }
+
+        @keyframes coinRotate {
+            0% { transform: rotateY(0deg) scale(1); }
+            50% { transform: rotateY(180deg) scale(1.1); }
+            100% { transform: rotateY(360deg) scale(1); }
+        }
+
+        .fuel-item {
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            background: radial-gradient(circle at 35% 35%, #4ade80, #16a34a 70%, #14532d);
+            border: 2px solid #bbf7d0;
+            box-shadow: 0 0 16px rgba(34, 197, 94, 0.9);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #ffffff;
+            font-size: 1.2rem;
+            animation: fuelPulse 0.85s infinite alternate;
+        }
+
+        @keyframes fuelPulse {
+            0% { transform: scale(0.92); }
+            100% { transform: scale(1.14); }
+        }
+
+        /* Floating Popup Text */
+        .popup-text {
+            position: absolute;
+            font-weight: 900;
+            font-size: 1.15rem;
+            z-index: 30;
+            pointer-events: none;
+            animation: floatUp 0.8s ease-out forwards;
+            text-shadow: 0 2px 6px rgba(0,0,0,0.9);
+        }
+
+        @keyframes floatUp {
+            0% { opacity: 1; transform: translateY(0) scale(1); }
+            100% { opacity: 0; transform: translateY(-42px) scale(1.25); }
+        }
+
+        /* Responsive Scaling */
+        @media (max-width: 740px) {
+            .track-container {
+                width: 96vw;
+                height: 96vh;
+            }
+            .top-hud {
+                width: 96%;
+                padding: 6px 12px;
+            }
+            .hud-value {
+                font-size: 1rem;
+            }
+        }
+    </style>
 </head>
-
-<style>
-    * {
-        margin: 0;
-        padding: 0;
-    }
-
-    body {
-        background: url(27471.jpg) no-repeat center;
-        background-size: cover;
-        height: 100vh;
-        display: grid;
-        place-items: center;
-        /* overflow-y: hidden; */
-
-    }
-
-    #road {
-        /* border: 2px solid red; */
-        background: url(road.png) repeat-y;
-        height: 1200vh;
-        width: 50vw;
-        position: relative;
-        top: -80vh;
-        z-index: -9;
-        /* animation: roadanimation infinite 20s linear; */
-    }
-
-    #start {
-        position: absolute;
-        /* top: 60vh; */
-        /* left: 47vw; */
-        z-index: 100;
-        font-size: 2rem;
-        background-color: rgb(245, 99, 99);
-        color: white;
-        padding: 5px;
-        border-radius: 20px;
-        cursor: pointer;
-    }
-
-    #score {
-        position: absolute;
-        top: 20px;
-        left: 20px;
-        font-size: 2rem;
-        padding: 5px;
-        background-color: white;
-        border-radius: 20px;
-    }
-
-    #enemycar1 {
-        /* display: grid; */
-        /* place-items: center; */
-        position: relative;
-        width: 100px;
-        height: 100px;
-        left: 310px;
-        /* left: 230px; */
-        z-index: 1001;
-        /* animation: ecar1 infinite linear 3s; */
-    }
-
-    #enemycar2 {
-        /* display: grid;
-        place-items: center; */
-        position: relative;
-        width: 100px;
-        height: 100px;
-        left: 100px;
-        /* left: 150px; */
-        z-index: 1001;
-        /* animation: ecar2 infinite linear 4s; */
-
-    }
-
-    #enemycar3 {
-        /* display: grid;
-        place-items: center; */
-        position: relative;
-        width: 100px;
-        height: 100px;
-        left: -100px;
-        /* left: -50px; */
-        /* left: -140px; */
-        z-index: 1001;
-        /* animation: ecar3 infinite linear 6s; */
-
-    }
-
-    #enemycar4 {
-        /* display: grid;
-        place-items: center; */
-        position: relative;
-        width: 100px;
-        height: 100px;
-        left: -300px;
-        /* left: -330px; */
-        /* left: -220px; */
-        top: -250px;
-        z-index: 1001;
-        /* animation: ecar4 infinite linear 2s; */
-
-    }
-
-    .ecarimg {
-        width: 80px;
-        border: 2px solid red;
-    }
-
-    .mycarimg {
-        border: 2px solid red;
-        width: 80px;
-    }
-
-    #mycar {
-        width: 100px;
-        height: 100px;
-        position: relative;
-        top: 15vh;
-        /* left: -1080px; */
-
-    }
-
-    @keyframes ecar1 {
-        0% {
-            top: -30vh;
-
-        }
-
-        100% {
-            top: 100vh;
-        }
-    }
-
-    @keyframes ecar2 {
-        0% {
-            top: -50vh;
-
-        }
-
-        100% {
-            top: 100vh;
-        }
-    }
-
-    @keyframes ecar3 {
-        0% {
-            top: -60vh;
-
-        }
-
-        100% {
-            top: 100vh;
-        }
-    }
-
-    @keyframes ecar4 {
-        0% {
-            top: -80vh;
-
-        }
-
-        100% {
-            top: 100vh;
-        }
-    }
-
-    @keyframes roadanimation {
-        0% {
-            top: -1100vh;
-
-        }
-
-        100% {
-            top: -200vh;
-        }
-    }
-</style>
-
 <body>
 
-    <div id="score">Score : 0</div>
-    <button id="start">Start</button>
+    <div class="game-wrapper">
 
-    <div>
-        <div id="enemycar1"><img id="ecarimg1" class="ecarimg" src="car2.png" alt=""></div>
-        <div id="enemycar2"><img id="ecarimg2" class="ecarimg" src="car3.png" alt=""></div>
-        <div id="enemycar3"><img id="ecarimg3" class="ecarimg" src="car2.png" alt=""></div>
-        <div id="enemycar4"><img id="ecarimg4" class="ecarimg" src="car3.png" alt=""></div>
+        <!-- Track Container -->
+        <div class="track-container" id="track">
+
+            <!-- Top HUD Bar -->
+            <div class="top-hud">
+                <div class="hud-item">
+                    <i class="fas fa-trophy hud-icon"></i>
+                    <div class="hud-text">
+                        <span class="hud-label">Score</span>
+                        <span class="hud-value" id="hud-score">0</span>
+                    </div>
+                </div>
+
+                <div class="hud-item">
+                    <i class="fas fa-crown hud-icon" style="color: #facc15;"></i>
+                    <div class="hud-text">
+                        <span class="hud-label">Best</span>
+                        <span class="hud-value" id="hud-highscore">0</span>
+                    </div>
+                </div>
+
+                <div class="hud-item">
+                    <i class="fas fa-coins hud-icon" style="color: #f59e0b;"></i>
+                    <div class="hud-text">
+                        <span class="hud-label">Coins</span>
+                        <span class="hud-value" id="hud-coins">0</span>
+                    </div>
+                </div>
+
+                <div class="hud-item">
+                    <i class="fas fa-bolt hud-icon" style="color: #38bdf8;"></i>
+                    <div class="hud-text">
+                        <span class="hud-label">Speed</span>
+                        <span class="hud-value" id="hud-speed">0 km/h</span>
+                    </div>
+                </div>
+
+                <div class="hud-item">
+                    <i class="fas fa-gas-pump hud-icon" style="color: #22c55e;"></i>
+                    <div class="hud-text">
+                        <span class="hud-label">Fuel</span>
+                        <div class="fuel-bar-box">
+                            <div class="fuel-bar-fill" id="fuel-bar"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <button class="hud-btn" id="btn-pause-play" onclick="togglePause()" title="Pause / Play (Space)">
+                    <i class="fas fa-pause"></i>
+                </button>
+            </div>
+
+            <!-- Smooth Dashed Lane Lines -->
+            <div class="lane-lines-wrapper" id="lane-wrapper">
+                <div class="lane-line"></div>
+                <div class="lane-line"></div>
+                <div class="lane-line"></div>
+            </div>
+
+            <!-- Player Car -->
+            <img src="car1.png" id="player" class="game-object player-car" alt="Player Car">
+
+            <!-- Start Modal -->
+            <div class="modal-overlay" id="start-modal">
+                <h1 class="modal-title">🏎️ TURBO SPEED RACER</h1>
+                <p class="modal-subtitle">Dodge traffic, collect coins 🪙 & fuel ⛽. Don't crash!</p>
+
+                <div class="hud-label" style="font-size: 0.95rem;">Select Your Supercar</div>
+                <div class="car-selector">
+                    <div class="car-option selected" onclick="selectCar('car1.png', this)">
+                        <img src="car1.png" alt="Car 1">
+                    </div>
+                    <div class="car-option" onclick="selectCar('car2.png', this)">
+                        <img src="car2.png" alt="Car 2">
+                    </div>
+                    <div class="car-option" onclick="selectCar('car3.png', this)">
+                        <img src="car3.png" alt="Car 3">
+                    </div>
+                </div>
+
+                <button class="btn-primary" onclick="startGame()">
+                    <i class="fas fa-play"></i> START RACE
+                </button>
+
+                <div class="modal-subtitle" style="font-size: 0.85rem; margin-top: 5px;">
+                    🎮 <b>Arrow Keys / WASD</b> or <b>Mouse / Touch Drag</b> | <b>SPACE</b>: Pause / Play
+                </div>
+            </div>
+
+            <!-- Pause Modal -->
+            <div class="modal-overlay" id="pause-modal" style="display: none;">
+                <h1 class="modal-title" style="background: linear-gradient(135deg, #38bdf8, #818cf8); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">⏸️ GAME PAUSED</h1>
+                <div style="display: flex; gap: 20px;">
+                    <div class="hud-text" style="background: rgba(255,255,255,0.05); padding: 12px 24px; border-radius: 14px;">
+                        <span class="hud-label">Current Score</span>
+                        <span class="hud-value" id="pause-score">0</span>
+                    </div>
+                    <div class="hud-text" style="background: rgba(255,255,255,0.05); padding: 12px 24px; border-radius: 14px;">
+                        <span class="hud-label">Coins Collected</span>
+                        <span class="hud-value" id="pause-coins">0</span>
+                    </div>
+                </div>
+                <div style="display: flex; gap: 15px;">
+                    <button class="btn-primary" onclick="togglePause()">
+                        <i class="fas fa-play"></i> RESUME
+                    </button>
+                    <button class="btn-primary" style="background: linear-gradient(135deg, #64748b, #475569);" onclick="startGame()">
+                        <i class="fas fa-rotate-right"></i> RESTART
+                    </button>
+                </div>
+                <div class="modal-subtitle" style="font-size: 0.85rem; margin-top: 5px;">
+                    Press <b>SPACE</b> or click <b>RESUME</b> to continue
+                </div>
+            </div>
+
+            <!-- Game Over Modal -->
+            <div class="modal-overlay" id="gameover-modal" style="display: none;">
+                <h1 class="modal-title" style="color: #ef4444;">💥 CRASHED!</h1>
+                <div style="display: flex; gap: 20px;">
+                    <div class="hud-text" style="background: rgba(255,255,255,0.05); padding: 12px 24px; border-radius: 14px;">
+                        <span class="hud-label">Final Score</span>
+                        <span class="hud-value" id="final-score">0</span>
+                    </div>
+                    <div class="hud-text" style="background: rgba(255,255,255,0.05); padding: 12px 24px; border-radius: 14px;">
+                        <span class="hud-label">Coins Collected</span>
+                        <span class="hud-value" id="final-coins">0</span>
+                    </div>
+                </div>
+                <button class="btn-primary" onclick="startGame()">
+                    <i class="fas fa-rotate-right"></i> PLAY AGAIN
+                </button>
+            </div>
+
+        </div>
+
     </div>
 
-    <div id="mycar"><img id="mycarimg" class="mycarimg" src="car1.png" alt=""></div>
-    <div id="road"></div>
+    <script>
+        // Web Audio Synthesizer for SFX
+        let audioCtx = null;
 
+        function getAudioContext() {
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
+            }
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            return audioCtx;
+        }
 
+        function playCoinSFX() {
+            try {
+                const ctx = getAudioContext();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(987, ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(1318, ctx.currentTime + 0.15);
+                gain.gain.setValueAtTime(0.3, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.15);
+            } catch (e) {}
+        }
+
+        function playCrashSFX() {
+            try {
+                const ctx = getAudioContext();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(40, ctx.currentTime + 0.4);
+                gain.gain.setValueAtTime(0.5, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.4);
+            } catch (e) {}
+        }
+
+        // Game Variables
+        const track = document.getElementById('track');
+        const laneWrapper = document.getElementById('lane-wrapper');
+        const player = document.getElementById('player');
+        
+        let selectedCarSrc = 'car1.png';
+        let isGameRunning = false;
+        let isPaused = false;
+        let pauseStartTime = 0;
+        let animationFrameId = null;
+
+        let score = 0;
+        let highScore = parseInt(localStorage.getItem('turbo_racer_highscore') || '0');
+        let coins = 0;
+        let fuel = 100;
+        let baseSpeed = 9;
+        let currentSpeedKmh = 120;
+
+        let playerPos = { x: 300, y: 0 };
+        let keys = { ArrowLeft: false, ArrowRight: false, ArrowUp: false, ArrowDown: false, KeyA: false, KeyD: false, KeyW: false, KeyS: false };
+
+        let enemies = [];
+        let collectibles = [];
+        let lastEnemySpawn = 0;
+        let lastItemSpawn = 0;
+
+        document.getElementById('hud-highscore').innerText = highScore;
+
+        function selectCar(src, element) {
+            selectedCarSrc = src;
+            player.src = src;
+            document.querySelectorAll('.car-option').forEach(opt => opt.classList.remove('selected'));
+            element.classList.add('selected');
+        }
+
+        // Keyboard Listener (Space for Pause/Play)
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                if (isGameRunning) {
+                    togglePause();
+                }
+                return;
+            }
+            if (keys.hasOwnProperty(e.code)) {
+                keys[e.code] = true;
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (e.code !== 'Space' && keys.hasOwnProperty(e.code)) {
+                keys[e.code] = false;
+            }
+        });
+
+        // Toggle Pause / Play Functionality
+        function togglePause() {
+            if (!isGameRunning) return;
+
+            isPaused = !isPaused;
+            const pauseModal = document.getElementById('pause-modal');
+            const pauseBtnIcon = document.querySelector('#btn-pause-play i');
+
+            if (isPaused) {
+                laneWrapper.classList.remove('animate-road');
+                pauseModal.style.display = 'flex';
+                document.getElementById('pause-score').innerText = score;
+                document.getElementById('pause-coins').innerText = coins;
+                if (pauseBtnIcon) pauseBtnIcon.className = 'fas fa-play';
+                pauseStartTime = Date.now();
+            } else {
+                laneWrapper.classList.add('animate-road');
+                pauseModal.style.display = 'none';
+                if (pauseBtnIcon) pauseBtnIcon.className = 'fas fa-pause';
+                const pausedDuration = Date.now() - pauseStartTime;
+                lastEnemySpawn += pausedDuration;
+                lastItemSpawn += pausedDuration;
+                gameLoop();
+            }
+        }
+
+        // Mouse Drag / Follow Listener
+        let isMouseDragging = false;
+        track.addEventListener('mousedown', (e) => { isMouseDragging = true; updatePlayerPosFromMouse(e); });
+        track.addEventListener('mousemove', (e) => { if (isMouseDragging) updatePlayerPosFromMouse(e); });
+        window.addEventListener('mouseup', () => { isMouseDragging = false; });
+
+        // Touch Listeners
+        track.addEventListener('touchmove', (e) => {
+            if (!isGameRunning || isPaused) return;
+            const touch = e.touches[0];
+            updatePlayerPosFromMouse(touch);
+        }, { passive: true });
+
+        function updatePlayerPosFromMouse(e) {
+            if (!isGameRunning || isPaused) return;
+            const rect = track.getBoundingClientRect();
+            let mouseX = e.clientX - rect.left - 36;
+            let mouseY = e.clientY - rect.top - 60;
+
+            const maxX = rect.width - 82;
+            const maxY = rect.height - 130;
+
+            playerPos.x = Math.max(10, Math.min(maxX, mouseX));
+            playerPos.y = Math.max(70, Math.min(maxY, mouseY));
+        }
+
+        function startGame() {
+            getAudioContext();
+            isPaused = false;
+            document.getElementById('start-modal').style.display = 'none';
+            document.getElementById('gameover-modal').style.display = 'none';
+            document.getElementById('pause-modal').style.display = 'none';
+            const pauseBtnIcon = document.querySelector('#btn-pause-play i');
+            if (pauseBtnIcon) pauseBtnIcon.className = 'fas fa-pause';
+
+            // Clear previous game objects
+            document.querySelectorAll('.enemy-car, .collectible, .popup-text').forEach(el => el.remove());
+            enemies = [];
+            collectibles = [];
+
+            const rect = track.getBoundingClientRect();
+            playerPos = { x: rect.width / 2 - 36, y: rect.height - 150 };
+
+            score = 0;
+            coins = 0;
+            fuel = 100;
+            baseSpeed = 9;
+            isGameRunning = true;
+
+            laneWrapper.classList.add('animate-road');
+            lastEnemySpawn = Date.now();
+            lastItemSpawn = Date.now();
+
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+            gameLoop();
+        }
+
+        function spawnEnemy() {
+            const rect = track.getBoundingClientRect();
+            const carImages = ['car2.png', 'car3.png'];
+            const randomImg = carImages[Math.floor(Math.random() * carImages.length)];
+            
+            const enemyEl = document.createElement('img');
+            enemyEl.src = randomImg;
+            enemyEl.className = 'game-object enemy-car';
+            
+            const spawnX = Math.random() * (rect.width - 90) + 10;
+            const enemyObj = {
+                el: enemyEl,
+                x: spawnX,
+                y: -140,
+                speed: baseSpeed + Math.random() * 3.5 - 1
+            };
+
+            track.appendChild(enemyEl);
+            enemies.push(enemyObj);
+        }
+
+        function spawnCollectible() {
+            const rect = track.getBoundingClientRect();
+            const isCoin = Math.random() > 0.28; // 72% Coins, 28% Fuel Canisters
+            const type = isCoin ? 'coin' : 'fuel';
+
+            const itemEl = document.createElement('div');
+            itemEl.className = 'game-object collectible';
+            if (isCoin) {
+                itemEl.innerHTML = `<div class="coin-item"><i class="fas fa-coins"></i></div>`;
+            } else {
+                itemEl.innerHTML = `<div class="fuel-item"><i class="fas fa-gas-pump"></i></div>`;
+            }
+
+            const spawnX = Math.random() * (rect.width - 70) + 10;
+            const itemObj = {
+                el: itemEl,
+                type: type,
+                x: spawnX,
+                y: -60,
+                speed: baseSpeed
+            };
+
+            track.appendChild(itemEl);
+            collectibles.push(itemObj);
+        }
+
+        function showPopupText(x, y, text, color) {
+            const pop = document.createElement('div');
+            pop.className = 'popup-text';
+            pop.innerText = text;
+            pop.style.left = `${x}px`;
+            pop.style.top = `${y}px`;
+            pop.style.color = color;
+            track.appendChild(pop);
+            setTimeout(() => pop.remove(), 800);
+        }
+
+        function gameLoop() {
+            if (!isGameRunning || isPaused) return;
+
+            const rect = track.getBoundingClientRect();
+            const trackWidth = rect.width;
+            const trackHeight = rect.height;
+
+            let currentSpeed = baseSpeed;
+            currentSpeedKmh = Math.floor(baseSpeed * 14);
+
+            // Keyboard Movement
+            const moveStep = 9;
+            if (keys.ArrowLeft || keys.KeyA) playerPos.x -= moveStep;
+            if (keys.ArrowRight || keys.KeyD) playerPos.x += moveStep;
+            if (keys.ArrowUp || keys.KeyW) playerPos.y -= moveStep;
+            if (keys.ArrowDown || keys.KeyS) playerPos.y += moveStep;
+
+            // Keep Player inside Track Bounds
+            const minX = 10;
+            const maxX = trackWidth - 82;
+            const minY = 75; // below top HUD
+            const maxY = trackHeight - 130;
+
+            playerPos.x = Math.max(minX, Math.min(maxX, playerPos.x));
+            playerPos.y = Math.max(minY, Math.min(maxY, playerPos.y));
+
+            // Render Player Car Position
+            player.style.left = `${playerPos.x}px`;
+            player.style.top = `${playerPos.y}px`;
+
+            // Spawning Logic
+            const now = Date.now();
+            if (now - lastEnemySpawn > Math.max(700, 2000 - score * 2.5)) {
+                spawnEnemy();
+                lastEnemySpawn = now;
+            }
+            if (now - lastItemSpawn > 1300) {
+                spawnCollectible();
+                lastItemSpawn = now;
+            }
+
+            // Update Enemies
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                const e = enemies[i];
+                e.y += currentSpeed;
+                e.el.style.left = `${e.x}px`;
+                e.el.style.top = `${e.y}px`;
+
+                // Check Collision with Player
+                if (checkCollision(playerPos, { x: e.x, y: e.y, w: 64, h: 110 })) {
+                    gameOver();
+                    return;
+                }
+
+                // Remove out of screen enemies
+                if (e.y > trackHeight + 120) {
+                    e.el.remove();
+                    enemies.splice(i, 1);
+                    score += 10;
+                }
+            }
+
+            // Update Collectibles
+            for (let i = collectibles.length - 1; i >= 0; i--) {
+                const item = collectibles[i];
+                item.y += currentSpeed;
+                item.el.style.left = `${item.x}px`;
+                item.el.style.top = `${item.y}px`;
+
+                // Check Pickup
+                if (checkCollision(playerPos, { x: item.x, y: item.y, w: 44, h: 44 })) {
+                    if (item.type === 'coin') {
+                        coins++;
+                        score += 50;
+                        playCoinSFX();
+                        showPopupText(item.x, item.y, '+1 COIN', '#facc15');
+                    } else if (item.type === 'fuel') {
+                        fuel = Math.min(100, fuel + 35);
+                        playCoinSFX();
+                        showPopupText(item.x, item.y, '+FUEL', '#22c55e');
+                    }
+                    item.el.remove();
+                    collectibles.splice(i, 1);
+                    continue;
+                }
+
+                // Remove out of screen items
+                if (item.y > trackHeight + 60) {
+                    item.el.remove();
+                    collectibles.splice(i, 1);
+                }
+            }
+
+            // Deplete Fuel slowly
+            fuel -= 0.035;
+            if (fuel <= 0) {
+                gameOver("OUT OF FUEL!");
+                return;
+            }
+
+            // Gradually Increase Difficulty
+            baseSpeed = 9 + Math.floor(score / 250) * 0.9;
+
+            // Update HUD
+            document.getElementById('hud-score').innerText = score;
+            document.getElementById('hud-coins').innerText = coins;
+            document.getElementById('hud-speed').innerText = `${currentSpeedKmh} km/h`;
+            document.getElementById('fuel-bar').style.width = `${Math.max(0, fuel)}%`;
+
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('turbo_racer_highscore', highScore.toString());
+                document.getElementById('hud-highscore').innerText = highScore;
+            }
+
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        // Box Bounding Collision Check
+        function checkCollision(p, obj) {
+            const pW = 58;
+            const pH = 100;
+            return (
+                p.x < obj.x + obj.w &&
+                p.x + pW > obj.x &&
+                p.y < obj.y + obj.h &&
+                p.y + pH > obj.y
+            );
+        }
+
+        function gameOver() {
+            isGameRunning = false;
+            isPaused = false;
+            laneWrapper.classList.remove('animate-road');
+            playCrashSFX();
+
+            document.getElementById('final-score').innerText = score;
+            document.getElementById('final-coins').innerText = coins;
+            document.getElementById('gameover-modal').style.display = 'flex';
+        }
+    </script>
 </body>
-
-<script>
-
-
-    document.getElementById("start").addEventListener("click", function () {
-
-        document.getElementById("start").style.display = 'none'
-        document.getElementById("road").style.animation = 'roadanimation 20s linear infinite'
-
-
-        setInterval(() => {
-            num = Math.floor(Math.random() * (350 - 230 + 1) + 230)
-            document.getElementById("enemycar1").style.left = `${num}px`
-
-        }, 3000)
-        setInterval(() => {
-            num = Math.floor(Math.random() * (150 - 50 + 1) + 50)
-            document.getElementById("enemycar2").style.left = `${num}px`
-
-        }, 6000)
-        setInterval(() => {
-            num = Math.floor(Math.random() * (-50 + 140 + 1) - 140)
-            document.getElementById("enemycar3").style.left = `${num}px`
-
-        }, 5000)
-        setInterval(() => {
-            num = Math.floor(Math.random() * (-220 + 330 + 1) - 330)
-            document.getElementById("enemycar4").style.left = `${num}px`
-
-        }, 4000)
-
-
-        document.getElementById("enemycar1").style.animation = 'ecar1 3s linear infinite'
-        document.getElementById("enemycar2").style.animation = 'ecar2 6s linear infinite'
-        document.getElementById("enemycar3").style.animation = 'ecar3 5s linear infinite'
-        document.getElementById("enemycar4").style.animation = 'ecar4 4s linear infinite'
-
-
-        let t = 15
-        let l = 0
-
-        window.addEventListener("keydown", function (x) {
-
-            if (x.keyCode == 87) {
-                t = t - 3
-                // alert("w")
-
-            }
-            if (x.keyCode == 65) {
-                l = l - 1
-                // alert("w")
-            }
-            if (x.keyCode == 83) {
-                t = t + 3
-                // alert("w")
-            }
-            if (x.keyCode == 68) {
-                l = l + 1
-                // alert("w")
-            }
-            document.getElementById("mycar").style.top = `${t}vh`
-            document.getElementById("mycar").style.left = `${l}vw`
-        })
-
-        n = 0
-        setInterval(() => {
-
-            document.getElementById("score").innerText = `Score : ${n}`
-            n = n + 1
-
-
-
-            var ecar1_left = Math.abs(document.getElementById("ecarimg1").getBoundingClientRect().left);
-            var ecar1_right = Math.abs(document.getElementById("ecarimg1").getBoundingClientRect().right);
-            var ecar1_top = Math.abs(document.getElementById("ecarimg1").getBoundingClientRect().top);
-            var ecar1_bottom = Math.abs(document.getElementById("ecarimg1").getBoundingClientRect().bottom);
-
-            var ecar2_left = Math.abs(document.getElementById("ecarimg2").getBoundingClientRect().left);
-            var ecar2_right = Math.abs(document.getElementById("ecarimg2").getBoundingClientRect().right);
-            var ecar2_top = Math.abs(document.getElementById("ecarimg2").getBoundingClientRect().top);
-            var ecar2_bottom = Math.abs(document.getElementById("ecarimg2").getBoundingClientRect().bottom);
-
-            var ecar3_left = Math.abs(document.getElementById("ecarimg3").getBoundingClientRect().left);
-            var ecar3_right = Math.abs(document.getElementById("ecarimg3").getBoundingClientRect().right);
-            var ecar3_top = Math.abs(document.getElementById("ecarimg3").getBoundingClientRect().top);
-            var ecar3_bottom = Math.abs(document.getElementById("ecarimg3").getBoundingClientRect().bottom);
-
-            var ecar4_left = Math.abs(document.getElementById("ecarimg4").getBoundingClientRect().left);
-            var ecar4_right = Math.abs(document.getElementById("ecarimg4").getBoundingClientRect().right);
-            var ecar4_top = Math.abs(document.getElementById("ecarimg4").getBoundingClientRect().top);
-            var ecar4_bottom = Math.abs(document.getElementById("ecarimg4").getBoundingClientRect().bottom);
-
-            var mycar_left = Math.abs(document.getElementById("mycarimg").getBoundingClientRect().left);
-            var mycar_right = Math.abs(document.getElementById("mycarimg").getBoundingClientRect().right);
-            var mycar_top = Math.abs(document.getElementById("mycarimg").getBoundingClientRect().top);
-            var mycar_bottom = Math.abs(document.getElementById("mycarimg").getBoundingClientRect().bottom);
-
-
-            if (mycar_left < 450 || mycar_right > 1130 || mycar_top < 20 || mycar_bottom > 690) {
-                setTimeout(() => {
-                    alert(`GAME OVER!`)
-                })
-                location.reload()
-
-            }
-            if (((ecar1_left < mycar_left && mycar_left < ecar1_right) || (ecar1_left < mycar_right && mycar_right < ecar1_right)) && ((ecar1_top < mycar_top && mycar_top < ecar1_bottom) || (ecar1_top < mycar_bottom && mycar_bottom < ecar1_bottom))) {
-
-                setTimeout(() => {
-                    alert(`GAME OVER!`)
-                })
-                location.reload()
-
-            }
-            if (((ecar2_left < mycar_left && mycar_left < ecar2_right) || (ecar2_left < mycar_right && mycar_right < ecar2_right)) && ((ecar2_top < mycar_top && mycar_top < ecar2_bottom) || (ecar2_top < mycar_bottom && mycar_bottom < ecar2_bottom))) {
-
-                setTimeout(() => {
-                    alert(`GAME OVER!`)
-                })
-                location.reload()
-
-            }
-            if (((ecar3_left < mycar_left && mycar_left < ecar3_right) || (ecar3_left < mycar_right && mycar_right < ecar3_right)) && ((ecar3_top < mycar_top && mycar_top < ecar3_bottom) || (ecar3_top < mycar_bottom && mycar_bottom < ecar3_bottom))) {
-
-                setTimeout(() => {
-                    alert(`GAME OVER!`)
-                })
-                location.reload()
-
-            }
-            if (((ecar4_left < mycar_left && mycar_left < ecar4_right) || (ecar4_left < mycar_right && mycar_right < ecar4_right)) && ((ecar4_top < mycar_top && mycar_top < ecar4_bottom) || (ecar4_top < mycar_bottom && mycar_bottom < ecar4_bottom))) {
-
-                setTimeout(() => {
-                    alert(`GAME OVER!`)
-                })
-                location.reload()
-
-            }
-
-
-        }, 100)
-
-
-
-    })
-
-</script>
-
 </html>

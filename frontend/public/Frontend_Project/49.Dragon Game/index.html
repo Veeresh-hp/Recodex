@@ -2,26 +2,128 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Dino Game</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dragon Runner Pro 🐉 | Endless Arcade</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-    <div id="container">
-        <div id="dino">
-            <img src="assets/dino.png" alt="dino">
-        </div>
-        <div id="block">
-            <img src="assets/block.png" alt="blocks">
-        </div>
-        <div id="road">
-            <img src="assets/road.png" alt="road">
-        </div>
-        <div id="cloud">
-            <img src="assets/cloud.jpg" alt="cloud">
-        </div>
-        <div id="score">Score <b>00</b></div>
-        <div id="gameOver">Game Over</div>
+
+    <div class="app-wrapper">
+
+        <!-- Top Header & Controls -->
+        <header class="game-header">
+            <div class="logo">
+                <i class="fas fa-dragon logo-icon"></i>
+                <h1>DRAGON<span class="highlight">RUNNER</span></h1>
+            </div>
+
+            <!-- Stats HUD -->
+            <div class="stats-hud">
+                <div class="stat-pill">
+                    <span class="stat-lbl"><i class="fas fa-trophy" style="color: #facc15;"></i> Best</span>
+                    <span class="stat-val" id="val-highscore">0</span>
+                </div>
+                <div class="stat-pill main-score">
+                    <span class="stat-lbl"><i class="fas fa-star" style="color: #38bdf8;"></i> Score</span>
+                    <span class="stat-val" id="val-score">0</span>
+                </div>
+            </div>
+
+            <!-- Action Controls -->
+            <div class="header-controls">
+                <button class="btn-control" id="btn-pause" onclick="togglePause()" title="Pause / Play (Space)">
+                    <i class="fas fa-pause"></i> <span id="txt-pause">Pause</span>
+                </button>
+                <button class="btn-control btn-secondary" onclick="restartGame()" title="Restart">
+                    <i class="fas fa-rotate-right"></i> Restart
+                </button>
+                <button class="icon-btn" id="btn-sound" onclick="toggleSound()" title="Toggle Sound">
+                    <i class="fas fa-volume-high"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Game Stage -->
+        <main class="game-stage" id="game-stage">
+            
+            <!-- Cloud Layer -->
+            <div class="cloud-layer" id="cloud-layer">
+                <img src="assets/cloud.jpg" alt="clouds" class="cloud-img">
+                <img src="assets/cloud.jpg" alt="clouds" class="cloud-img">
+            </div>
+
+            <!-- Dragon Character -->
+            <div id="dino">
+                <img src="assets/dino.png" alt="Dragon" id="dino-img">
+            </div>
+
+            <!-- Obstacle Block -->
+            <div id="block">
+                <img src="assets/block.png" alt="Obstacle" id="block-img">
+            </div>
+
+            <!-- Road Ground Layer -->
+            <div class="road-layer" id="road-layer">
+                <img src="assets/road.png" alt="Road Ground" class="road-img">
+                <img src="assets/road.png" alt="Road Ground" class="road-img">
+            </div>
+
+            <!-- On-Screen Mobile Action Buttons -->
+            <div class="stage-controls">
+                <button class="btn-jump-action" id="btn-jump" onclick="triggerJump()">
+                    <i class="fas fa-angles-up"></i> JUMP (Space / Up)
+                </button>
+            </div>
+
+            <!-- Pause Screen Overlay -->
+            <div class="overlay-modal" id="pause-overlay" style="display: none;">
+                <div class="modal-card">
+                    <div class="modal-icon"><i class="fas fa-pause"></i></div>
+                    <h2>GAME PAUSED</h2>
+                    <p>Press <b>SPACE</b> or click Resume to continue</p>
+                    <div class="modal-actions">
+                        <button class="btn-primary" onclick="togglePause()"><i class="fas fa-play"></i> RESUME</button>
+                        <button class="btn-secondary" onclick="restartGame()"><i class="fas fa-rotate-right"></i> RESTART</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Game Over Screen Overlay -->
+            <div class="overlay-modal" id="gameover-overlay" style="display: none;">
+                <div class="modal-card">
+                    <div class="modal-icon icon-danger"><i class="fas fa-skull"></i></div>
+                    <h2>GAME OVER</h2>
+                    <p class="modal-sub">You collided with the obstacle!</p>
+                    
+                    <div class="final-stats">
+                        <div class="stat-box">
+                            <span class="lbl">Final Score</span>
+                            <span class="val" id="final-score">0</span>
+                        </div>
+                        <div class="stat-box">
+                            <span class="lbl">Best Score</span>
+                            <span class="val" id="final-best">0</span>
+                        </div>
+                    </div>
+
+                    <button class="btn-primary" onclick="restartGame()"><i class="fas fa-play"></i> PLAY AGAIN</button>
+                </div>
+            </div>
+
+        </main>
+
+        <!-- Instructions Bar -->
+        <footer class="instructions-bar">
+            <span>🎮 <b>Space / Up Arrow / Tap Screen</b>: Jump</span>
+            <span>⏸️ <b>Escape / Space</b>: Pause Game</span>
+        </footer>
+
     </div>
+
     <script src="js/file.js"></script>
 </body>
 </html>

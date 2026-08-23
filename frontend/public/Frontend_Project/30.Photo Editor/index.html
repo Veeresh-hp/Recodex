@@ -1,60 +1,128 @@
 <!DOCTYPE html>
-<!-- Coding By CodingNepal - youtube.com/codingnepal -->
 <html lang="en" dir="ltr">
   <head>
     <meta charset="utf-8">
-    <title>Image Editor JavaScript | CodingNepal</title>
+    <title>Photo Studio Pro 📸 | Professional Image Editor</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
     <link rel="stylesheet" href="style.css">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="https://unpkg.com/boxicons@2.1.2/css/boxicons.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css"/>
   </head>
   <body>
-    <div class="container disable">
-        <h2>Easy Image Editor</h2>
-        <div class="wrapper">
-            <div class="editor-panel">
-                <div class="filter">
-                    <label class="title">Filters</label>
-                    <div class="options">
-                        <button id="brightness" class="active">Brightness</button>
-                        <button id="saturation">Saturation</button>
-                        <button id="inversion">Inversion</button>
-                        <button id="grayscale">Grayscale</button>
-                    </div>
-                    <div class="slider">
-                        <div class="filter-info">
-                            <p class="name">Brighteness</p>
-                            <p class="value">100%</p>
-                        </div>
-                        <input type="range" value="100" min="0" max="200">
-                    </div>
-                </div>
-                <div class="rotate">
-                    <label class="title">Rotate & Flip</label>
-                    <div class="options">
-                        <button id="left"><i class="fa-solid fa-rotate-left"></i></button>
-                        <button id="right"><i class="fa-solid fa-rotate-right"></i></button>
-                        <button id="horizontal"><i class='bx bx-reflect-vertical'></i></button>
-                        <button id="vertical"><i class='bx bx-reflect-horizontal' ></i></button>
-                    </div>
-                </div>
+
+    <div class="app-wrapper">
+      <main class="app-card">
+
+        <!-- Left Controls Sidebar -->
+        <section class="controls-sidebar">
+          
+          <!-- Logo -->
+          <div class="logo">
+            <i class="fas fa-sliders logo-icon"></i>
+            <h1>PHOTO<span class="highlight">STUDIO</span></h1>
+          </div>
+
+          <!-- One-Click Preset Filters -->
+          <div class="row">
+            <label class="row-title"><i class="fas fa-wand-magic-sparkles"></i> Preset Filters</label>
+            <div class="preset-chips">
+              <button class="chip active" onclick="applyPreset('original')">Original</button>
+              <button class="chip" onclick="applyPreset('vivid')">Vivid</button>
+              <button class="chip" onclick="applyPreset('vintage')">Vintage</button>
+              <button class="chip" onclick="applyPreset('noir')">Noir B&W</button>
+              <button class="chip" onclick="applyPreset('warm')">Warm Sunset</button>
+              <button class="chip" onclick="applyPreset('cool')">Cool Breeze</button>
             </div>
-            <div class="preview-img">
-                <img src="image-placeholder.svg" alt="preview-img">
+          </div>
+
+          <!-- Adjustments Selector & Slider -->
+          <div class="row">
+            <label class="row-title"><i class="fas fa-sliders"></i> Manual Adjustments</label>
+            <div class="adjustment-buttons">
+              <button id="brightness" class="adj-btn active">Brightness</button>
+              <button id="saturation" class="adj-btn">Saturation</button>
+              <button id="contrast" class="adj-btn">Contrast</button>
+              <button id="blur" class="adj-btn">Blur</button>
+              <button id="sepia" class="adj-btn">Sepia</button>
+              <button id="grayscale" class="adj-btn">Grayscale</button>
+              <button id="inversion" class="adj-btn">Inversion</button>
             </div>
-        </div>
-        <div class="controls">
-            <button class="reset-filter">Reset Filters</button>
-            <div class="row">
-                <input type="file" class="file-input" accept="image/*" hidden>
-                <button class="choose-img">Choose Image</button>
-                <button class="save-img">Save Image</button>
+
+            <!-- Slider Control -->
+            <div class="slider-box">
+              <div class="slider-header">
+                <span id="filter-name">Brightness</span>
+                <b id="filter-val">100%</b>
+              </div>
+              <input type="range" id="filter-slider" min="0" max="200" value="100">
             </div>
-        </div>
+          </div>
+
+          <!-- Rotate & Flip Controls -->
+          <div class="row">
+            <label class="row-title"><i class="fas fa-rotate"></i> Rotate & Flip</label>
+            <div class="rotate-grid">
+              <button class="rot-btn" id="left" title="Rotate Left 90°"><i class="fas fa-rotate-left"></i></button>
+              <button class="rot-btn" id="right" title="Rotate Right 90°"><i class="fas fa-rotate-right"></i></button>
+              <button class="rot-btn" id="horizontal" title="Flip Horizontal"><i class="fas fa-arrows-left-right"></i></button>
+              <button class="rot-btn" id="vertical" title="Flip Vertical"><i class="fas fa-arrows-up-down"></i></button>
+            </div>
+          </div>
+
+        </section>
+
+        <!-- Right Preview Board -->
+        <section class="preview-board">
+          
+          <!-- Top Canvas Toolbar -->
+          <div class="preview-toolbar">
+            <div class="zoom-controls">
+              <button class="tool-icon-btn" onclick="zoomImage(1.15)" title="Zoom In"><i class="fas fa-magnifying-glass-plus"></i></button>
+              <button class="tool-icon-btn" onclick="zoomImage(0.85)" title="Zoom Out"><i class="fas fa-magnifying-glass-minus"></i></button>
+              <button class="tool-icon-btn" onclick="resetZoom()" title="Reset Zoom"><i class="fas fa-expand"></i></button>
+            </div>
+
+            <button class="btn-sample" onclick="loadSampleImage()" title="Load Sample Image">
+              <i class="fas fa-image"></i> Sample Image
+            </button>
+          </div>
+
+          <!-- Preview Frame -->
+          <div class="preview-img-frame">
+            <img src="image-placeholder.svg" id="preview-img" alt="preview-img">
+          </div>
+
+          <!-- Bottom Action Buttons -->
+          <div class="action-footer">
+            <button class="btn-action reset-filter" onclick="resetFilters()">
+              <i class="fas fa-arrow-rotate-left"></i> Reset Filters
+            </button>
+
+            <div class="action-right">
+              <input type="file" id="file-input" accept="image/*" style="display: none;">
+              <button class="btn-action choose-img" onclick="document.getElementById('file-input').click()">
+                <i class="fas fa-folder-open"></i> Choose Image
+              </button>
+              <button class="btn-action save-img" onclick="saveImage()">
+                <i class="fas fa-download"></i> Save Image
+              </button>
+            </div>
+          </div>
+
+        </section>
+
+      </main>
+    </div>
+
+    <!-- Toast Alert Popup -->
+    <div class="toast-message" id="toast" style="display: none;">
+      <i class="fas fa-circle-check" id="toast-icon"></i>
+      <span id="toast-text">Image saved successfully!</span>
     </div>
 
     <script src="script.js"></script>
-    
+
   </body>
 </html>

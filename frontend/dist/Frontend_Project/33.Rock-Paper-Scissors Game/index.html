@@ -1,42 +1,135 @@
 <!DOCTYPE html>
-<!-- Coding by CodingLab || www.codinglabweb.com -->
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>JavaScript Game | Rock Paper Scissors</title>
+    <title>Rock Paper Scissors Pro ✊✋✌️</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
-    <section class="container">
-      <div class="result_field">
-        <div class="result_images">
-          <span class="user_result">
-            <img src="images/rock.png" alt="" />
+
+    <div class="app_wrapper">
+
+      <!-- Header Controls -->
+      <header class="game_header">
+        <div class="logo">
+          <i class="fas fa-hand-back-fist logo_icon"></i>
+          <h1>RPS<span class="highlight">PRO</span></h1>
+        </div>
+
+        <div class="header_controls">
+          <div class="format_selector">
+            <button class="fmt_btn active" data-fmt="endless" onclick="setMatchFormat('endless')">Endless</button>
+            <button class="fmt_btn" data-fmt="3" onclick="setMatchFormat('3')">Best of 3</button>
+            <button class="fmt_btn" data-fmt="5" onclick="setMatchFormat('5')">Best of 5</button>
+          </div>
+
+          <div class="ai_box">
+            <select id="ai_mode" onchange="setAiMode(this.value)">
+              <option value="random">Random Bot</option>
+              <option value="smart" selected>Predictive AI</option>
+            </select>
+          </div>
+
+          <button class="icon_btn" id="btn_sound" onclick="toggleSound()" title="Toggle Sound">
+            <i class="fas fa-volume-high"></i>
+          </button>
+        </div>
+      </header>
+
+      <!-- Main Game Section (Classic Container Preserved & Enhanced) -->
+      <section class="container">
+
+        <!-- Scoreboard HUD -->
+        <div class="scoreboard">
+          <div class="score_box user_score_box">
+            <span class="score_label"><i class="fas fa-user"></i> USER</span>
+            <span class="score_val" id="user_score">0</span>
+          </div>
+
+          <div class="streak_pill">
+            <span id="streak_text"><i class="fas fa-bolt" style="color: #facc15;"></i> Streak: 0</span>
+          </div>
+
+          <div class="score_box cpu_score_box">
+            <span class="score_label"><i class="fas fa-robot"></i> CPU</span>
+            <span class="score_val" id="cpu_score">0</span>
+          </div>
+        </div>
+
+        <!-- Result Field (Classic Hand-Shaking Display) -->
+        <div class="result_field">
+          <div class="result_images">
+            <span class="user_result">
+              <img src="images/rock.png" alt="User Hand" />
+            </span>
+            <span class="cpu_result">
+              <img src="images/rock.png" alt="CPU Hand" />
+            </span>
+          </div>
+          <div class="result">Let's Play!!</div>
+        </div>
+
+        <!-- Option Selection Images (Classic Rock, Paper, Scissors) -->
+        <div class="option_images">
+          <span class="option_image">
+            <img src="images/rock.png" alt="Rock" />
+            <p>Rock</p>
           </span>
-          <span class="cpu_result">
-            <img src="images/rock.png" alt="" />
+          <span class="option_image">
+            <img src="images/paper.png" alt="Paper" />
+            <p>Paper</p>
+          </span>
+          <span class="option_image">
+            <img src="images/scissors.png" alt="Scissors" />
+            <p>Scissors</p>
           </span>
         </div>
-        <div class="result">Let's Play!!</div>
-      </div>
 
-      <div class="option_images">
-        <span class="option_image">
-          <img src="images/rock.png" alt="" />
-          <p>Rock</p>
-        </span>
-        <span class="option_image">
-          <img src="images/paper.png" alt="" />
-          <p>Paper</p>
-        </span>
-        <span class="option_image">
-          <img src="images/scissors.png" alt="" />
-          <p>Scissors</p>
-        </span>
+        <!-- Action Bar -->
+        <div class="action_bar">
+          <button class="btn_action" onclick="resetMatch()">
+            <i class="fas fa-arrows-rotate"></i> Reset Match
+          </button>
+          <button class="btn_action btn_secondary" onclick="resetScores()">
+            <i class="fas fa-trash-can"></i> Reset Scores
+          </button>
+        </div>
+
+      </section>
+
+    </div>
+
+    <!-- Match Victory Modal -->
+    <div class="modal_overlay" id="win_modal" style="display: none;">
+      <div class="modal_card">
+        <div class="modal_icon" id="modal_icon">
+          <i class="fas fa-trophy"></i>
+        </div>
+        <h2 class="modal_title" id="modal_title">VICTORY!</h2>
+        <p class="modal_subtitle" id="modal_subtitle">You won the match!</p>
+        
+        <div class="modal_stats">
+          <div class="stat_box">
+            <span class="stat_lbl">Final Score</span>
+            <span class="stat_val" id="modal_final_score">3 - 1</span>
+          </div>
+          <div class="stat_box">
+            <span class="stat_lbl">Best Streak</span>
+            <span class="stat_val" id="modal_best_streak">0</span>
+          </div>
+        </div>
+
+        <button class="btn_modal_primary" onclick="closeModalAndRestart()">
+          <i class="fas fa-play"></i> PLAY AGAIN
+        </button>
       </div>
-    </section>
+    </div>
 
     <script src="script.js" defer></script>
   </body>

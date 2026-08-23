@@ -1,57 +1,103 @@
 <!DOCTYPE html>
-<!-- Coding By CodingNepal - youtube.com/codingnepal -->
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Music Player | CodingNepal</title>
-  <link rel="stylesheet" href="style.css">
+  <title>Beat Studio Pro 🎵 | High-Fidelity Dark Music Player</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="wrapper">
-    <div class="top-bar">
-      <i class="material-icons">expand_more</i>
-      <span>Now Playing</span>
-      <i class="material-icons">more_horiz</i>
-    </div>
-    <div class="img-area">
-      <img src="" alt="">
-    </div>
-    <div class="song-details">
-      <p class="name"></p>
-      <p class="artist"></p>
-    </div>
-    <div class="progress-area">
-      <div class="progress-bar">
-        <audio id="main-audio" src=""></audio>
-      </div>
-      <div class="song-timer">
-        <span class="current-time">0:00</span>
-        <span class="max-duration">0:00</span>
-      </div>
-    </div>
-    <div class="controls">
-      <i id="repeat-plist" class="material-icons" title="Playlist looped">repeat</i>
-      <i id="prev" class="material-icons">skip_previous</i>
-      <div class="play-pause">
-        <i class="material-icons play">play_arrow</i>
-      </div>
-      <i id="next" class="material-icons">skip_next</i>
-      <i id="more-music" class="material-icons">queue_music</i>
-    </div>
-    <div class="music-list">
-      <div class="header">
-        <div class="row">
-          <i class= "list material-icons">queue_music</i>
-          <span>Music list</span>
+
+  <div class="container">
+    <div class="wrapper">
+
+      <!-- Top Header Navigation -->
+      <div class="top-bar">
+        <div class="logo">
+          <i class="material-icons logo-icon">graphic_eq</i>
+          <span>BEAT<span class="highlight">PRO</span></span>
         </div>
-        <i id="close" class="material-icons">close</i>
+
+        <!-- Addon: Animated Audio Equalizer Bars -->
+        <div class="equalizer" id="equalizer">
+          <span></span><span></span><span></span><span></span>
+        </div>
+
+        <!-- Addon: Favorite / Heart Button -->
+        <button class="btn-fav" id="btn-fav" onclick="toggleFavorite()" title="Favorite Song">
+          <i class="far fa-heart" id="fav-icon"></i>
+        </button>
+
+        <i class="material-icons btn-list-toggle" id="btn-menu" title="Open Playlist">queue_music</i>
       </div>
-      <ul>
-        <!-- here li list are coming from js -->
-      </ul>
+
+      <!-- Album Cover Vinyl Art (Rotates when playing) -->
+      <div class="img-area">
+        <img src="" alt="Song Cover" id="cover-img">
+      </div>
+
+      <!-- Song Details -->
+      <div class="song-details">
+        <h2 class="name">Hardwind - Want Me</h2>
+        <p class="artist">Mike Archangelo</p>
+      </div>
+
+      <!-- Progress Area -->
+      <div class="progress-area">
+        <div class="progress-bar">
+          <audio id="main-audio" src=""></audio>
+        </div>
+        <div class="song-timer">
+          <span class="current-time">0:00</span>
+          <span class="max-duration">0:00</span>
+        </div>
+      </div>
+
+      <!-- Controls Row -->
+      <div class="controls">
+        <i id="repeat-plist" class="material-icons" title="Repeat Mode">repeat</i>
+        <i id="prev" class="material-icons" title="Previous Track">skip_previous</i>
+        
+        <div class="play-pause" title="Play / Pause">
+          <i class="material-icons play">play_arrow</i>
+        </div>
+
+        <i id="next" class="material-icons" title="Next Track">skip_next</i>
+        <i id="more-music" class="material-icons" title="Queue List">playlist_play</i>
+      </div>
+
+      <!-- Addon: Volume Control Bar -->
+      <div class="volume-bar-box">
+        <i class="material-icons" id="vol-icon" onclick="toggleMute()" title="Mute / Unmute">volume_up</i>
+        <input type="range" id="vol-slider" min="0" max="100" value="80" title="Volume Control">
+      </div>
+
+      <!-- Popup Music List Modal -->
+      <div class="music-list">
+        <div class="header">
+          <div class="row">
+            <i class="list material-icons">queue_music</i>
+            <span>Playlist Queue</span>
+          </div>
+          <i id="close" class="material-icons">close</i>
+        </div>
+        <ul>
+          <!-- Dynamic li tracks injected via JS -->
+        </ul>
+      </div>
+
     </div>
+  </div>
+
+  <!-- Toast Alert Popup -->
+  <div class="toast-message" id="toast" style="display: none;">
+    <i class="fas fa-circle-check" id="toast-icon"></i>
+    <span id="toast-text">Track changed!</span>
   </div>
 
   <script src="js/music-list.js"></script>

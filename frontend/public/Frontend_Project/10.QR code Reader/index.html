@@ -4,38 +4,117 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR Code Studio Pro 📱 | Generator & Reader</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@500;700&family=Outfit:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
-    <title>QR Code Generator | Code Traversal</title>
 </head>
 <body>
-    <div class="box">
-        <div class="qr-header">
-            <h1>Generate QR Code</h1>
-            <input type="text" placeholder="Type your text or URL" id="qr-text">
-            <div>
-            <label for="sizes">Select Size:</label>
-            <select id="sizes">
-                <option value="100">100x100</option>
-                <option value="200">200x200</option>
-                <option value="300">300x300</option>
-                <option value="400">400x400</option>
-                <option value="500">500x500</option>
-                <option value="600">600x600</option>
-                <option value="700">700x700</option>
-                <option value="800">800x800</option>
-                <option value="900">900x900</option>
-                <option value="1000">1000x1000</option>
-            </select>
-        </div>
-        </div>
-        <div class="qr-body"></div>
-        <div class="qr-footer">
-            <a href="" id="generateBtn">Generate</a>
-            <a href="" id="downloadBtn" download="QR_Code.png">Download</a>
-        </div>
+
+    <div class="app-wrapper">
+        <main class="app-card">
+
+            <!-- Header -->
+            <header class="app-header">
+                <div class="logo">
+                    <i class="fas fa-qrcode logo-icon"></i>
+                    <h1>QR<span class="highlight">STUDIO</span></h1>
+                </div>
+
+                <!-- Mode Switcher Tabs -->
+                <div class="tab-switcher">
+                    <button class="tab-btn active" id="tab-btn-gen" onclick="switchTab('gen')">
+                        <i class="fas fa-wand-magic-sparkles"></i> Generator
+                    </button>
+                    <button class="tab-btn" id="tab-btn-read" onclick="switchTab('read')">
+                        <i class="fas fa-expand"></i> Reader / Scanner
+                    </button>
+                </div>
+            </header>
+
+            <!-- TAB 1: QR CODE GENERATOR -->
+            <section class="tab-content active" id="tab-gen">
+                <div class="input-group">
+                    <label for="qr-text"><i class="fas fa-link"></i> Text or URL</label>
+                    <input type="text" placeholder="https://example.com or type text..." id="qr-text" value="https://example.com" autocomplete="off" oninput="generateQRCode()">
+                </div>
+
+                <div class="options-row">
+                    <div class="opt-field">
+                        <label for="sizes"><i class="fas fa-maximize"></i> Size</label>
+                        <select id="sizes" onchange="generateQRCode()">
+                            <option value="150">150x150</option>
+                            <option value="200" selected>200x200</option>
+                            <option value="250">250x250</option>
+                            <option value="300">300x300</option>
+                            <option value="400">400x400</option>
+                        </select>
+                    </div>
+
+                    <div class="opt-field">
+                        <label for="color-dark"><i class="fas fa-palette"></i> QR Color</label>
+                        <input type="color" id="color-dark" value="#0f172a" oninput="generateQRCode()" onchange="generateQRCode()">
+                    </div>
+
+                    <div class="opt-field">
+                        <label for="color-light"><i class="fas fa-fill-drip"></i> BG Color</label>
+                        <input type="color" id="color-light" value="#ffffff" oninput="generateQRCode()" onchange="generateQRCode()">
+                    </div>
+                </div>
+
+                <div class="qr-output-box">
+                    <div class="qr-body" id="qr-body"></div>
+                </div>
+
+                <div class="action-row">
+                    <button class="btn-primary" id="generateBtn" onclick="generateQRCode(true)">
+                        <i class="fas fa-bolt"></i> Generate QR
+                    </button>
+                    <a href="#" id="downloadBtn" class="btn-secondary" download="QR_Code.png">
+                        <i class="fas fa-download"></i> Download PNG
+                    </a>
+                </div>
+            </section>
+
+            <!-- TAB 2: QR CODE READER / SCANNER -->
+            <section class="tab-content" id="tab-read" style="display: none;">
+                <div class="drop-zone" id="drop-zone" onclick="document.getElementById('qr-file').click()">
+                    <i class="fas fa-cloud-arrow-up drop-icon"></i>
+                    <p class="drop-title">Click or Drag & Drop QR Image</p>
+                    <p class="drop-sub">Supports PNG, JPG, WEBP, SVG</p>
+                    <input type="file" id="qr-file" accept="image/*" style="display: none;" onchange="handleFileSelect(event)">
+                </div>
+
+                <canvas id="scan-canvas" style="display: none;"></canvas>
+
+                <div class="decoded-box" id="decoded-box" style="display: none;">
+                    <span class="box-label"><i class="fas fa-square-check" style="color: #10b981;"></i> Decoded QR Result:</span>
+                    <div class="decoded-text" id="decoded-text">...</div>
+                    <div class="decoded-actions">
+                        <button class="btn-action-small" id="btn-copy-read" onclick="copyDecodedText()">
+                            <i class="fas fa-copy"></i> Copy Text
+                        </button>
+                        <a href="#" target="_blank" class="btn-action-small btn-url" id="btn-open-url" style="display: none;">
+                            <i class="fas fa-arrow-up-right-from-square"></i> Open Link
+                        </a>
+                    </div>
+                </div>
+            </section>
+
+        </main>
     </div>
 
-    <script src="script.js"></script>
+    <!-- Toast Notification -->
+    <div class="toast-notification" id="toast" style="display: none;">
+        <i class="fas fa-circle-check"></i> <span id="toast-text">Action completed!</span>
+    </div>
+
+    <!-- QR Code Generator Library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <!-- QR Code Reader Library -->
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+    <script src="script.js"></script>
 </body>
 </html>

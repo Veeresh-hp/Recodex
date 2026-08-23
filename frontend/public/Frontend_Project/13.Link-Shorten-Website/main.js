@@ -1,218 +1,321 @@
-// ITEM CONTROLLER ************************
+// --- Link Shortener Pro Engine ---
 
-const ItemCtrl = (function(){
-    // item constructor
-    const Item = function(id, url, shortUrl){
-        this.id = id;
-        this.url = url;
-        this.shortUrl = shortUrl;
-    };
+const STORAGE_KEY = 'shortener_links_history_v2';
+let linksHistory = [];
+let soundEnabled = true;
 
-    //data structure
-    const data = {
-        items: [
-            // {id:0, url:'http://www.hello.com', shortUrl:'http://sho.link.j8t5'},
-            // {id:1, url:'http://www.bye.com', shortUrl:'http://show.link/7hk9'}
-        ],
-        currentItem: null
-    };
+// Web Audio API Synthesizer
+let audioCtx = null;
 
-    // public methods
-    return{
-        logData: function(){
-            return data;
-        },
-        addLink: function(link){
-            let ID;
-            // create id
-            if(data.items.length > 0){
-                ID = data.items[data.items.length - 1].id + 1;
-            } else {
-                ID = 0;
-            }
-            let shortLink;
-            shortLink = ItemCtrl.generateLink();
-            //create new item
-            newItem = new Item(ID, link, shortLink);
-            // push it into the array
-            data.items.push(newItem);
+function getAudioContext() {
+    if (!audioCtx) {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        audioCtx = new AudioContext();
+    }
+    if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume();
+    }
+    return audioCtx;
+}
 
-            return newItem;
-        },
-        // generate short link
-        generateLink: function(){
-            const c1 = ItemCtrl.generateCharacter();
-            const c2 = ItemCtrl.generateCharacter();
-            const c3 = ItemCtrl.generateCharacter();
-            const c4 = ItemCtrl.generateCharacter();
+function playCopySFX() {
+    if (!soundEnabled) return;
+    try {
+        const ctx = getAudioContext();
+        const notes = [523.25, 659.25]; // C5, E5
+        notes.forEach((freq, idx) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, ctx.currentTime + idx * 0.06);
+            gain.gain.setValueAtTime(0.2, ctx.currentTime + idx * 0.06);
+            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + idx * 0.06 + 0.12);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(ctx.currentTime + idx * 0.06);
+            osc.stop(ctx.currentTime + idx * 0.06 + 0.12);
+        });
+    } catch (e) {}
+}
 
-            return 'http://sho.link/'+c1+c2+c3+c4;
-        },
-        // generate single character
-        generateCharacter: function(){
-            const arr = 'abcdefghijklmnopqrstuvwxyz1234567890';
-            return arr[Math.floor(Math.random()*arr.length)];
-        },
-        // get item by id
-        getItemById: function(id){
-            let found = null;
-             // loop through item
-             data.items.forEach(function(item){
-                if(item.id ===  id){
-                    found = item;
-                    }
-                })
-                   return found;
-        },
-        // set current link
-        setCurrentLink: function(link){
-            data.currentItem = link;
+function playSuccessSFX() {
+    if (!soundEnabled) return;
+    try {
+        const ctx = getAudioContext();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(440, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.1);
+        gain.gain.setValueAtTime(0.2, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.1);
+    } catch (e) {}
+}
 
-            return data.currentItem.shortUrl;
+// LocalStorage Persistence
+function loadHistory() {
+    try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+            linksHistory = JSON.parse(saved);
+        }
+    } catch (e) {
+        linksHistory = [];
+    }
+    renderLinksList();
+}
+
+function saveHistory() {
+    try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(linksHistory));
+    } catch (e) {}
+    renderLinksList();
+}
+
+function clearAllHistory() {
+    if (confirm("Are you sure you want to clear all shortened links history?")) {
+        linksHistory = [];
+        saveHistory();
+        showToast("History cleared!");
+    }
+}
+
+function deleteLink(id) {
+    linksHistory = linksHistory.filter(item => item.id !== id);
+    saveHistory();
+    showToast("Link removed");
+}
+
+// Multi-Tier Real URL Shortening Service (Bypasses CORS via Proxy)
+async function requestRealShortUrl(rawUrl) {
+    // 1. Try TinyURL API via CORS Proxy
+    try {
+        const tinyUrl = `https://tinyurl.com/api-create.php?url=${encodeURIComponent(rawUrl)}`;
+        const res = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(tinyUrl)}`);
+        const text = await res.text();
+        if (text && text.trim().startsWith('http') && !text.includes('Error')) {
+            return text.trim();
+        }
+    } catch (e) {}
+
+    // 2. Try CleanURI API (CORS Enabled)
+    try {
+        const res = await fetch('https://cleanuri.com/api/v1/shorten', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `url=${encodeURIComponent(rawUrl)}`
+        });
+        const data = await res.json();
+        if (data && data.result_url) {
+            return data.result_url;
+        }
+    } catch (e) {}
+
+    // 3. Try is.gd API via CORS Proxy
+    try {
+        const isGdUrl = `https://is.gd/create.php?format=json&url=${encodeURIComponent(rawUrl)}`;
+        const res = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(isGdUrl)}`);
+        const data = await res.json();
+        if (data && data.shorturl) {
+            return data.shorturl;
+        }
+    } catch (e) {}
+
+    // 4. Direct TinyURL fetch fallback
+    try {
+        const res = await fetch(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(rawUrl)}`);
+        const text = await res.text();
+        if (text && text.trim().startsWith('http')) {
+            return text.trim();
+        }
+    } catch (e) {}
+
+    return '';
+}
+
+// Real URL Shortening Logic
+async function handleShortenSubmit(e) {
+    e.preventDefault();
+    getAudioContext();
+
+    const inputEl = document.getElementById('shortener');
+    const submitBtn = document.getElementById('submit__btn');
+
+    let rawUrl = inputEl.value.trim();
+
+    if (!rawUrl) {
+        showToast("Please paste a URL to shorten", true);
+        return;
+    }
+
+    // Auto prepend https:// if protocol is missing
+    if (!/^https?:\/\//i.test(rawUrl)) {
+        rawUrl = 'https://' + rawUrl;
+    }
+
+    // URL validation regex
+    const urlPattern = /^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$/i;
+    if (!urlPattern.test(rawUrl)) {
+        showToast("Please enter a valid web URL (e.g. example.com)", true);
+        return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Shortening...`;
+
+    try {
+        const shortUrl = await requestRealShortUrl(rawUrl);
+
+        if (!shortUrl) {
+            showToast("Failed to create short link. Please check network connection.", true);
+            return;
         }
 
+        const newItem = {
+            id: Date.now(),
+            longUrl: rawUrl,
+            shortUrl: shortUrl,
+            createdAt: new Date().toLocaleDateString()
+        };
+
+        linksHistory.unshift(newItem);
+        saveHistory();
+
+        inputEl.value = "";
+        playSuccessSFX();
+        showToast("Link shortened & registered successfully! 🎉");
+
+    } catch (error) {
+        showToast("Failed to shorten link. Try again.", true);
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = `Short it!`;
     }
-})();
+}
 
-// UI CONTROLLER ************************
-const UICtrl = (function(){
-    // ui selectors
-    const UISelectors = {
-        linkInput: '#shortener',
-        shortItBtn: '#submit__btn',
-        linksContainer: '.links__container',
-        errorMsg: '.error__msg',
-        colyLink: '.copy__btn'
+// Render Links History UI
+function renderLinksList() {
+    const container = document.getElementById('links-container');
+    const clearBtn = document.getElementById('clear-history-btn');
+
+    if (!container) return;
+    container.innerHTML = "";
+
+    if (linksHistory.length === 0) {
+        container.innerHTML = `
+            <div style="text-align: center; padding: 24px; color: #64748b; font-size: 0.88rem;">
+                <i class="fas fa-link-slash" style="font-size: 1.8rem; margin-bottom: 8px; display: block; color: #94a3b8;"></i>
+                No shortened links yet. Paste a link above to get started!
+            </div>
+        `;
+        if (clearBtn) clearBtn.style.display = 'none';
+        return;
     }
 
-    // public methods
-    return{
-        // make selectors public
-        getSelectors: function(){
-            return UISelectors;
-        },
-        // get input value
-        getLinkInput: function (){
-            return {
-                longLink: document.querySelector(UISelectors.linkInput).value
-            }
-        },
-        // check valid url
-        errorLink: function(){
-            const errorMsg = document.querySelector(UISelectors.errorMsg);
-            errorMsg.className = 'error__msg show';
+    if (clearBtn) clearBtn.style.display = 'flex';
 
-            setTimeout(function(){
-                errorMsg.className = 'error__msg'
-            }, 3000);
+    linksHistory.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'link-item';
+        div.innerHTML = `
+            <span class="long-url" title="${item.longUrl}">${item.longUrl}</span>
+            <a href="${item.shortUrl}" target="_blank" class="short-url-link" title="Click to open short link">${item.shortUrl}</a>
+            <div class="item-actions">
+                <button class="copy__btn" onclick="copyToClipboard('${item.shortUrl}', this)" title="Copy Link">Copy</button>
+                <button class="action-icon-btn btn-qr" onclick="openQrModal('${item.shortUrl}')" title="Generate QR">
+                    <i class="fas fa-qrcode"></i>
+                </button>
+                <button class="action-icon-btn btn-del" onclick="deleteLink(${item.id})" title="Delete">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+        `;
+        container.appendChild(div);
+    });
+}
 
-            UICtrl.clearInput()
-        },
-        // clear input
-        clearInput: function(){
-            document.querySelector(UISelectors.linkInput).value = '';
-        },
-        // add new link to UI
-        addListLink: function(item){
-            // create new div
-            const div = document.createElement('div');
-            // add class
-            div.className = 'link';
-            // add id
-            div.id = `link-${item.id}`;
-            // add html
-            div.innerHTML = `
-            <span class="long__link">${item.url}</span>
-            <span class="short__link">${item.shortUrl}</span>
-            <button class="copy__btn">Copy</button>
-            `;
-            //insert item
-            document.querySelector(UISelectors.linksContainer).insertAdjacentElement('beforeend', div);
-        },
-        copyShortLink: function(link){
-            const textarea = document.createElement('textarea');
-            const copiedLink = link;
+function copyToClipboard(text, btnEl) {
+    navigator.clipboard.writeText(text);
+    playCopySFX();
 
-            textarea.value = copiedLink;
-            document.body.appendChild(textarea);
-            textarea.select();
-            document.execCommand('copy');
-            textarea.remove();
-        },
-        changeButton: function(btn){
-            btn.style.backgroundColor = '#21243d';
-            btn.style.color = 'white';
-            btn.innerHTML = 'Copied!';
+    if (btnEl) {
+        btnEl.classList.add('copied');
+        btnEl.innerText = "Copied!";
+        setTimeout(() => {
+            btnEl.classList.remove('copied');
+            btnEl.innerText = "Copy";
+        }, 1800);
+    }
+    showToast("Link copied to clipboard! 📋");
+}
+
+// Modal QR Code Handler
+let currentModalQrInstance = null;
+
+function openQrModal(shortUrl) {
+    getAudioContext();
+    const modal = document.getElementById('qr-modal');
+    const subText = document.getElementById('modal-short-url');
+    const qrContainer = document.getElementById('modal-qr-body');
+    const downloadBtn = document.getElementById('download-qr-btn');
+
+    subText.innerText = shortUrl;
+    qrContainer.innerHTML = "";
+
+    currentModalQrInstance = new QRCode(qrContainer, {
+        text: shortUrl,
+        width: 160,
+        height: 160,
+        colorDark: "#21243d",
+        colorLight: "#ffffff",
+        correctLevel: QRCode.CorrectLevel.H
+    });
+
+    setTimeout(() => {
+        const img = qrContainer.querySelector('img');
+        const canvas = qrContainer.querySelector('canvas');
+        if (img && img.src) {
+            downloadBtn.href = img.src;
+        } else if (canvas) {
+            downloadBtn.href = canvas.toDataURL('image/png');
         }
-    }
-})();
+    }, 150);
 
-// ITEM CONTROLLER ************************
-const App = (function(ItemCtrl, UICtrl){
-    // event listeners
-    const loadEventListeners = function (){
-        // get ui selectors
-        const UISelectors = UICtrl.getSelectors();
-        // add new link
-        document.querySelector(UISelectors.shortItBtn).addEventListener('click', addLink);
-        // copy link
-        document.querySelector(UISelectors.linksContainer).addEventListener('click', copyLink);
-    }
+    modal.style.display = 'flex';
+}
 
-    // add new link
-    const addLink = function(e){
-        // get form input from UI controller
-        const input = UICtrl.getLinkInput();
+function closeQrModal() {
+    const modal = document.getElementById('qr-modal');
+    modal.style.display = 'none';
+}
 
-        // make sure input has a value
-        if(input.longLink !== ''){
-            const re = /(https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|www\.[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9]+\.[^\s]{2,}|www\.[a-zA-Z0-9]+\.[^\s]{2,})/;
+let toastTimer = null;
+function showToast(msg, isError = false) {
+    const toast = document.getElementById('toast');
+    const textSpan = document.getElementById('toast-text');
+    const icon = document.getElementById('toast-icon');
 
-            if(re.test(input.longLink) == false){
-                // run error msg
-                UICtrl.errorLink();
-            } else if(re.test(input.longLink) ==  true){
-                // add new item
-                const newLink = ItemCtrl.addLink(input.longLink);
-                // add item to ui list
-                UICtrl.addListLink(newLink);
-                // clear inputs
-                UICtrl.clearInput();
-            }
-        }
-        // console.log(input.longLink);
-
-        e.preventDefault();
-    };
-
-    // copy link
-    const copyLink = function(e){
-        if(e.target.classList.contains('copy__btn')){
-            // get list item ID
-            const linkId = e.target.parentNode.id;
-            // break the id into an array
-            const linkArr = linkId.split('-');
-            // get the actual id
-            const id = parseInt(linkArr[1]);
-            // get the link to be copied by using the id
-            const linkToCopy = ItemCtrl.getItemById(id);
-            // set current link
-            const currentLink = ItemCtrl.setCurrentLink(linkToCopy);
-            // copy short link
-            UICtrl.copyShortLink(currentLink);
-            // change color button
-            UICtrl.changeButton(e.target);
-            
-        }
-        
+    if (textSpan) textSpan.innerText = msg;
+    if (isError) {
+        toast.className = 'toast-message error';
+        if (icon) icon.className = 'fas fa-circle-exclamation';
+    } else {
+        toast.className = 'toast-message';
+        if (icon) icon.className = 'fas fa-circle-check';
     }
 
-    // init function
-    return{
-        init: function(){
-            loadEventListeners();
-        }
-    }
-})(ItemCtrl, UICtrl);
+    toast.style.display = 'flex';
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => {
+        toast.style.display = 'none';
+    }, 2200);
+}
 
-App.init();
+// App Initialization
+document.addEventListener('DOMContentLoaded', () => {
+    loadHistory();
+});

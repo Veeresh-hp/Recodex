@@ -1,28 +1,142 @@
 <!DOCTYPE html>
-<!-- Coding By CodingNepal - youtube.com/codingnepal -->
-<html lang="en" dir="ltr">
-  <head>
-    <meta charset="utf-8">
-    <title>Snake Game JavaScript | CodingNepal</title>
-    <link rel="stylesheet" href="style.css">
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.3.0/css/all.min.css">
-    <script src="script.js" defer></script>
-  </head>
-  <body>
-    <div class="wrapper">
-      <div class="game-details">
-        <span class="score">Score: 0</span>
-        <span class="high-score">High Score: 0</span>
-      </div>
-      <div class="play-board"></div>
-      <div class="controls">
-        <i data-key="ArrowLeft" class="fa-solid fa-arrow-left-long"></i>
-        <i data-key="ArrowUp" class="fa-solid fa-arrow-up-long"></i>
-        <i data-key="ArrowRight" class="fa-solid fa-arrow-right-long"></i>
-        <i data-key="ArrowDown" class="fa-solid fa-arrow-down-long"></i>
-      </div>
+    <title>Cyber Snake Pro 🐍 | Modern Arcade</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div class="app-wrapper">
+
+        <div class="main-layout">
+
+            <!-- Sidebar Panel (Beside the Square Board) -->
+            <aside class="sidebar-panel">
+
+                <!-- Logo Header -->
+                <div class="logo">
+                    <span class="logo-icon"><i class="fas fa-staff-snake"></i></span>
+                    <h1>CYBER<span class="highlight">SNAKE</span></h1>
+                </div>
+
+                <!-- Stats HUD -->
+                <div class="stats-hud">
+                    <div class="stat-pill">
+                        <span class="stat-lbl"><i class="fas fa-apple-whole" style="color: #ef4444;"></i> Score</span>
+                        <span class="stat-val" id="val-score">0</span>
+                    </div>
+                    <div class="stat-pill">
+                        <span class="stat-lbl"><i class="fas fa-trophy" style="color: #facc15;"></i> Best</span>
+                        <span class="stat-val" id="val-highscore">0</span>
+                    </div>
+                    <div class="stat-pill">
+                        <span class="stat-lbl"><i class="fas fa-bolt" style="color: #38bdf8;"></i> Speed</span>
+                        <span class="stat-val" id="val-speed">Medium</span>
+                    </div>
+                </div>
+
+                <!-- Speed Selector Box -->
+                <div class="control-box">
+                    <span class="box-label">Speed Difficulty</span>
+                    <div class="speed-selector">
+                        <button class="spd-btn" data-spd="140" onclick="setSpeed(140)">Easy</button>
+                        <button class="spd-btn active" data-spd="100" onclick="setSpeed(100)">Medium</button>
+                        <button class="spd-btn" data-spd="65" onclick="setSpeed(65)">Hard</button>
+                    </div>
+                </div>
+
+                <!-- Action Controls (Pause / Play & Sound) -->
+                <div class="action-buttons">
+                    <button class="icon-btn-text btn-main-pause" id="btn-pause" onclick="togglePause()">
+                        <i class="fas fa-pause"></i> Pause (Space)
+                    </button>
+                    <button class="icon-btn-text" id="btn-sound" onclick="toggleSound()">
+                        <i class="fas fa-volume-high"></i> Sound On
+                    </button>
+                </div>
+
+                <button class="btn-restart-side" onclick="restartGame()">
+                    <i class="fas fa-arrows-rotate"></i> Restart Game
+                </button>
+
+                <!-- Guide Box -->
+                <div class="guide-box">
+                    <span class="box-label"><i class="fas fa-keyboard"></i> Controls & Tips</span>
+                    <div class="guide-item">🎮 <b>Arrow Keys / WASD</b>: Turn Snake</div>
+                    <div class="guide-item">⏸️ <b>SPACE</b>: Pause / Play</div>
+                    <div class="guide-item">🌟 <b>Golden Apple</b>: +30 Bonus Points</div>
+                </div>
+
+                <!-- Mobile D-Pad Controls -->
+                <div class="dpad-controls">
+                    <div class="dpad-btn dpad-up" data-key="ArrowUp"><i class="fas fa-chevron-up"></i></div>
+                    <div class="dpad-middle">
+                        <div class="dpad-btn dpad-left" data-key="ArrowLeft"><i class="fas fa-chevron-left"></i></div>
+                        <div class="dpad-btn dpad-right" data-key="ArrowRight"><i class="fas fa-chevron-right"></i></div>
+                    </div>
+                    <div class="dpad-btn dpad-down" data-key="ArrowDown"><i class="fas fa-chevron-down"></i></div>
+                </div>
+
+            </aside>
+
+            <!-- Square Play Board Area (Beside the Sidebar) -->
+            <main class="board-wrapper">
+                <!-- Floating Pause / Play Button on Board -->
+                <button class="board-pause-btn" id="board-pause-btn" onclick="togglePause()" title="Pause / Play (Space)">
+                    <i class="fas fa-pause"></i>
+                </button>
+
+                <div class="play-board" id="play-board"></div>
+
+                <!-- Pause Screen Overlay -->
+                <div class="pause-overlay" id="pause-overlay" style="display: none;">
+                    <h2>⏸️ GAME PAUSED</h2>
+                    <p>Press <b>SPACE</b> or click Resume to continue</p>
+                    <div class="pause-actions">
+                        <button class="btn-resume" onclick="togglePause()">
+                            <i class="fas fa-play"></i> RESUME
+                        </button>
+                        <button class="btn-resume btn-restart-overlay" onclick="restartGame()">
+                            <i class="fas fa-arrows-rotate"></i> RESTART
+                        </button>
+                    </div>
+                </div>
+            </main>
+
+        </div>
+
     </div>
 
-  </body>
+    <!-- Game Over Modal -->
+    <div class="modal-overlay" id="gameover-modal" style="display: none;">
+        <div class="modal-card">
+            <div class="modal-icon"><i class="fas fa-skull"></i></div>
+            <h2 class="modal-title">GAME OVER!</h2>
+            <p class="modal-subtitle" id="modal-cause">You crashed into the wall!</p>
+
+            <div class="modal-stats">
+                <div class="stat-box">
+                    <span class="stat-label">Final Score</span>
+                    <span class="stat-val" id="stat-final-score">0</span>
+                </div>
+                <div class="stat-box">
+                    <span class="stat-label">High Score</span>
+                    <span class="stat-val" id="stat-high-score">0</span>
+                </div>
+            </div>
+
+            <button class="btn-modal-primary" onclick="restartGame()">
+                <i class="fas fa-play"></i> PLAY AGAIN
+            </button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
 </html>

@@ -1,51 +1,124 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
+<head>
     <meta charset="UTF-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Password Generator</title>
+    <title>Secure Password Generator Pro</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@500;700&family=Inter:wght@400;500;600;700;800&family=Karla:wght@700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="styles.css" />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=Karla:wght@800&display=swap"
-      rel="stylesheet"
-    />
-  </head>
-  <body>
-    <main>
-      <header>
-        <h1>Generate a <span> random password</span></h1>
-        <h2>Never use an insecure password again.</h2>
-      </header>
-      <div class="buttons">
-        <button>
-          <img src="./Iconlight.png" alt="light-icon" /><span>
-            Generate passwords</span
-          >
-        </button>
-        <input
-          placeholder="Password length"
-          type="number"
-          id="passwordLength"
-          class="input-second"
-        />
-      </div>
-      <section class="input-container">
-        <input type="text" class="input--password" name="" id="firstPassword" />
-        <input type="text" class="input--password" name="" id="secondPasword" />
-        <input type="text" class="input--password" name="" id="thirdPasword" />
-        <input type="text" class="input--password" name="" id="fourthPasword" />
-      </section>
-      <p class="error-message">message</p>
-      <div>
-        <label>Special characters</label>
-        <input type="range" min="0" max="1" value="1" id="special-char" />
-      </div>
-      <div>
-        <label>Uppercase</label>
-        <input type="range" min="0" max="1" value="1" id="uperrcase" />
-      </div>
+</head>
+<body>
+
+    <main class="card-container">
+        
+        <!-- Header -->
+        <header>
+            <h1>Generate a <span>random password</span></h1>
+            <h2>Never use an insecure password again.</h2>
+        </header>
+
+        <!-- Controls Row -->
+        <div class="buttons">
+            <button id="btn-generate" onclick="generateAllPasswords()">
+                <i class="fas fa-bolt"></i> <span>Generate passwords</span>
+            </button>
+            <div class="length-input-group">
+                <input type="number" id="passwordLength" class="input-second" placeholder="Length" value="15" min="4" max="32" oninput="validateAndGenerate()" />
+            </div>
+        </div>
+
+        <!-- Quick Length Preset Chips -->
+        <div class="length-presets">
+            <span class="preset-label">Length Presets:</span>
+            <button class="chip" onclick="setPresetLength(8)">8</button>
+            <button class="chip" onclick="setPresetLength(12)">12</button>
+            <button class="chip active" id="chip-15" onclick="setPresetLength(15)">15</button>
+            <button class="chip" onclick="setPresetLength(20)">20</button>
+            <button class="chip" onclick="setPresetLength(32)">32 (Max)</button>
+            <span class="limit-info" id="limit-info">Max: 32</span>
+        </div>
+
+        <!-- 4 Password Grid -->
+        <section class="input-container">
+            <div class="input--password" id="firstPassword" onclick="copyCardPassword(0)" title="Click to copy">
+                <span class="pass-text" id="pass-0">...</span>
+                <i class="fas fa-copy copy-icon"></i>
+            </div>
+            <div class="input--password" id="secondPassword" onclick="copyCardPassword(1)" title="Click to copy">
+                <span class="pass-text" id="pass-1">...</span>
+                <i class="fas fa-copy copy-icon"></i>
+            </div>
+            <div class="input--password" id="thirdPassword" onclick="copyCardPassword(2)" title="Click to copy">
+                <span class="pass-text" id="pass-2">...</span>
+                <i class="fas fa-copy copy-icon"></i>
+            </div>
+            <div class="input--password" id="fourthPassword" onclick="copyCardPassword(3)" title="Click to copy">
+                <span class="pass-text" id="pass-3">...</span>
+                <i class="fas fa-copy copy-icon"></i>
+            </div>
+        </section>
+
+        <!-- Password Strength Bar -->
+        <div class="strength-meter-box">
+            <div class="strength-info">
+                <span>STRENGTH: <b id="strength-val">STRONG</b></span>
+                <span id="entropy-val">72 bits entropy</span>
+            </div>
+            <div class="strength-track">
+                <div class="strength-bar" id="strength-bar"></div>
+            </div>
+        </div>
+
+        <!-- Notification & Copy All Actions -->
+        <div class="action-footer-row">
+            <p class="toast-message" id="toast-message" style="display: none;">
+                <i class="fas fa-circle-check"></i> <span id="toast-text">Password copied to clipboard!</span>
+            </p>
+            <button class="btn-copy-all" onclick="copyAllPasswords()">
+                <i class="fas fa-copy"></i> Copy All 4
+            </button>
+        </div>
+
+        <!-- Toggles Section -->
+        <div class="toggles-container">
+            <div class="toggles-grid">
+                <div class="toggle-row">
+                    <span class="toggle-label">Special characters</span>
+                    <label class="switch">
+                        <input type="checkbox" id="special-char" checked onchange="generateAllPasswords()">
+                        <span class="slider round"></span>
+                    </label>
+                </div>
+                <div class="toggle-row">
+                    <span class="toggle-label">Uppercase</span>
+                    <label class="switch">
+                        <input type="checkbox" id="uppercase" checked onchange="generateAllPasswords()">
+                        <span class="slider round"></span>
+                    </label>
+                </div>
+                <div class="toggle-row">
+                    <span class="toggle-label">Numbers</span>
+                    <label class="switch">
+                        <input type="checkbox" id="numbers" checked onchange="generateAllPasswords()">
+                        <span class="slider round"></span>
+                    </label>
+                </div>
+                <div class="toggle-row">
+                    <span class="toggle-label">Exclude Ambiguous (1, l, O)</span>
+                    <label class="switch">
+                        <input type="checkbox" id="exclude-ambiguous" onchange="generateAllPasswords()">
+                        <span class="slider round"></span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
     </main>
+
     <script src="my.js"></script>
-  </body>
+</body>
 </html>
