@@ -1744,9 +1744,20 @@ export default function Dashboard() {
 
         return (
           <div className="space-y-6">
-            <div>
-              <h3 className="text-lg font-bold text-foreground dark:text-white font-sans font-extrabold uppercase">Client Service Inquiries</h3>
-              <p className="text-xs text-zinc-400 dark:text-zinc-500">Respond to development proposals, system estimates, and support tickets submitted via contact forms.</p>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div>
+                <h3 className="text-lg font-bold text-foreground dark:text-white font-sans font-extrabold uppercase">Client Service Inquiries</h3>
+                <p className="text-xs text-zinc-400 dark:text-zinc-500">Respond to development proposals, system estimates, and support tickets submitted via contact forms.</p>
+              </div>
+              <button
+                onClick={() => {
+                  const API_URL = typeof window !== "undefined" && window.location.hostname !== "localhost" ? "/api" : "http://localhost:5000/api";
+                  window.open(`${API_URL}/contacts/export-csv`, "_blank");
+                }}
+                className="px-4 py-2 bg-primary/10 border border-primary/20 text-primary dark:text-[#00d1ff] rounded-xl text-xs font-mono font-bold hover:bg-primary/20 transition-all flex items-center gap-2 shrink-0 cursor-pointer"
+              >
+                <FileText size={14} /> Export CSV for Google Docs/Sheets
+              </button>
             </div>
 
             {inquiriesLoading ? (

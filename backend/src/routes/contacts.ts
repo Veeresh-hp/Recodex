@@ -27,6 +27,30 @@ router.post("/", async (req, res) => {
     });
 
     console.log(`[CONTACT] New inquiry received from ${name} (${email})`);
+
+    // Trigger Google Sheets / Google Docs Webhook if configured
+    const webhookUrl = process.env.GOOGLE_SHEET_WEBHOOK_URL || process.env.GOOGLE_DOC_WEBHOOK_URL || "https://script.google.com/macros/s/AKfycbxzCq2Zsk5b_dCD0eysi3X7MOa5CLgu80EZRFXllz50Djf3GJd0NAAyxsMGFfMoMtxm9w/exec";
+    if (webhookUrl) {
+      try {
+        fetch(webhookUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: inquiry.id,
+            timestamp: inquiry.createdAt.toISOString(),
+            date: new Date(inquiry.createdAt).toLocaleString("en-US", { timeZone: "Asia/Kolkata" }),
+            name,
+            email,
+            phone,
+            type: type || "others",
+            message,
+          }),
+        }).catch((whErr) => console.warn("[CONTACT WEBHOOK] Google Doc/Sheet sync warning:", whErr));
+      } catch (whErr) {
+        console.warn("[CONTACT WEBHOOK] Google Doc/Sheet fetch error:", whErr);
+      }
+    }
+
     return res.status(201).json(inquiry);
   } catch (error) {
     console.error("Error creating inquiry in database:", error);
@@ -157,6 +181,39 @@ router.put("/:id/reply", requireAuth, async (req: AuthenticatedRequest, res: Res
   } catch (error) {
     console.error("Error replying to inquiry:", error);
     return res.status(500).json({ error: "Failed to save reply message." });
+  }
+});
+
+/**
+ * GET /api/contacts/export-csv
+ * Exports all customer contact inquiries as a structured CSV file for Google Sheets / Google Docs.
+ */
+router.get("/export-csv", async (_req, res) => {
+  try {
+    const inquiries = await prisma.inquiry.findMany({
+      orderBy: { createdAt: "desc" },
+    });
+
+    const headers = ["ID", "Submitted Date", "Customer Name", "Email Address", "Phone Number", "Project/Service Type", "Message", "Admin Reply"];
+    const rows = inquiries.map((inq: any) => [
+      `"${inq.id}"`,
+      `"${new Date(inq.createdAt).toLocaleString("en-US", { timeZone: "Asia/Kolkata" })}"`,
+      `"${(inq.name || "").replace(/"/g, '""')}"`,
+      `"${(inq.email || "").replace(/"/g, '""')}"`,
+      `"${(inq.phone || "").replace(/"/g, '""')}"`,
+      `"${(inq.type || "others").replace(/"/g, '""')}"`,
+      `"${(inq.message || "").replace(/"/g, '""')}"`,
+      `"${(inq.reply || "").replace(/"/g, '""')}"`,
+    ]);
+
+    const csvContent = [headers.join(","), ...rows.map((r: string[]) => r.join(","))].join("\n");
+
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader("Content-Disposition", `attachment; filename=RecodeX_Contact_Inquiries_${Date.now()}.csv`);
+    return res.status(200).send(csvContent);
+  } catch (error) {
+    console.error("Error exporting inquiries CSV:", error);
+    return res.status(500).json({ error: "Failed to export inquiries CSV." });
   }
 });
 
