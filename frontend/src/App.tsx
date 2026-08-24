@@ -101,7 +101,7 @@ export default function App() {
           id: userId,
           email: userEmail,
           name: fullName,
-          role: isAdmin ? "admin" : "developer",
+          role: isAdmin ? "admin" : "client",
           profileImage: user.imageUrl || undefined,
         });
 

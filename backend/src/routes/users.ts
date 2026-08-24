@@ -76,22 +76,25 @@ router.get("/", async (_req, res) => {
             const firstName = u.first_name || "";
             const lastName = u.last_name || "";
             const fullName = [firstName, lastName].filter(Boolean).join(" ") || u.username || email.split("@")[0];
-            const role = email.toLowerCase() === "veereshhp2004@gmail.com" ? "admin" : "developer";
+            const isRootAdmin = email.toLowerCase() === "veereshhp2004@gmail.com";
             const img = u.image_url || u.profile_image_url || null;
+
+            const existingUser = await prisma.user.findUnique({ where: { id: u.id } });
+            const targetRole = isRootAdmin ? "admin" : (existingUser?.role || "client");
 
             await prisma.user.upsert({
               where: { id: u.id },
               update: {
                 email,
                 name: fullName,
-                role,
+                role: targetRole,
                 ...(img ? { profileImage: img } : {}),
               },
               create: {
                 id: u.id,
                 email,
                 name: fullName,
-                role,
+                role: isRootAdmin ? "admin" : "client",
                 profileImage: img,
               },
             });
@@ -116,9 +119,6 @@ router.get("/", async (_req, res) => {
  * POST /api/users/sync
  * Synchronizes user data from frontend signups.
  * If the user record exists, it updates it, otherwise creates a new one.
- * Bypasses JWT validation if needed (e.g. called right after auth registration), 
- * but validating JWT is recommended if req.body.id matches req.user.id. 
- * To keep registration simple and fast, we allow an option to sync during signup.
  */
 router.post("/sync", async (req, res) => {
   const { id, email, name, role, profileImage } = req.body;
@@ -128,7 +128,10 @@ router.post("/sync", async (req, res) => {
   }
 
   try {
-    const userRole = email.toLowerCase() === "veereshhp2004@gmail.com" ? "admin" : (role || "developer");
+    const isRootAdmin = email.toLowerCase() === "veereshhp2004@gmail.com";
+    const existingUser = await prisma.user.findUnique({ where: { id } });
+    const userRole = isRootAdmin ? "admin" : (existingUser?.role || role || "client");
+
     const user = await prisma.user.upsert({
       where: { id },
       update: {
@@ -141,12 +144,12 @@ router.post("/sync", async (req, res) => {
         id,
         email,
         name,
-        role: userRole,
+        role: isRootAdmin ? "admin" : "client",
         profileImage: profileImage || null,
       },
     });
 
-    console.log(`Synced user: ${user.name} (${user.id})`);
+    console.log(`Synced user: ${user.name} (${user.id}) with role: ${user.role}`);
     return res.status(200).json(user);
   } catch (error: any) {
     console.error("Error syncing user data:", error);

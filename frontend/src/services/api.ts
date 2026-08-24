@@ -165,7 +165,7 @@ export async function syncUser(userData: {
         id: userData.id || `usr-${Date.now()}`,
         name: userData.name || userData.email.split("@")[0],
         email: userData.email,
-        role: userData.role || (userData.email === "veereshhp2004@gmail.com" ? "admin" : "developer"),
+        role: userData.role || (userData.email.toLowerCase() === "veereshhp2004@gmail.com" ? "admin" : "client"),
         profileImage: userData.profileImage || "",
         status: "Active",
         createdAt: new Date().toISOString()
