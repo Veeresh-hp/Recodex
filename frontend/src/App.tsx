@@ -59,6 +59,18 @@ export default function App() {
   React.useEffect(() => {
     if (!isLoaded) return;
 
+    // Purge legacy dummy accounts from local storage
+    try {
+      const raw = localStorage.getItem("recodex_synced_users");
+      if (raw) {
+        const dummyEmails = ["john.doe@recodex.io", "sarah@skynet.com", "vance@blackmesa.org"];
+        const cleaned = JSON.parse(raw).filter((u: any) => u && u.email && !dummyEmails.includes(u.email.toLowerCase()));
+        localStorage.setItem("recodex_synced_users", JSON.stringify(cleaned));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+
     const handleAuth = async () => {
       if (userId && user) {
         const token = await getToken();

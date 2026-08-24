@@ -269,11 +269,15 @@ export async function joinProject(projectId: string, token: string): Promise<any
 
 /**
  * Fetches all ecosystem users from the backend database.
- * Falls back to static local mock data + synced users if offline.
+ * Returns ONLY real registered & synced users without any demo/dummy users.
  */
 export async function getUsers(): Promise<any[]> {
   const localSyncedRaw = typeof window !== "undefined" ? localStorage.getItem("recodex_synced_users") : null;
-  const localSynced: any[] = localSyncedRaw ? JSON.parse(localSyncedRaw) : [];
+  let localSynced: any[] = localSyncedRaw ? JSON.parse(localSyncedRaw) : [];
+
+  // Filter out any legacy dummy emails if present
+  const dummyEmails = ["john.doe@recodex.io", "sarah@skynet.com", "vance@blackmesa.org"];
+  localSynced = localSynced.filter((u: any) => u && u.email && !dummyEmails.includes(u.email.toLowerCase()));
 
   let backendUsers: any[] = [];
   try {
@@ -288,21 +292,18 @@ export async function getUsers(): Promise<any[]> {
       backendUsers = await response.json();
     }
   } catch (error) {
-    console.warn("[RECODEX API] Local server unreachable. Reverting to static user directory mock nodes.", error);
-    backendUsers = [
-      { id: "usr-01", name: "Veeresh H P", email: "veereshhp2004@gmail.com", role: "admin", status: "Active", createdAt: new Date(Date.now() - 3600 * 1000 * 24 * 10).toISOString() },
-      { id: "usr-02", name: "John Doe", email: "john.doe@recodex.io", role: "developer", status: "Active", createdAt: new Date(Date.now() - 3600 * 1000 * 24 * 5).toISOString() },
-      { id: "usr-03", name: "Sarah Connor", email: "sarah@skynet.com", role: "client", status: "Pending", createdAt: new Date(Date.now() - 3600 * 1000 * 24).toISOString() },
-      { id: "usr-04", name: "Alice Vance", email: "vance@blackmesa.org", role: "developer", status: "Active", createdAt: new Date(Date.now() - 3600 * 1000 * 2).toISOString() }
-    ];
+    console.warn("[RECODEX API] Local server unreachable. Returning real synced user records.", error);
+    backendUsers = [];
   }
 
   const userMap = new Map<string, any>();
   backendUsers.forEach((u: any) => {
-    if (u && u.email) userMap.set(u.email.toLowerCase(), u);
+    if (u && u.email && !dummyEmails.includes(u.email.toLowerCase())) {
+      userMap.set(u.email.toLowerCase(), u);
+    }
   });
   localSynced.forEach((u: any) => {
-    if (u && u.email) {
+    if (u && u.email && !dummyEmails.includes(u.email.toLowerCase())) {
       const existing = userMap.get(u.email.toLowerCase());
       if (existing) {
         userMap.set(u.email.toLowerCase(), { ...existing, ...u });

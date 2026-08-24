@@ -106,6 +106,15 @@ const getAnnouncementMessage = (ann: Announcement): string => {
   return ann.message;
 };
 
+const isNewUser = (createdAtStr?: string): boolean => {
+  if (!createdAtStr) return false;
+  const created = new Date(createdAtStr);
+  if (isNaN(created.getTime())) return false;
+  const diffMs = Date.now() - created.getTime();
+  // Highlight users created within the last 7 days as NEW
+  return diffMs >= 0 && diffMs <= 7 * 24 * 60 * 60 * 1000;
+};
+
 export default function Dashboard() {
   const { isLoaded, userId, getToken } = useAuth();
   const { user } = useUser();
@@ -1350,9 +1359,14 @@ export default function Dashboard() {
                               </div>
                               <span 
                                 onClick={() => setSelectedUserDetails({ ...u, role: isUserAdmin ? "admin" : u.role })} 
-                                className="text-foreground dark:text-white font-bold cursor-pointer hover:text-primary transition-colors text-xs"
+                                className="text-foreground dark:text-white font-bold cursor-pointer hover:text-primary transition-colors text-xs inline-flex items-center gap-1.5"
                               >
                                 {u.name}
+                                {isNewUser(u.createdAt) && (
+                                  <span className="px-1.5 py-0.5 rounded text-[7px] font-mono font-black uppercase bg-emerald-500/15 border border-emerald-500/30 text-emerald-500 dark:text-emerald-400 tracking-wider shadow-sm animate-pulse">
+                                    NEW
+                                  </span>
+                                )}
                               </span>
                             </div>
                           </td>
