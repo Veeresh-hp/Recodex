@@ -56,9 +56,52 @@ router.get("/profile", requireAuth, async (req: AuthenticatedRequest, res: Respo
 /**
  * GET /api/users
  * Returns a list of all synchronized ecosystem users.
+ * Automatically syncs with Clerk users if CLERK_SECRET_KEY is configured.
  */
 router.get("/", async (_req, res) => {
   try {
+    const clerkSecret = process.env.CLERK_SECRET_KEY;
+    if (clerkSecret) {
+      try {
+        const response = await fetch("https://api.clerk.com/v1/users", {
+          headers: {
+            Authorization: `Bearer ${clerkSecret}`,
+          },
+        });
+        if (response.ok) {
+          const clerkUsers: any[] = await response.json();
+          for (const u of clerkUsers) {
+            const email = u.email_addresses?.[0]?.email_address;
+            if (!email) continue;
+            const firstName = u.first_name || "";
+            const lastName = u.last_name || "";
+            const fullName = [firstName, lastName].filter(Boolean).join(" ") || u.username || email.split("@")[0];
+            const role = email.toLowerCase() === "veereshhp2004@gmail.com" ? "admin" : "developer";
+            const img = u.image_url || u.profile_image_url || null;
+
+            await prisma.user.upsert({
+              where: { id: u.id },
+              update: {
+                email,
+                name: fullName,
+                role,
+                ...(img ? { profileImage: img } : {}),
+              },
+              create: {
+                id: u.id,
+                email,
+                name: fullName,
+                role,
+                profileImage: img,
+              },
+            });
+          }
+        }
+      } catch (clerkErr) {
+        console.warn("[RECODEX API] Clerk automatic user sync warning:", clerkErr);
+      }
+    }
+
     const users = await prisma.user.findMany({
       orderBy: { createdAt: "desc" },
     });

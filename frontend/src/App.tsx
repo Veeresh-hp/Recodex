@@ -92,7 +92,9 @@ export default function App() {
         localStorage.removeItem("recodex_auth_intent");
         window.dispatchEvent(new Event("recodex-auth-update"));
 
-        const fullName = user.fullName || user.username || userEmail.split("@")[0] || "RecodeX Engineer";
+        const firstName = user.firstName || "";
+        const lastName = user.lastName || "";
+        const fullName = [firstName, lastName].filter(Boolean).join(" ") || user.fullName || user.username || userEmail.split("@")[0] || "RecodeX Engineer";
 
         await syncUser({
           id: userId,
