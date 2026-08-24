@@ -1328,9 +1328,9 @@ export default function Dashboard() {
               </div>
             </div>
  
-            <div className="glass-card w-full border border-outline-variant/40">
-              <div className="overflow-visible">
-                <table className="w-full border-collapse text-left">
+            <div className="glass-card w-full border border-outline-variant/40 overflow-hidden">
+              <div className="overflow-x-auto w-full">
+                <table className="w-full min-w-[650px] border-collapse text-left">
                   <thead>
                     <tr className="border-b border-outline-variant/40 bg-surface-container-low/50 text-[10px] font-mono font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-widest h-10 select-none">
                       <th className="px-md py-3">User</th>
@@ -1554,7 +1554,7 @@ export default function Dashboard() {
             </div>
 
             <div className="overflow-x-auto text-xs font-mono w-full select-text">
-              <table className="w-full border-collapse text-left">
+              <table className="w-full min-w-[650px] border-collapse text-left">
                 <thead>
                   <tr className="border-b border-black/10 dark:border-zinc-900 text-[8px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest h-10 select-none">
                     <th className="pb-3">Project Title</th>
@@ -2265,19 +2265,36 @@ export default function Dashboard() {
 
   return (
     <div className="bg-background text-on-background flex h-screen w-screen overflow-hidden font-sans select-text antialiased">
+      {/* Mobile backdrop overlay */}
+      {isMobileMenuOpen && (
+        <div 
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm z-40 md:hidden"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+
       {/* SideNavBar */}
-      <aside className="w-64 shrink-0 h-full bg-[#06080c]/95 dark:bg-[#07090e]/95 backdrop-blur-xl border-r border-black/10 dark:border-white/10 flex flex-col justify-between select-none z-30">
-        <div className="p-5 border-b border-black/5 dark:border-white/5">
-          <div className="flex items-center gap-3">
-            <Link to="/" className="flex items-center gap-2 hover:opacity-90 transition-opacity">
-              <img src="/recodeXlogo.png" alt="RecodeX Logo" className="brand-logo-img h-8 w-auto object-contain" />
-            </Link>
-          </div>
+      <aside className={`fixed md:static inset-y-0 left-0 z-50 w-64 shrink-0 h-full bg-[#06080c]/95 dark:bg-[#07090e]/95 backdrop-blur-xl border-r border-black/10 dark:border-white/10 flex flex-col justify-between select-none transition-transform duration-300 ${
+        isMobileMenuOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+      }`}>
+        <div className="p-5 border-b border-black/5 dark:border-white/5 flex items-center justify-between">
+          <Link to="/" className="flex items-center gap-2 hover:opacity-90 transition-opacity">
+            <img src="/recodeXlogo.png" alt="RecodeX Logo" className="brand-logo-img h-8 w-auto object-contain" />
+          </Link>
+          <button
+            onClick={() => setIsMobileMenuOpen(false)}
+            className="md:hidden text-zinc-400 hover:text-white p-1"
+          >
+            <X size={18} />
+          </button>
         </div>
 
         <div className="px-4 py-3">
           <button 
-            onClick={() => setActiveSidebarTab("Projects")} 
+            onClick={() => {
+              setActiveSidebarTab("Projects");
+              setIsMobileMenuOpen(false);
+            }} 
             className="w-full py-2.5 px-4 bg-primary text-white dark:text-black rounded-xl font-mono text-xs font-extrabold uppercase tracking-wider hover:brightness-110 transition-all shadow-[0_0_20px_rgba(0,209,255,0.25)] hover-lift flex items-center justify-center gap-2 cursor-pointer"
           >
             <span className="material-symbols-outlined text-[18px]">add</span>
@@ -2291,7 +2308,10 @@ export default function Dashboard() {
             return (
               <button 
                 key={item.label}
-                onClick={() => setActiveSidebarTab(item.label)}
+                onClick={() => {
+                  setActiveSidebarTab(item.label);
+                  setIsMobileMenuOpen(false);
+                }}
                 className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all duration-150 cursor-pointer font-sans text-xs font-semibold ${
                   isActive 
                     ? "bg-primary/10 text-primary dark:text-[#00d1ff] font-bold border-l-4 border-primary dark:border-[#00d1ff] pl-3 shadow-[inset_0_0_15px_rgba(0,209,255,0.05)]" 
@@ -2307,14 +2327,20 @@ export default function Dashboard() {
 
         <div className="p-3 border-t border-black/5 dark:border-white/5 space-y-1 bg-black/5 dark:bg-white/[0.02]">
           <button 
-            onClick={() => setActiveSidebarTab("Inquiries")} 
+            onClick={() => {
+              setActiveSidebarTab("Inquiries");
+              setIsMobileMenuOpen(false);
+            }} 
             className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-all text-xs font-semibold cursor-pointer text-left"
           >
             <span className="material-symbols-outlined text-[18px]">support_agent</span>
             <span>Support</span>
           </button>
           <button 
-            onClick={() => setActiveSidebarTab("Settings")} 
+            onClick={() => {
+              setActiveSidebarTab("Settings");
+              setIsMobileMenuOpen(false);
+            }} 
             className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-all text-xs font-semibold cursor-pointer text-left"
           >
             <span className="material-symbols-outlined text-[18px]">help</span>
@@ -2333,10 +2359,19 @@ export default function Dashboard() {
       {/* Main Content Wrapper */}
       <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden bg-background">
         {/* TopAppBar */}
-        <header className="h-16 shrink-0 z-20 flex justify-between items-center w-full px-6 md:px-8 bg-white/80 dark:bg-[#07090e]/80 backdrop-blur-xl border-b border-black/5 dark:border-white/5 shadow-xs">
-          <div className="flex items-center gap-6">
+        <header className="h-16 shrink-0 z-20 flex justify-between items-center w-full px-3 sm:px-6 md:px-8 bg-white/80 dark:bg-[#07090e]/80 backdrop-blur-xl border-b border-black/5 dark:border-white/5 shadow-xs gap-2">
+          <div className="flex items-center gap-3 md:gap-6 min-w-0">
+            {/* Mobile Toggle Button */}
+            <button
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="md:hidden p-2 text-zinc-400 hover:text-foreground dark:hover:text-white bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl cursor-pointer shrink-0"
+              aria-label="Toggle mobile navigation menu"
+            >
+              <Menu size={18} />
+            </button>
+
             {/* Search */}
-            <div className="relative w-72 select-none">
+            <div className="relative w-36 sm:w-64 md:w-72 select-none shrink">
               <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 dark:text-zinc-500 text-[18px]">search</span>
               <input 
                 value={userSearch} 
@@ -2344,11 +2379,11 @@ export default function Dashboard() {
                   setUserSearch(e.target.value);
                   if (activeSidebarTab !== "Users") setActiveSidebarTab("Users");
                 }} 
-                className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-full py-1.5 pl-9 pr-12 text-xs text-foreground dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-primary dark:focus:border-[#00d1ff] transition-all font-sans" 
-                placeholder="Search database..." 
+                className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-full py-1.5 pl-9 pr-7 sm:pr-12 text-xs text-foreground dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-primary dark:focus:border-[#00d1ff] transition-all font-sans" 
+                placeholder="Search..." 
                 type="text"
               />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] font-mono text-zinc-400 dark:text-zinc-600 bg-black/5 dark:bg-white/10 px-1.5 py-0.5 rounded border border-black/5 dark:border-white/5">⌘K</span>
+              <span className="hidden sm:inline-block absolute right-3 top-1/2 -translate-y-1/2 text-[9px] font-mono text-zinc-400 dark:text-zinc-600 bg-black/5 dark:bg-white/10 px-1.5 py-0.5 rounded border border-black/5 dark:border-white/5">⌘K</span>
             </div>
             {/* Nav Links */}
             <nav className="hidden md:flex gap-6 select-none">
@@ -2358,30 +2393,30 @@ export default function Dashboard() {
             </nav>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1.5 text-zinc-400 dark:text-zinc-400 select-none">
-              <button onClick={() => setActiveSidebarTab("Notifications")} className="p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors relative cursor-pointer">
-                <span className="material-symbols-outlined text-[20px]">notifications</span>
-                <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full animate-pulse"></span>
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            <div className="flex items-center gap-1 text-zinc-400 dark:text-zinc-400 select-none">
+              <button onClick={() => setActiveSidebarTab("Notifications")} className="p-1.5 sm:p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors relative cursor-pointer">
+                <span className="material-symbols-outlined text-[18px] sm:text-[20px]">notifications</span>
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full animate-pulse"></span>
               </button>
-              <button onClick={() => setActiveSidebarTab("Inquiries")} className="p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer">
-                <span className="material-symbols-outlined text-[20px]">mail</span>
+              <button onClick={() => setActiveSidebarTab("Inquiries")} className="p-1.5 sm:p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer">
+                <span className="material-symbols-outlined text-[18px] sm:text-[20px]">mail</span>
               </button>
-              <button onClick={toggleTheme} className="p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer">
-                <span className="material-symbols-outlined text-[20px]">contrast</span>
-              </button>
-            </div>
-
-            <div className="h-5 w-px bg-black/10 dark:bg-white/10 mx-1"></div>
-
-            <div className="flex items-center gap-2">
-              <button onClick={handleExportJSON} className="px-3.5 py-1.5 text-xs font-mono font-bold border border-black/10 dark:border-white/15 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer text-foreground dark:text-white">Export</button>
-              <button onClick={handleRefreshSystem} disabled={isRefreshing} className="px-3.5 py-1.5 text-xs font-mono font-bold bg-primary text-white dark:text-black rounded-xl hover:brightness-110 transition-all shadow-[0_0_15px_rgba(0,209,255,0.2)] hover-lift cursor-pointer flex items-center gap-1.5">
-                <RefreshCw size={12} className={isRefreshing ? "animate-spin" : ""} /> Refresh
+              <button onClick={toggleTheme} className="p-1.5 sm:p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer">
+                <span className="material-symbols-outlined text-[18px] sm:text-[20px]">contrast</span>
               </button>
             </div>
 
-            <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 overflow-hidden ml-1 flex items-center justify-center cursor-pointer hover:border-primary/50 transition-colors">
+            <div className="hidden sm:block h-5 w-px bg-black/10 dark:bg-white/10 mx-0.5"></div>
+
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <button onClick={handleExportJSON} className="hidden sm:inline-block px-3 py-1.5 text-xs font-mono font-bold border border-black/10 dark:border-white/15 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer text-foreground dark:text-white">Export</button>
+              <button onClick={handleRefreshSystem} disabled={isRefreshing} className="px-2.5 sm:px-3.5 py-1.5 text-xs font-mono font-bold bg-primary text-white dark:text-black rounded-xl hover:brightness-110 transition-all shadow-[0_0_15px_rgba(0,209,255,0.2)] hover-lift cursor-pointer flex items-center gap-1.5">
+                <RefreshCw size={12} className={isRefreshing ? "animate-spin" : ""} /> <span className="hidden sm:inline">Refresh</span>
+              </button>
+            </div>
+
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-primary/10 border border-primary/20 overflow-hidden ml-0.5 flex items-center justify-center cursor-pointer hover:border-primary/50 transition-colors shrink-0">
               {user?.imageUrl ? (
                 <img alt="Admin User" className="w-full h-full object-cover" src={user.imageUrl} />
               ) : (
@@ -2392,7 +2427,7 @@ export default function Dashboard() {
         </header>
 
         {/* Main Canvas */}
-        <main className="flex-1 p-6 md:p-8 overflow-y-auto w-full max-w-[1600px] mx-auto space-y-8">
+        <main className="flex-1 p-4 sm:p-6 md:p-8 overflow-y-auto w-full max-w-[1600px] mx-auto space-y-6 sm:space-y-8">
           {activeSidebarTab === "Dashboard" && (
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-black/5 dark:border-white/5">
               <div>

@@ -47,6 +47,9 @@ export default function Footer() {
             <Link to="/solutions" className="text-xs text-zinc-400 dark:text-zinc-400 hover:text-primary dark:hover:text-[#00d1ff] transition-all duration-200">
               Solutions
             </Link>
+            <Link to="/about" className="text-xs text-zinc-400 dark:text-zinc-400 hover:text-primary dark:hover:text-[#00d1ff] transition-all duration-200">
+              About Us
+            </Link>
           </div>
 
           {/* Column 3: RESOURCES */}

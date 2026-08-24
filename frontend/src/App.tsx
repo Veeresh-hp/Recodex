@@ -19,6 +19,7 @@ import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
 import Profile from "./pages/Profile";
 import Announcements from "./pages/Announcements";
+import About from "./pages/About";
 import { ThemeProvider } from "./context/ThemeContext";
 import { LoginModalProvider, useLoginModal } from "./context/LoginModalContext";
 import InteractiveGrid from "./components/InteractiveGrid";
@@ -153,6 +154,7 @@ export default function App() {
               <Route path="/privacy" element={<Privacy />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/announcements" element={<Announcements />} />
+              <Route path="/about" element={<About />} />
             </Route>
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="*" element={<Navigate to="/" replace />} />
