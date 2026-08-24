@@ -471,7 +471,7 @@ export default function Dashboard() {
     window.addEventListener("recodex-auth-update", syncUsers);
     window.addEventListener("storage", syncUsers);
 
-    const userPollTimer = setInterval(syncUsers, 10000);
+    const userPollTimer = setInterval(syncUsers, 4000);
 
     return () => {
       window.removeEventListener("recodex-user-registered", syncUsers);

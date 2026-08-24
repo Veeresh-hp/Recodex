@@ -85,18 +85,20 @@ router.post("/sync", async (req, res) => {
   }
 
   try {
+    const userRole = email.toLowerCase() === "veereshhp2004@gmail.com" ? "admin" : (role || "developer");
     const user = await prisma.user.upsert({
       where: { id },
       update: {
         name,
         email,
-        role: role || "developer",
+        role: userRole,
+        ...(profileImage ? { profileImage } : {}),
       },
       create: {
         id,
         email,
         name,
-        role: role || "developer",
+        role: userRole,
         profileImage: profileImage || null,
       },
     });
