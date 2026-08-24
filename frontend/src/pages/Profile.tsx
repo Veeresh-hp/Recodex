@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
-import Footer from "@/components/Footer";
 import { useAuth, useUser } from "@clerk/clerk-react";
 import { getUserProfile } from "@/services/api";
 import {
@@ -265,9 +264,7 @@ export default function Profile() {
               getDynamicProjectData(proj.id, proj.title, proj.category)
             );
 
-            const projectsList = dbProfile.role === "client" && enrichedProjects.length === 0 ? [
-              getDynamicProjectData("recodex-live-demo-project", "Enterprise Custom Portal Implementation", "Web Systems")
-            ] : enrichedProjects;
+            const projectsList = enrichedProjects;
 
             const p: UserProfile = {
               id: dbProfile.id,
@@ -288,9 +285,7 @@ export default function Profile() {
             const resolvedAvatar = savedAvatar || user.imageUrl || null;
             const isUserAdmin = user.primaryEmailAddress?.emailAddress === "veereshhp2004@gmail.com" || localStorage.getItem("recodex_admin_user") === "true";
             
-            const demoProjects = !isUserAdmin ? [
-              getDynamicProjectData("recodex-fallback-demo", "RecodeX Unified Core Integration", "Web Systems")
-            ] : [];
+            const demoProjects: any[] = [];
 
             const p: UserProfile = {
               id: user.id,
@@ -373,14 +368,13 @@ export default function Profile() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background text-foreground flex flex-col justify-between font-sans">
+      <div className="min-h-screen bg-background text-foreground flex flex-col justify-center font-sans">
         <main className="flex-grow flex items-center justify-center pt-24 pb-16">
           <div className="flex flex-col items-center gap-4">
             <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
             <p className="text-xs font-mono text-zinc-500 uppercase tracking-widest">Loading secure identity profiles...</p>
           </div>
         </main>
-        <Footer />
       </div>
     );
   }
@@ -874,8 +868,6 @@ export default function Profile() {
           </div>
         </div>
       )}
-
-      <Footer />
     </div>
   );
 }
