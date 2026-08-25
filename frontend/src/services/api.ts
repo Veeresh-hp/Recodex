@@ -482,16 +482,23 @@ export async function submitInquiry(inquiryData: {
     message: inquiryData.message,
   };
 
-  // 1. Direct browser fetch to Google Apps Script Webhook
+  // 1. Direct browser fetch to Google Apps Script Webhook (both text/plain & form-encoded for 100% compatibility)
   try {
     fetch(GOOGLE_SCRIPT_WEBHOOK_URL, {
       method: "POST",
       mode: "no-cors",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "text/plain" },
       body: JSON.stringify(payload),
-    }).catch((gErr) => console.warn("[CONTACT WEBHOOK] Direct Google Apps Script dispatch warning:", gErr));
+    }).catch(() => {});
+
+    const formParams = new URLSearchParams();
+    Object.entries(payload).forEach(([k, v]) => formParams.append(k, String(v)));
+    fetch(GOOGLE_SCRIPT_WEBHOOK_URL, {
+      method: "POST",
+      mode: "no-cors",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: formParams.toString(),
+    }).catch(() => {});
   } catch (gErr) {
     console.warn("[CONTACT WEBHOOK] Direct Google Apps Script dispatch error:", gErr);
   }
@@ -501,8 +508,11 @@ export async function submitInquiry(inquiryData: {
     if (typeof window !== "undefined") {
       const raw = localStorage.getItem("recodex_submitted_inquiries");
       const list: any[] = raw ? JSON.parse(raw) : [];
-      list.unshift(payload);
-      localStorage.setItem("recodex_submitted_inquiries", JSON.stringify(list));
+      const isDup = list.some((i) => i.email === payload.email && i.message === payload.message);
+      if (!isDup) {
+        list.unshift(payload);
+        localStorage.setItem("recodex_submitted_inquiries", JSON.stringify(list));
+      }
       window.dispatchEvent(new Event("recodex-inquiry-submitted"));
     }
   } catch (lErr) {
@@ -532,7 +542,7 @@ export async function submitInquiry(inquiryData: {
 }
 
 /**
- * Fetches all contact inquiries from backend API & local sync (admin only).
+ * Fetches all contact inquiries from backend API, Google Sheet & local sync (admin only).
  */
 export async function getInquiries(token: string): Promise<any[]> {
   let backendInquiries: any[] = [];
@@ -552,6 +562,20 @@ export async function getInquiries(token: string): Promise<any[]> {
     console.warn("[RECODEX API] Fetch backend inquiries warning:", error);
   }
 
+  // Fetch inquiries from Google Apps Script Webapp GET endpoint if available
+  let sheetInquiries: any[] = [];
+  try {
+    const sheetRes = await fetch(GOOGLE_SCRIPT_WEBHOOK_URL, { method: "GET" });
+    if (sheetRes.ok) {
+      const data = await sheetRes.json();
+      if (Array.isArray(data)) {
+        sheetInquiries = data;
+      }
+    }
+  } catch (sheetErr) {
+    console.warn("[RECODEX API] Google Sheet GET sync warning:", sheetErr);
+  }
+
   let localInquiries: any[] = [];
   try {
     if (typeof window !== "undefined") {
@@ -567,12 +591,19 @@ export async function getInquiries(token: string): Promise<any[]> {
   const map = new Map<string, any>();
   backendInquiries.forEach((inq) => {
     if (inq && (inq.id || inq.email)) {
-      map.set(inq.id || inq.email, inq);
+      map.set(inq.id || `${inq.email}-${inq.message}`, inq);
+    }
+  });
+
+  sheetInquiries.forEach((inq) => {
+    if (inq && (inq.id || inq.email)) {
+      const key = inq.id || `${inq.email}-${inq.message}`;
+      if (!map.has(key)) map.set(key, inq);
     }
   });
 
   localInquiries.forEach((inq) => {
-    const key = inq.id || inq.email;
+    const key = inq.id || `${inq.email}-${inq.message}`;
     if (key && !map.has(key)) {
       map.set(key, inq);
     }
