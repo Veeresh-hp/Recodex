@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, lazy, Suspense } from "react";
 import { Link } from "react-router-dom";
-import TerminalModal from "@/components/TerminalModal";
+const TerminalModal = lazy(() => import("@/components/TerminalModal"));
 import { MOCK_PROJECTS, ECOSYSTEMS } from "@/data/mockData";
 import { ArrowUpRight, Terminal as TerminalIcon, Code, ShieldCheck, Cpu, Award } from "lucide-react";
 
@@ -382,10 +382,14 @@ export default function Home() {
       </main>
 
       {/* Terminal View Dialog Overlay */}
-      <TerminalModal
-        project={selectedProject}
-        onClose={() => setSelectedProject(null)}
-      />
+      {selectedProject && (
+        <Suspense fallback={null}>
+          <TerminalModal
+            project={selectedProject}
+            onClose={() => setSelectedProject(null)}
+          />
+        </Suspense>
+      )}
     </>
   );
 }
