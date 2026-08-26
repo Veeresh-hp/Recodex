@@ -54,13 +54,13 @@ export default function Home() {
               <div className="flex items-center gap-4 pt-6 text-sm text-zinc-600 dark:text-zinc-400 font-mono">
                 <div className="flex -space-x-3">
                   <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-zinc-800 border-2 border-white dark:border-black flex items-center justify-center text-[10px] font-bold overflow-hidden">
-                    <img alt="Uday" className="w-full h-full object-cover" src="/Uday_photo.jpeg" />
+                    <img alt="Uday" className="w-full h-full object-cover" src="/Uday_photo.jpeg" width="40" height="40" loading="lazy" decoding="async" />
                   </div>
                   <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-zinc-800 border-2 border-white dark:border-black flex items-center justify-center text-[10px] font-bold overflow-hidden">
-                    <img alt="Adi" className="w-full h-full object-cover" src="/Adi_photo.jpeg" />
+                    <img alt="Adi" className="w-full h-full object-cover" src="/Adi_photo.jpeg" width="40" height="40" loading="lazy" decoding="async" />
                   </div>
                   <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-zinc-800 border-2 border-white dark:border-black flex items-center justify-center text-[10px] font-bold overflow-hidden">
-                    <img alt="Veeresh" className="w-full h-full object-cover" src="/veeresh_photo.jpg" />
+                    <img alt="Veeresh" className="w-full h-full object-cover" src="/veeresh_photo.jpg" width="40" height="40" loading="lazy" decoding="async" />
                   </div>
                 </div>
                 <p>Join 400+ elite engineers</p>

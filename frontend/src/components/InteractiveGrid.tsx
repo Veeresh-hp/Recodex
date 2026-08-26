@@ -4,14 +4,20 @@ import { useEffect } from "react";
 
 export default function InteractiveGrid() {
   useEffect(() => {
+    let ticking = false;
+
     const handleMouseMove = (e: MouseEvent) => {
-      const x = e.clientX;
-      const y = e.clientY;
-      document.documentElement.style.setProperty("--mouse-x", `${x}px`);
-      document.documentElement.style.setProperty("--mouse-y", `${y}px`);
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          document.documentElement.style.setProperty("--mouse-x", `${e.clientX}px`);
+          document.documentElement.style.setProperty("--mouse-y", `${e.clientY}px`);
+          ticking = false;
+        });
+        ticking = true;
+      }
     };
 
-    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mousemove", handleMouseMove, { passive: true });
     return () => {
       window.removeEventListener("mousemove", handleMouseMove);
     };

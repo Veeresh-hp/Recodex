@@ -100,7 +100,7 @@ export default function Navbar() {
           to="/"
           className="flex items-center gap-2 hover:opacity-90 transition-opacity"
         >
-          <img src="/recodeXlogo.png" alt="RecodeX Logo" className="brand-logo-img h-9 sm:h-10 w-auto object-contain" />
+          <img src="/recodeXlogo.png" alt="RecodeX Logo" className="brand-logo-img h-9 sm:h-10 w-auto object-contain" width="160" height="40" decoding="async" />
         </Link>
 
         {/* Desktop Route Index */}
