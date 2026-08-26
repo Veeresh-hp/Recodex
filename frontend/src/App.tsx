@@ -1,25 +1,25 @@
-// Client-side routing workspace
-import React from "react";
+import React, { lazy, Suspense } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from "react-router-dom";
+
 import Home from "./pages/Home";
-import Signup from "./pages/Signup";
-import Login from "./pages/Login";
-import ForgotPassword from "./pages/ForgotPassword";
-import Admin from "./pages/Admin";
-import Categories from "./pages/Categories";
-import Contact from "./pages/Contact";
-import Dashboard from "./pages/Dashboard";
-import Marketplace from "./pages/Marketplace";
-import Projects from "./pages/Projects";
-import Services from "./pages/Services";
-import Showcase from "./pages/Showcase";
-import Solutions from "./pages/Solutions";
-import Docs from "./pages/Docs";
-import Terms from "./pages/Terms";
-import Privacy from "./pages/Privacy";
-import Profile from "./pages/Profile";
-import Announcements from "./pages/Announcements";
-import About from "./pages/About";
+const Signup = lazy(() => import("./pages/Signup"));
+const Login = lazy(() => import("./pages/Login"));
+const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
+const Admin = lazy(() => import("./pages/Admin"));
+const Categories = lazy(() => import("./pages/Categories"));
+const Contact = lazy(() => import("./pages/Contact"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Marketplace = lazy(() => import("./pages/Marketplace"));
+const Projects = lazy(() => import("./pages/Projects"));
+const Services = lazy(() => import("./pages/Services"));
+const Showcase = lazy(() => import("./pages/Showcase"));
+const Solutions = lazy(() => import("./pages/Solutions"));
+const Docs = lazy(() => import("./pages/Docs"));
+const Terms = lazy(() => import("./pages/Terms"));
+const Privacy = lazy(() => import("./pages/Privacy"));
+const Profile = lazy(() => import("./pages/Profile"));
+const Announcements = lazy(() => import("./pages/Announcements"));
+const About = lazy(() => import("./pages/About"));
 import { ThemeProvider } from "./context/ThemeContext";
 import { LoginModalProvider, useLoginModal } from "./context/LoginModalContext";
 import InteractiveGrid from "./components/InteractiveGrid";
@@ -134,31 +134,37 @@ export default function App() {
         <Router>
           <InteractiveGrid />
           <LoginModal />
-          <Routes>
-            {/* All routes share the single persistent Navbar via PersistentLayout */}
-            <Route element={<PersistentLayout />}>
-              <Route path="/" element={<Home />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/signup" element={<Signup />} />
-              <Route path="/forgot-password" element={<ForgotPassword />} />
-              <Route path="/admin" element={<Admin />} />
-              <Route path="/categories" element={<Categories />} />
-              <Route path="/contact" element={<Contact />} />
-              <Route path="/marketplace" element={<Marketplace />} />
-              <Route path="/projects" element={<Projects />} />
-              <Route path="/services" element={<Services />} />
-              <Route path="/showcase" element={<Navigate to="/projects" replace />} />
-              <Route path="/solutions" element={<Solutions />} />
-              <Route path="/docs" element={<Docs />} />
-              <Route path="/terms" element={<Terms />} />
-              <Route path="/privacy" element={<Privacy />} />
-              <Route path="/profile" element={<Profile />} />
-              <Route path="/announcements" element={<Announcements />} />
-              <Route path="/about" element={<About />} />
-            </Route>
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
+          <Suspense fallback={
+            <div className="flex items-center justify-center min-h-[60vh]">
+              <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+            </div>
+          }>
+            <Routes>
+              {/* All routes share the single persistent Navbar via PersistentLayout */}
+              <Route element={<PersistentLayout />}>
+                <Route path="/" element={<Home />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/signup" element={<Signup />} />
+                <Route path="/forgot-password" element={<ForgotPassword />} />
+                <Route path="/admin" element={<Admin />} />
+                <Route path="/categories" element={<Categories />} />
+                <Route path="/contact" element={<Contact />} />
+                <Route path="/marketplace" element={<Marketplace />} />
+                <Route path="/projects" element={<Projects />} />
+                <Route path="/services" element={<Services />} />
+                <Route path="/showcase" element={<Navigate to="/projects" replace />} />
+                <Route path="/solutions" element={<Solutions />} />
+                <Route path="/docs" element={<Docs />} />
+                <Route path="/terms" element={<Terms />} />
+                <Route path="/privacy" element={<Privacy />} />
+                <Route path="/profile" element={<Profile />} />
+                <Route path="/announcements" element={<Announcements />} />
+                <Route path="/about" element={<About />} />
+              </Route>
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </Suspense>
         </Router>
       </LoginModalProvider>
     </ThemeProvider>

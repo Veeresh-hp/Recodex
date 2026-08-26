@@ -45,6 +45,7 @@ function ShowcaseContent() {
   );
   
   const [selectedFile, setSelectedFile] = useState<string>("");
+  const [files, setFiles] = useState<Record<string, string>>({});
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   // Sync repositories and current repository with Express live backend
@@ -66,11 +67,18 @@ function ShowcaseContent() {
   // Sync selected file when repository selection changes
   useEffect(() => {
     if (!selectedRepo) return;
-    const fileKeys = Object.keys(selectedRepo.files);
-    if (fileKeys.length > 0) {
-      setSelectedFile(fileKeys[0]);
+    const filesObj = selectedRepo.files;
+    if (filesObj && Object.keys(filesObj).length > 0) {
+      setFiles(filesObj);
+      const fileKeys = Object.keys(filesObj);
+      setSelectedFile(fileKeys[0] || "");
     } else {
-      setSelectedFile("");
+      import("../data/projectFiles").then((m) => {
+        const fetched = m.PROJECT_FILES[selectedRepo.id] || {};
+        setFiles(fetched);
+        const fileKeys = Object.keys(fetched);
+        setSelectedFile(fileKeys[0] || "");
+      });
     }
   }, [selectedRepo]);
 
@@ -295,7 +303,7 @@ function ShowcaseContent() {
                 </div>
 
                 {/* File keys selector buttons */}
-                {Object.keys(selectedRepo.files).map((fileName) => (
+                {Object.keys(files).map((fileName) => (
                   <button
                     key={fileName}
                     onClick={() => setSelectedFile(fileName)}
@@ -314,8 +322,8 @@ function ShowcaseContent() {
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => {
-                    if (selectedRepo.files[selectedFile]) {
-                      const cleanText = selectedRepo.files[selectedFile].replace(/\r\n/g, "\n");
+                    if (files[selectedFile]) {
+                      const cleanText = files[selectedFile].replace(/\r\n/g, "\n");
                       navigator.clipboard.writeText(cleanText);
                       setCopied(true);
                       setTimeout(() => setCopied(false), 2000);
@@ -344,9 +352,9 @@ function ShowcaseContent() {
 
             {/* Code Output Area */}
             <div className="p-5 overflow-auto max-h-[380px] text-xs leading-relaxed text-zinc-300 bg-[#030406]/60 select-text select-all font-mono min-h-[220px]">
-              {selectedRepo.files[selectedFile] ? (
+              {files[selectedFile] ? (
                 (() => {
-                  const formattedCode = selectedRepo.files[selectedFile].replace(/\r\n/g, "\n");
+                  const formattedCode = files[selectedFile].replace(/\r\n/g, "\n");
                   const codeLines = formattedCode.split("\n");
                   return (
                     <div className="flex">

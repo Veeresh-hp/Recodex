@@ -13,18 +13,7 @@ interface TerminalModalProps {
 }
 
 export default function TerminalModal({ project, initialTab = "output", onClose }: TerminalModalProps) {
-  let files: Record<string, string> = {};
-  if (project && project.files) {
-    if (typeof project.files === "string") {
-      try {
-        files = JSON.parse(project.files);
-      } catch (e) {
-        files = {};
-      }
-    } else if (typeof project.files === "object") {
-      files = project.files as Record<string, string>;
-    }
-  }
+  const [files, setFiles] = useState<Record<string, string>>({});
   const fileNames = Object.keys(files);
   const [selectedFile, setSelectedFile] = useState<string>("");
   
@@ -36,11 +25,30 @@ export default function TerminalModal({ project, initialTab = "output", onClose 
   useEffect(() => {
     if (!project) return;
     
-    // Set first file as active
-    if (fileNames.length > 0) {
-      setSelectedFile(fileNames[0]);
+    let loaded: Record<string, string> = {};
+    if (project.files) {
+      if (typeof project.files === "string") {
+        try {
+          loaded = JSON.parse(project.files);
+        } catch (e) {
+          loaded = {};
+        }
+      } else if (typeof project.files === "object") {
+        loaded = project.files as Record<string, string>;
+      }
+    }
+
+    if (Object.keys(loaded).length > 0) {
+      setFiles(loaded);
+      const names = Object.keys(loaded);
+      setSelectedFile(names[0] || "");
     } else {
-      setSelectedFile("");
+      import("../data/projectFiles").then((m) => {
+        const fetched = m.PROJECT_FILES[project.id] || {};
+        setFiles(fetched);
+        const names = Object.keys(fetched);
+        setSelectedFile(names[0] || "");
+      });
     }
 
     setActiveTab(initialTab || "output");
