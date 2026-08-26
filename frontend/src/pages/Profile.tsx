@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { useAuth, useUser } from "@clerk/clerk-react";
-import { getUserProfile } from "@/services/api";
+import { getUserProfile, getInquiries } from "@/services/api";
 import {
   User as UserIcon, Shield, Mail, Phone, Cpu, ArrowLeft, ArrowRight,
   CheckCircle, ExternalLink, Camera, Upload, X, Check, CreditCard,
-  Calendar, DollarSign, MessageSquare, Clock, ListTodo, Info, Activity, FolderGit2
+  Calendar, DollarSign, MessageSquare, Clock, ListTodo, Info, Activity, FolderGit2,
+  ShieldCheck, CheckCircle2
 } from "lucide-react";
 
 interface UserProfile {
@@ -312,6 +313,41 @@ export default function Profile() {
 
     fetchUserProfileData();
   }, [isLoaded, userId, user, getToken]);
+
+  const [userInquiries, setUserInquiries] = useState<any[]>([]);
+
+  const loadUserInquiries = async () => {
+    if (!profile?.email) return;
+    try {
+      const all = await getInquiries("");
+      const repliesMapRaw = typeof window !== "undefined" ? localStorage.getItem("recodex_inquiry_replies") : null;
+      const repliesMap = repliesMapRaw ? JSON.parse(repliesMapRaw) : {};
+
+      const merged = all.map((inq: any) => {
+        const r = repliesMap[inq.id] || inq.reply;
+        return r ? { ...inq, reply: r } : inq;
+      });
+
+      const userList = merged.filter((inq: any) => {
+        if (inq.email && inq.email.toLowerCase() === profile.email.toLowerCase()) return true;
+        return false;
+      });
+
+      setUserInquiries(userList);
+    } catch (e) {
+      console.warn("Failed to load user inquiries in Profile:", e);
+    }
+  };
+
+  useEffect(() => {
+    loadUserInquiries();
+    window.addEventListener("recodex-inquiry-replied", loadUserInquiries);
+    window.addEventListener("recodex-inquiry-submitted", loadUserInquiries);
+    return () => {
+      window.removeEventListener("recodex-inquiry-replied", loadUserInquiries);
+      window.removeEventListener("recodex-inquiry-submitted", loadUserInquiries);
+    };
+  }, [profile?.email]);
 
   const handleSelectPreset = (url: string) => {
     setPendingAvatar(url);
@@ -733,7 +769,61 @@ export default function Profile() {
                 </div>
               )}
             </div>
-          )}      </main>
+          )}
+
+          {/* DEDICATED CUSTOMER CONTACT INQUIRIES & ADMIN REPLIES SECTION */}
+          <div className="mt-8 glass-card bg-white/60 dark:bg-[#07090e]/60 backdrop-blur-xl border border-black/10 dark:border-zinc-800/80 rounded-2xl p-8 shadow-xl space-y-6 select-text">
+            <div className="flex items-center justify-between border-b border-black/5 dark:border-zinc-900 pb-4">
+              <div>
+                <h3 className="text-base font-bold text-foreground dark:text-white font-sans uppercase tracking-wider flex items-center gap-2">
+                  <ShieldCheck size={18} className="text-emerald-400" />
+                  Contact Inquiries & Support Responses
+                </h3>
+                <p className="text-xs text-zinc-500">Track submitted messages and official platform architect replies.</p>
+              </div>
+              <span className="px-3 py-1 bg-primary/10 text-primary dark:text-[#00d1ff] text-[10px] font-mono font-bold uppercase rounded-full">
+                {userInquiries.length} Submitted
+              </span>
+            </div>
+
+            {userInquiries.length === 0 ? (
+              <div className="py-8 text-center text-xs font-mono text-zinc-400 uppercase tracking-wider">
+                No contact inquiries submitted yet.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {userInquiries.map((inq: any, idx: number) => (
+                  <div key={idx} className="p-5 bg-black/5 dark:bg-[#04060a]/60 border border-black/10 dark:border-zinc-800 rounded-xl space-y-3">
+                    <div className="flex items-center justify-between text-[10px] font-mono text-zinc-500">
+                      <span>Submitted: {inq.date || inq.createdAt || "Recently"} • Service: {inq.type || "General Inquiry"}</span>
+                      {inq.reply ? (
+                        <span className="px-2.5 py-0.5 bg-emerald-500/20 text-emerald-400 font-bold uppercase tracking-wider rounded-md">
+                          REPLIED BY ADMIN
+                        </span>
+                      ) : (
+                        <span className="px-2.5 py-0.5 bg-amber-500/20 text-amber-400 font-bold uppercase tracking-wider rounded-md">
+                          AWAITING ARCHITECT REVIEW
+                        </span>
+                      )}
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-[9px] font-mono text-zinc-400 uppercase tracking-widest block">Your Message:</span>
+                      <p className="text-xs text-zinc-700 dark:text-zinc-300 font-sans italic">"{inq.message}"</p>
+                    </div>
+                    {inq.reply && (
+                      <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl space-y-1 mt-2">
+                        <span className="text-[10px] font-mono font-bold text-emerald-400 uppercase tracking-wider block flex items-center gap-1.5">
+                          <CheckCircle2 size={13} /> Official RecodeX Lead Platform Architect Reply:
+                        </span>
+                        <p className="text-sm font-semibold text-zinc-900 dark:text-white font-sans whitespace-pre-wrap">{inq.reply}</p>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </main>
 
       {/* Avatar Picker Modal */}
       {showAvatarPicker && (

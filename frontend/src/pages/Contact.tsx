@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import { useUser } from "@clerk/clerk-react";
 import { 
   MapPin, 
   Mail, 
@@ -8,11 +9,17 @@ import {
   Globe, 
   ChevronDown, 
   CheckCircle2, 
-  Play 
+  Play,
+  ShieldCheck,
+  Clock
 } from "lucide-react";
-import { submitInquiry } from "@/services/api";
+import { submitInquiry, getInquiries } from "@/services/api";
 
 export default function Contact() {
+  const { user } = useUser();
+  const userEmail = user?.primaryEmailAddress?.emailAddress || "";
+  const [customerInquiries, setCustomerInquiries] = useState<any[]>([]);
+
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -28,6 +35,39 @@ export default function Contact() {
   // Accordion state
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
 
+  const loadInquiries = async () => {
+    try {
+      const all = await getInquiries("");
+      const repliesMapRaw = typeof window !== "undefined" ? localStorage.getItem("recodex_inquiry_replies") : null;
+      const repliesMap = repliesMapRaw ? JSON.parse(repliesMapRaw) : {};
+
+      const list = all.map((inq: any) => {
+        const r = repliesMap[inq.id] || inq.reply;
+        return r ? { ...inq, reply: r } : inq;
+      });
+
+      const userList = list.filter((inq: any) => {
+        if (inq.reply) return true;
+        if (!userEmail) return false;
+        return inq.email && inq.email.toLowerCase() === userEmail.toLowerCase();
+      });
+
+      setCustomerInquiries(userList);
+    } catch (e) {
+      console.warn("Failed to load customer inquiry replies:", e);
+    }
+  };
+
+  useEffect(() => {
+    loadInquiries();
+    window.addEventListener("recodex-inquiry-replied", loadInquiries);
+    window.addEventListener("recodex-inquiry-submitted", loadInquiries);
+    return () => {
+      window.removeEventListener("recodex-inquiry-replied", loadInquiries);
+      window.removeEventListener("recodex-inquiry-submitted", loadInquiries);
+    };
+  }, [userEmail]);
+
   const toggleFaq = (index: number) => {
     setActiveFaq(activeFaq === index ? null : index);
   };
@@ -42,6 +82,7 @@ export default function Contact() {
     try {
       await submitInquiry(formData);
       setIsSubmitted(true);
+      loadInquiries();
     } catch (err: any) {
       setError(err.message || "Failed to submit message to database.");
     } finally {
@@ -86,6 +127,39 @@ export default function Contact() {
               Whether you&apos;re looking to hire top-tier talent or have questions about our marketplace stack, our team is here to help you scale.
             </p>
           </div>
+
+          {/* Admin Response Banner List */}
+          {customerInquiries.filter((i) => i.reply).length > 0 && (
+            <div className="mb-12 space-y-4">
+              <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-mono font-bold uppercase tracking-widest">
+                <ShieldCheck size={16} /> Official Support Responses Received ({customerInquiries.filter((i) => i.reply).length})
+              </div>
+              <div className="space-y-4">
+                {customerInquiries.filter((i) => i.reply).map((inq: any, idx: number) => (
+                  <div key={idx} className="p-6 bg-white dark:bg-[#07090e] border border-emerald-500/30 rounded-xl shadow-xl space-y-4 relative overflow-hidden">
+                    <div className="flex items-center justify-between border-b border-black/5 dark:border-zinc-900 pb-3">
+                      <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider">
+                        Inquiry Date: {inq.date || inq.createdAt || "Recently"} • Service: {inq.type || "General Inquiry"}
+                      </span>
+                      <span className="px-2.5 py-0.5 bg-emerald-500/20 text-emerald-400 text-[9px] font-mono font-bold uppercase tracking-wider rounded-md">
+                        REPLIED BY ADMIN
+                      </span>
+                    </div>
+                    <div className="p-3 bg-black/5 dark:bg-zinc-900/50 rounded-lg">
+                      <span className="text-[9px] font-mono text-zinc-400 uppercase tracking-widest block mb-1">Your Submitted Message:</span>
+                      <p className="text-xs text-zinc-700 dark:text-zinc-300 font-sans italic">"{inq.message}"</p>
+                    </div>
+                    <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl space-y-1">
+                      <span className="text-[10px] font-mono font-bold text-emerald-400 uppercase tracking-wider block flex items-center gap-1.5">
+                        <CheckCircle2 size={13} /> Response from RecodeX Lead Platform Architect:
+                      </span>
+                      <p className="text-sm font-semibold text-zinc-900 dark:text-white font-sans whitespace-pre-wrap">{inq.reply}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Form & Sidebar split */}
           <div className="grid grid-cols-1 md:grid-cols-12 gap-12 items-start">
