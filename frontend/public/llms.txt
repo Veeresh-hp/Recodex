@@ -1,0 +1,15 @@
+# RecodeX - High-Performance Developer Marketplace
+
+> RecodeX connects businesses with top-tier software engineers, architects, and developers to build scalable software architectures.
+
+## Key Pages & Resources
+
+- [Home](https://www.recodex.in/): Developer marketplace homepage and platform overview.
+- [Projects](https://www.recodex.in/projects): Browse active developer projects and open-source repositories.
+- [Marketplace](https://www.recodex.in/marketplace): Explore specialized technical services, tools, and developer talent.
+- [Services](https://www.recodex.in/services): Custom software architecture, full-stack development, and engineering solutions.
+- [Solutions](https://www.recodex.in/solutions): Enterprise developer ecosystem solutions and API integrations.
+- [Categories](https://www.recodex.in/categories): Explore projects by tech stack (Web Apps, AI/ML, Games, Cloud, Blockchain).
+- [Docs](https://www.recodex.in/docs): Technical documentation and developer platform integration guides.
+- [About](https://www.recodex.in/about): Learn about RecodeX engineering team and mission.
+- [Contact](https://www.recodex.in/contact): Contact RecodeX team for custom engineering inquiries.

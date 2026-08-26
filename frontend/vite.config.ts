@@ -20,9 +20,8 @@ export default defineConfig({
         manualChunks(id) {
           if (id.includes("node_modules")) {
             if (id.includes("@clerk")) return "vendor-clerk";
-            if (id.includes("lucide-react")) return "vendor-lucide";
             if (id.includes("chart.js")) return "vendor-chart";
-            if (id.includes("react-router-dom") || id.includes("react-dom") || id.includes("react")) return "vendor-react";
+            return "vendor";
           }
         },
       },
