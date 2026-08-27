@@ -4,12 +4,72 @@ import prisma from "../config/db";
 import { uploadToCloudinary } from "../config/cloudinary";
 import { requireAuth, AuthenticatedRequest } from "../middleware/auth";
 
+import fs from "fs";
+import path from "path";
+
 const router = Router();
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
     fileSize: 3 * 1024 * 1024, // 3MB limit for profile images
   },
+});
+
+const PROMOTED_ADMINS_FILE = path.join(__dirname, "../../promoted_admins_db.json");
+
+const getSavedPromotedAdmins = (): string[] => {
+  const rootAdmins = ["veereshhp2004@gmail.com", "veereshhp04@gmail.com"];
+  try {
+    if (fs.existsSync(PROMOTED_ADMINS_FILE)) {
+      const data = fs.readFileSync(PROMOTED_ADMINS_FILE, "utf-8");
+      const list: string[] = JSON.parse(data);
+      return Array.from(new Set([...rootAdmins, ...list.map((e) => e.toLowerCase().trim())]));
+    }
+  } catch (err) {
+    console.warn("Failed to read promoted admins file:", err);
+  }
+  return rootAdmins;
+};
+
+const savePromotedAdmin = (email: string, isMakeAdmin: boolean) => {
+  const emailClean = email.toLowerCase().trim();
+  let list = getSavedPromotedAdmins();
+  if (isMakeAdmin) {
+    if (!list.includes(emailClean)) list.push(emailClean);
+  } else {
+    if (!["veereshhp2004@gmail.com", "veereshhp04@gmail.com"].includes(emailClean)) {
+      list = list.filter((e) => e !== emailClean);
+    }
+  }
+  try {
+    fs.writeFileSync(PROMOTED_ADMINS_FILE, JSON.stringify(list, null, 2), "utf-8");
+  } catch (err) {
+    console.warn("Failed to save promoted admins file:", err);
+  }
+  return list;
+};
+
+/**
+ * GET /api/users/promoted-admins
+ * Returns array of all system & promoted admin emails.
+ */
+router.get("/promoted-admins", (_req, res) => {
+  const admins = getSavedPromotedAdmins();
+  return res.json(admins);
+});
+
+/**
+ * POST /api/users/promote-admin
+ * Updates admin status for a user email.
+ */
+router.post("/promote-admin", async (req, res) => {
+  const { email, role } = req.body;
+  if (!email) {
+    return res.status(400).json({ error: "Missing email parameter." });
+  }
+  const isMakeAdmin = role === "admin";
+  const updatedList = savePromotedAdmin(email, isMakeAdmin);
+  return res.json({ success: true, promotedAdmins: updatedList });
 });
 
 /**
@@ -316,16 +376,23 @@ router.post(
  */
 router.put("/:id", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   const { id } = req.params;
-  const { name, role } = req.body;
+  const { name, role, email } = req.body;
+
+  if (email && role) {
+    savePromotedAdmin(email, role === "admin");
+  }
 
   try {
     const updatedUser = await prisma.user.update({
       where: { id },
       data: {
-        name,
-        role,
+        ...(name ? { name } : {}),
+        ...(role ? { role } : {}),
       },
     });
+    if (updatedUser.email && role) {
+      savePromotedAdmin(updatedUser.email, role === "admin");
+    }
     return res.json(updatedUser);
   } catch (error: any) {
     console.error(`Error updating user ${id} inside database:`, error);

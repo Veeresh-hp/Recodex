@@ -15,7 +15,8 @@ import {
   getProjects, getUsers, updateUser, deleteUser, 
   updateProject, deleteProject, getInquiries, 
   deleteInquiry, replyToInquiry, getUserProfile,
-  getCertificatesApi, saveCertificateApi, deleteCertificateApi
+  getCertificatesApi, saveCertificateApi, deleteCertificateApi,
+  promoteUserAdminApi
 } from "../services/api";
 import { useTheme } from "../context/ThemeContext";
 
@@ -1080,10 +1081,11 @@ export default function Dashboard() {
       }
       localStorage.setItem("recodex_promoted_admin_emails", JSON.stringify(promotedList));
       window.dispatchEvent(new Event("recodex-auth-update"));
+      promoteUserAdminApi(userEmailClean, newEditRole);
 
       try {
         const token = await getAuthToken();
-        await updateUser(editingUser.id, { name: newEditName, role: newEditRole }, token);
+        await updateUser(editingUser.id, { name: newEditName, role: newEditRole, email: userEmailClean }, token);
       } catch (apiErr) {
         console.warn("API update user role failed, saved in local store anyway:", apiErr);
       }
@@ -1145,10 +1147,11 @@ export default function Dashboard() {
       }
       localStorage.setItem("recodex_promoted_admin_emails", JSON.stringify(promotedList));
       window.dispatchEvent(new Event("recodex-auth-update"));
+      promoteUserAdminApi(userEmailClean, targetRole);
 
       try {
         const token = await getAuthToken();
-        await updateUser(userId, { name: userToModify.name, role: targetRole }, token);
+        await updateUser(userId, { name: userToModify.name, role: targetRole, email: userEmailClean }, token);
       } catch (apiErr) {
         console.warn("API update user role failed, saved in local store anyway:", apiErr);
       }

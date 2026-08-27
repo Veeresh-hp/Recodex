@@ -401,13 +401,30 @@ export async function getUsers(): Promise<any[]> {
     }
   });
 
+  let serverAdmins: string[] = [];
+  try {
+    const adminRes = await fetch(`${API_BASE_URL}/users/promoted-admins`);
+    if (adminRes.ok) {
+      const data = await adminRes.json();
+      if (Array.isArray(data)) serverAdmins = data;
+    }
+  } catch (e) {
+    console.warn("Server promoted admins sync warning:", e);
+  }
+
   const promotedAdminsRaw = typeof window !== "undefined" ? localStorage.getItem("recodex_promoted_admin_emails") : null;
-  const promotedAdmins: string[] = promotedAdminsRaw ? JSON.parse(promotedAdminsRaw) : [];
+  const localPromotedAdmins: string[] = promotedAdminsRaw ? JSON.parse(promotedAdminsRaw) : [];
   const ROOT_ADMIN_EMAILS = ["veereshhp2004@gmail.com", "veereshhp04@gmail.com"];
+
+  const allPromotedAdmins = Array.from(new Set([
+    ...ROOT_ADMIN_EMAILS,
+    ...serverAdmins.map((e: string) => e.toLowerCase().trim()),
+    ...localPromotedAdmins.map((e: string) => e.toLowerCase().trim())
+  ]));
 
   const finalUsers = Array.from(userMap.values()).map((u: any) => {
     const emailClean = (u.email || "").toLowerCase().trim();
-    if (promotedAdmins.includes(emailClean) || ROOT_ADMIN_EMAILS.includes(emailClean)) {
+    if (allPromotedAdmins.includes(emailClean)) {
       return { ...u, role: "admin" };
     }
     return u;
@@ -422,6 +439,37 @@ export async function getUsers(): Promise<any[]> {
   }
 
   return finalUsers;
+}
+
+/**
+ * Fetches the system-wide list of promoted admin emails from backend API.
+ */
+export async function getPromotedAdminsApi(): Promise<string[]> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/users/promoted-admins`);
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data)) return data.map((e: string) => e.toLowerCase().trim());
+    }
+  } catch (err) {
+    console.warn("Failed to fetch promoted admins from backend:", err);
+  }
+  return ["veereshhp2004@gmail.com", "veereshhp04@gmail.com"];
+}
+
+/**
+ * Posts admin promotion to backend API.
+ */
+export async function promoteUserAdminApi(email: string, role: string): Promise<any> {
+  try {
+    await fetch(`${API_BASE_URL}/users/promote-admin`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, role }),
+    });
+  } catch (err) {
+    console.warn("Failed to post promoted admin to backend:", err);
+  }
 }
 
 /**
