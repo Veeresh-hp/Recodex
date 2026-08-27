@@ -27,42 +27,62 @@ export default function Navbar() {
   useEffect(() => {
     if (!isLoaded) return;
 
-    if (userId && user) {
-      setIsAuthenticated(true);
-      const userEmail = user.primaryEmailAddress?.emailAddress || "";
-      const isUserAdmin =
-        userEmail === "veereshhp2004@gmail.com" ||
-        localStorage.getItem("recodex_admin_user") === "true";
-      setIsAdmin(!!isUserAdmin);
+    const checkNavAdminStatus = () => {
+      if (userId && user) {
+        setIsAuthenticated(true);
+        const userEmail = (user.primaryEmailAddress?.emailAddress || "").toLowerCase().trim();
 
-      const savedAvatar = localStorage.getItem(`profile_avatar_${userId}`);
-      setNavAvatar(savedAvatar || user.imageUrl || null);
+        // Check synced users list for promoted admin roles
+        const syncedUsersRaw = localStorage.getItem("recodex_synced_users");
+        const syncedUsers: any[] = syncedUsersRaw ? JSON.parse(syncedUsersRaw) : [];
+        const dbUserRecord = syncedUsers.find(
+          (u: any) => u.email && u.email.toLowerCase().trim() === userEmail
+        );
 
-      const name = user.fullName || user.username || userEmail.split("@")[0] || "";
-      setNavInitials(
-        name
-          .split(" ")
-          .map((n: string) => n[0])
-          .join("")
-          .substring(0, 2)
-          .toUpperCase()
-      );
-    } else {
-      const stillBypassed =
-        localStorage.getItem("recodex_session_token") === "admin-bypass-token" ||
-        localStorage.getItem("recodex_admin_user") === "true";
+        const isUserAdmin =
+          userEmail === "veereshhp2004@gmail.com" ||
+          localStorage.getItem("recodex_admin_user") === "true" ||
+          (dbUserRecord && dbUserRecord.role === "admin");
 
-      setIsAuthenticated(stillBypassed);
-      setIsAdmin(stillBypassed);
-      if (stillBypassed) {
-        const savedAvatar = localStorage.getItem("profile_avatar_sandbox-admin-001");
-        if (savedAvatar) setNavAvatar(savedAvatar);
-        setNavInitials("VH");
+        setIsAdmin(Boolean(isUserAdmin));
+
+        const savedAvatar = localStorage.getItem(`profile_avatar_${userId}`);
+        setNavAvatar(savedAvatar || user.imageUrl || null);
+
+        const name = user.fullName || user.username || userEmail.split("@")[0] || "";
+        setNavInitials(
+          name
+            .split(" ")
+            .map((n: string) => n[0])
+            .join("")
+            .substring(0, 2)
+            .toUpperCase()
+        );
       } else {
-        setNavAvatar(null);
-        setNavInitials("");
+        const stillBypassed =
+          localStorage.getItem("recodex_session_token") === "admin-bypass-token" ||
+          localStorage.getItem("recodex_admin_user") === "true";
+
+        setIsAuthenticated(stillBypassed);
+        setIsAdmin(stillBypassed);
+        if (stillBypassed) {
+          const savedAvatar = localStorage.getItem("profile_avatar_sandbox-admin-001");
+          if (savedAvatar) setNavAvatar(savedAvatar);
+          setNavInitials("VH");
+        } else {
+          setNavAvatar(null);
+          setNavInitials("");
+        }
       }
-    }
+    };
+
+    checkNavAdminStatus();
+    window.addEventListener("recodex-auth-update", checkNavAdminStatus);
+    window.addEventListener("storage", checkNavAdminStatus);
+    return () => {
+      window.removeEventListener("recodex-auth-update", checkNavAdminStatus);
+      window.removeEventListener("storage", checkNavAdminStatus);
+    };
   }, [isLoaded, userId, user]);
 
   const handleSignOut = async () => {

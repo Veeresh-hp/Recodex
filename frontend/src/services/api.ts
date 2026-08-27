@@ -341,55 +341,77 @@ export async function getUsers(): Promise<any[]> {
   const localSyncedRaw = typeof window !== "undefined" ? localStorage.getItem("recodex_synced_users") : null;
   let localSynced: any[] = localSyncedRaw ? JSON.parse(localSyncedRaw) : [];
 
-  // Filter out any legacy dummy emails if present
   const dummyEmails = ["john.doe@recodex.io", "sarah@skynet.com", "vance@blackmesa.org"];
-  localSynced = localSynced.filter((u: any) => u && u.email && !dummyEmails.includes(u.email.toLowerCase()));
+  localSynced = localSynced.filter((u: any) => u && u.email && !dummyEmails.includes(u.email.trim().toLowerCase()));
 
   let backendUsers: any[] = [];
   try {
     const response = await fetch(`${API_BASE_URL}/users`, {
       method: "GET",
-      headers: {
-        "Accept": "application/json",
-      },
+      headers: { "Accept": "application/json" },
     });
 
     if (response.ok) {
       backendUsers = await response.json();
     }
   } catch (error) {
-    console.warn("[RECODEX API] Server endpoint unreachable. Merging active Clerk & MongoDB ecosystem records.", error);
+    console.warn("[RECODEX API] Server endpoint unreachable.", error);
     backendUsers = [];
   }
 
   const userMap = new Map<string, any>();
 
-  // 1. Seed base real active users (Clerk & MongoDB Atlas verified)
+  const getUserKey = (u: any): string => {
+    const emailStr = (u.email || "").trim().toLowerCase();
+    const nameStr = (u.name || "").trim().toLowerCase().replace(/[^a-z]/g, "");
+    const emailHandle = emailStr.split("@")[0].replace(/[^a-z]/g, "");
+
+    if (emailStr.includes("veereshhp2004")) return "veereshhp2004@gmail.com";
+    if (emailStr.includes("veereshhp04")) return "veereshhp04@gmail.com";
+
+    if (nameStr && nameStr.length > 3) return nameStr;
+    if (emailHandle && emailHandle.length > 3) return emailHandle;
+    return emailStr;
+  };
+
+  // 1. Seed base real active users
   REAL_ECOSYSTEM_USERS.forEach((u) => {
-    userMap.set(u.email.toLowerCase(), u);
+    userMap.set(getUserKey(u), u);
   });
 
-  // 2. Merge backend users from API if available
+  // 2. Merge backend users
   backendUsers.forEach((u: any) => {
-    if (u && u.email && !dummyEmails.includes(u.email.toLowerCase())) {
-      const existing = userMap.get(u.email.toLowerCase());
-      userMap.set(u.email.toLowerCase(), { ...existing, ...u });
+    if (u && u.email && !dummyEmails.includes(u.email.trim().toLowerCase())) {
+      const key = getUserKey(u);
+      const existing = userMap.get(key);
+      userMap.set(key, { ...existing, ...u });
     }
   });
 
-  // 3. Merge locally synced users from recent signups
+  // 3. Merge locally synced users
   localSynced.forEach((u: any) => {
-    if (u && u.email && !dummyEmails.includes(u.email.toLowerCase())) {
-      const existing = userMap.get(u.email.toLowerCase());
+    if (u && u.email && !dummyEmails.includes(u.email.trim().toLowerCase())) {
+      const key = getUserKey(u);
+      const existing = userMap.get(key);
       if (existing) {
-        userMap.set(u.email.toLowerCase(), { ...existing, ...u });
+        userMap.set(key, { ...existing, ...u });
       } else {
-        userMap.set(u.email.toLowerCase(), u);
+        userMap.set(key, u);
       }
     }
   });
 
-  return Array.from(userMap.values());
+  const finalUsers = Array.from(userMap.values());
+
+  try {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("recodex_synced_users", JSON.stringify(finalUsers));
+    }
+  } catch (e) {
+    console.warn("Deduplication cleanup error:", e);
+  }
+
+  return finalUsers;
 }
 
 /**
@@ -565,15 +587,16 @@ export async function submitInquiry(inquiryData: {
 /**
  * Fetches all contact inquiries from backend API, Google Sheet & local sync (admin only).
  */
-export async function getInquiries(token: string): Promise<any[]> {
+export async function getInquiries(token?: string): Promise<any[]> {
   let backendInquiries: any[] = [];
   try {
+    const headers: Record<string, string> = { "Accept": "application/json" };
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
     const response = await fetch(`${API_BASE_URL}/contacts`, {
       method: "GET",
-      headers: {
-        "Authorization": `Bearer ${token}`,
-        "Accept": "application/json",
-      },
+      headers,
     });
 
     if (response.ok) {

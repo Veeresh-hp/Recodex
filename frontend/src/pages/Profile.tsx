@@ -819,20 +819,27 @@ export default function Profile() {
                         <span className="text-emerald-400 font-bold uppercase text-[9px]">Document Preview Active</span>
                       </div>
 
-                      {/* Display image preview if base64 fileData is an image */}
+                      {/* Display image or PDF preview if base64 fileData is attached */}
                       {cert.fileData.startsWith("data:image/") ? (
-                        <div className="max-h-80 overflow-hidden rounded-lg border border-white/10 flex justify-center bg-black">
-                          <img src={cert.fileData} alt="Certificate Document" className="max-h-80 w-auto object-contain" />
+                        <div className="max-h-[500px] overflow-hidden rounded-lg border border-white/10 flex justify-center bg-black">
+                          <img src={cert.fileData} alt="Certificate Document" className="max-h-[500px] w-auto object-contain" />
                         </div>
                       ) : (
-                        <div className="p-4 bg-white/5 border border-white/10 rounded-lg flex items-center justify-between text-xs font-mono text-zinc-300">
-                          <span>{cert.fileName || "Uploaded Certificate Document (PDF)"}</span>
-                          <button
-                            onClick={() => handleDownloadUserCert(cert)}
-                            className="px-3 py-1 bg-[#00d1ff]/20 text-[#00d1ff] hover:bg-[#00d1ff]/30 rounded text-[10px] font-bold uppercase tracking-wider"
-                          >
-                            Open PDF Document
-                          </button>
+                        <div className="rounded-lg border border-white/10 overflow-hidden bg-black shadow-2xl space-y-2">
+                          <iframe 
+                            src={cert.fileData} 
+                            className="w-full h-[480px] rounded-lg border-0 bg-white" 
+                            title="Issued Certificate PDF Preview"
+                          />
+                          <div className="p-3 bg-white/5 flex items-center justify-between text-xs font-mono text-zinc-300">
+                            <span className="truncate">{cert.fileName || "Uploaded Certificate Document (PDF)"}</span>
+                            <button
+                              onClick={() => handleDownloadUserCert(cert)}
+                              className="px-3.5 py-1.5 bg-[#00d1ff] text-black hover:brightness-110 rounded text-[10px] font-black uppercase tracking-wider transition-all"
+                            >
+                              Download PDF Document
+                            </button>
+                          </div>
                         </div>
                       )}
                     </div>

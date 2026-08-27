@@ -119,15 +119,41 @@ router.get("/", async (_req, res) => {
       orderBy: { createdAt: "desc" },
     });
 
+    const getUserKey = (u: any): string => {
+      const emailStr = (u.email || "").trim().toLowerCase();
+      const nameStr = (u.name || "").trim().toLowerCase().replace(/[^a-z]/g, "");
+      const emailHandle = emailStr.split("@")[0].replace(/[^a-z]/g, "");
+
+      if (emailStr.includes("veereshhp2004")) return "veereshhp2004@gmail.com";
+      if (emailStr.includes("veereshhp04")) return "veereshhp04@gmail.com";
+
+      if (nameStr && nameStr.length > 3) return nameStr;
+      if (emailHandle && emailHandle.length > 3) return emailHandle;
+      return emailStr;
+    };
+
     const userMap = new Map<string, any>();
-    FALLBACK_USERS.forEach((u: any) => userMap.set(u.email.toLowerCase(), u));
-    dbUsers.forEach((u: any) => userMap.set(u.email.toLowerCase(), { ...userMap.get(u.email.toLowerCase()), ...u }));
+    FALLBACK_USERS.forEach((u: any) => userMap.set(getUserKey(u), u));
+    dbUsers.forEach((u: any) => {
+      const key = getUserKey(u);
+      userMap.set(key, { ...userMap.get(key), ...u });
+    });
 
     return res.json(Array.from(userMap.values()));
   } catch (error: any) {
     console.error("Error retrieving all ecosystem users:", error);
+    const getUserKey = (u: any): string => {
+      const emailStr = (u.email || "").trim().toLowerCase();
+      const nameStr = (u.name || "").trim().toLowerCase().replace(/[^a-z]/g, "");
+      const emailHandle = emailStr.split("@")[0].replace(/[^a-z]/g, "");
+      if (emailStr.includes("veereshhp2004")) return "veereshhp2004@gmail.com";
+      if (emailStr.includes("veereshhp04")) return "veereshhp04@gmail.com";
+      if (nameStr && nameStr.length > 3) return nameStr;
+      if (emailHandle && emailHandle.length > 3) return emailHandle;
+      return emailStr;
+    };
     const userMap = new Map<string, any>();
-    FALLBACK_USERS.forEach((u: any) => userMap.set(u.email.toLowerCase(), u));
+    FALLBACK_USERS.forEach((u: any) => userMap.set(getUserKey(u), u));
     return res.json(Array.from(userMap.values()));
   }
 });

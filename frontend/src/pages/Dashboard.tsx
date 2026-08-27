@@ -199,6 +199,7 @@ export default function Dashboard() {
   const categoryChartRef = useRef<HTMLCanvasElement | null>(null);
   const growthChartInstance = useRef<Chart | null>(null);
   const categoryChartInstance = useRef<Chart | null>(null);
+  const [growthRange, setGrowthRange] = useState<"6M" | "1Y">("6M");
 
   // Deployments log list
   const [deployments, setDeployments] = useState<Deployment[]>([
@@ -375,13 +376,20 @@ export default function Dashboard() {
       }
 
       if (userId && user) {
-        const userEmail = user.primaryEmailAddress?.emailAddress || "";
-        const isAdmin = userEmail === "veereshhp2004@gmail.com";
+        const userEmail = (user.primaryEmailAddress?.emailAddress || "").toLowerCase().trim();
+        const isRootAdmin = userEmail === "veereshhp2004@gmail.com";
 
-        if (isAdmin) {
+        const syncedUsersRaw = localStorage.getItem("recodex_synced_users");
+        const syncedUsers: any[] = syncedUsersRaw ? JSON.parse(syncedUsersRaw) : [];
+        const dbUserRecord = syncedUsers.find(
+          (u: any) => u.email && u.email.toLowerCase().trim() === userEmail
+        );
+        const isPromotedAdmin = dbUserRecord && dbUserRecord.role === "admin";
+
+        if (isRootAdmin || isPromotedAdmin) {
           localStorage.setItem("recodex_admin_user", "true");
           setAdminEmail(userEmail);
-          setAdminName(user.fullName || "Admin");
+          setAdminName(user.fullName || (dbUserRecord && dbUserRecord.name) || "Admin");
           return;
         }
 
@@ -428,7 +436,10 @@ export default function Dashboard() {
         }
         return u;
       });
-      setDbUsers(mapped);
+      setDbUsers((prev) => {
+        if (JSON.stringify(prev) === JSON.stringify(mapped)) return prev;
+        return mapped;
+      });
     } catch (err) {
       console.log("[RECODEX ERROR] Backend user fetch failed:", err);
     }
@@ -450,23 +461,19 @@ export default function Dashboard() {
   const fetchInquiries = async () => {
     setInquiriesLoading(true);
     try {
-      const token = await getAuthToken();
-      if (token) {
-        const data = await getInquiries(token);
-        setInquiries(data);
-      } else {
-        throw new Error("No auth token");
-      }
+      const data = await getInquiries();
+      setInquiries(data);
     } catch (err) {
-      console.warn("[RECODEX ADMIN] Failed to retrieve server inquiries, loading sandbox mock inquiries:", err);
+      console.log("[RECODEX ERROR] Backend inquiries fetch failed:", err);
+      // Mock inquiries fallback if backend is offline
       setInquiries([
         {
           id: "inq-1",
-          name: "John Client",
-          email: "john@enterprise.com",
-          type: "spec-build",
-          message: "Looking to build a custom micro-frontend architecture for our payment gateway with strict PCI-DSS audits.",
-          createdAt: new Date(Date.now() - 3600 * 1000 * 2).toISOString()
+          name: "David Vance",
+          email: "vance@blackmesa.org",
+          type: "backend",
+          message: "Looking for an engineer to architect an event-driven Go microservices cluster with Kafka.",
+          createdAt: new Date(Date.now() - 3600 * 1000 * 5).toISOString()
         },
         {
           id: "inq-2",
@@ -517,7 +524,7 @@ export default function Dashboard() {
     fetchInquiries();
   }, [userId]);
 
-  // Live user registration sync & 10s telemetry polling
+  // Live user registration sync & 15s telemetry polling
   useEffect(() => {
     const syncUsers = () => {
       fetchUsers();
@@ -527,7 +534,7 @@ export default function Dashboard() {
     window.addEventListener("recodex-auth-update", syncUsers);
     window.addEventListener("storage", syncUsers);
 
-    const userPollTimer = setInterval(syncUsers, 4000);
+    const userPollTimer = setInterval(syncUsers, 15000);
 
     return () => {
       window.removeEventListener("recodex-user-registered", syncUsers);
@@ -558,140 +565,184 @@ export default function Dashboard() {
     return () => document.removeEventListener("click", handleCloseMenu);
   }, []);
 
-  // Live Chart rendering effect
+  // Live Chart rendering effect (Real Dynamic Data)
   useEffect(() => {
     if (activeSidebarTab !== "Dashboard") return;
 
-    const isDark = theme === "dark";
+    try {
+      const isDark = theme === "dark";
 
-    // Growth Chart (Line)
-    const growthCanvas = growthChartRef.current;
-    if (growthCanvas) {
-      const growthCtx = growthCanvas.getContext("2d");
-      if (growthCtx) {
-        if (growthChartInstance.current) {
-          growthChartInstance.current.destroy();
-        }
+      // 1. Compute Real Monthly Growth
+      const monthsCount = growthRange === "6M" ? 6 : 12;
+      const now = new Date();
+      const growthLabels: string[] = [];
+      const growthCounts: number[] = [];
 
-        const gradient = growthCtx.createLinearGradient(0, 0, 0, 400);
-        gradient.addColorStop(0, isDark ? "rgba(0, 209, 255, 0.3)" : "rgba(79, 70, 229, 0.4)");
-        gradient.addColorStop(1, "rgba(0, 0, 0, 0.0)");
+      const activeUsers = dbUsers.filter((u) => !softDeletedUserIds.includes(u.id));
 
-        growthChartInstance.current = new Chart(growthCtx, {
-          type: "line",
-          data: {
-            labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
-            datasets: [{
-              label: "Active Users",
-              data: [12000, 12500, 13200, 14100, 14800, 15400 + (dbUsers.length * 15)],
-              borderColor: isDark ? "#00d1ff" : "#4f46e5",
-              backgroundColor: gradient,
-              borderWidth: 3,
-              pointBackgroundColor: isDark ? "#00d1ff" : "#ffffff",
-              pointBorderColor: isDark ? "#00d1ff" : "#4f46e5",
-              pointBorderWidth: 2,
-              pointRadius: 4,
-              pointHoverRadius: 6,
-              fill: true,
-              tension: 0.4
-            }]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-              legend: { display: false },
-              tooltip: {
-                backgroundColor: isDark ? "#0b0e14" : "#213145",
-                titleFont: { family: "Geist", size: 13 },
-                bodyFont: { family: "Geist", size: 14, weight: "bold" },
-                padding: 10,
-                cornerRadius: 8,
-                displayColors: false
-              }
-            },
-            scales: {
-              x: {
-                grid: { display: false },
-                ticks: { font: { family: "Geist", size: 12 }, color: isDark ? "#a1a1aa" : "#777587" }
-              },
-              y: {
-                grid: { color: isDark ? "rgba(255, 255, 255, 0.08)" : "#e5eeff" },
-                ticks: { 
-                  font: { family: "Geist", size: 12 }, 
-                  color: isDark ? "#a1a1aa" : "#777587",
-                  callback: function(value) { return Number(value) / 1000 + "k"; }
-                },
-                beginAtZero: false,
-                min: 10000
-              }
-            },
-            interaction: { mode: "index", intersect: false }
-          }
-        });
+      for (let i = monthsCount - 1; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const monthLabel = d.toLocaleString("en-US", { month: "short" });
+        const endOfMonth = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59);
+
+        // Count registered users up to that month
+        const count = activeUsers.filter((u) => {
+          if (!u.createdAt) return true;
+          const created = new Date(u.createdAt);
+          return !isNaN(created.getTime()) ? created <= endOfMonth : true;
+        }).length;
+
+        growthLabels.push(monthLabel);
+        growthCounts.push(count);
       }
-    }
 
-    // Category Chart (Doughnut)
-    const catCanvas = categoryChartRef.current;
-    if (catCanvas) {
-      const catCtx = catCanvas.getContext("2d");
-      if (catCtx) {
-        if (categoryChartInstance.current) {
-          categoryChartInstance.current.destroy();
+      // Growth Chart (Line)
+      const growthCanvas = growthChartRef.current;
+      if (growthCanvas) {
+        const growthCtx = growthCanvas.getContext("2d");
+        if (growthCtx) {
+          if (growthChartInstance.current) {
+            growthChartInstance.current.destroy();
+            growthChartInstance.current = null;
+          }
+
+          const gradient = growthCtx.createLinearGradient(0, 0, 0, 400);
+          gradient.addColorStop(0, isDark ? "rgba(0, 209, 255, 0.3)" : "rgba(79, 70, 229, 0.4)");
+          gradient.addColorStop(1, "rgba(0, 0, 0, 0.0)");
+
+          growthChartInstance.current = new Chart(growthCtx, {
+            type: "line",
+            data: {
+              labels: growthLabels,
+              datasets: [{
+                label: "Active Users",
+                data: growthCounts,
+                borderColor: isDark ? "#00d1ff" : "#4f46e5",
+                backgroundColor: gradient,
+                borderWidth: 3,
+                pointBackgroundColor: isDark ? "#00d1ff" : "#ffffff",
+                pointBorderColor: isDark ? "#00d1ff" : "#4f46e5",
+                pointBorderWidth: 2,
+                pointRadius: 4,
+                pointHoverRadius: 6,
+                fill: true,
+                tension: 0.4
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              animation: false,
+              plugins: {
+                legend: { display: false },
+                tooltip: {
+                  backgroundColor: isDark ? "#0b0e14" : "#213145",
+                  titleFont: { family: "Geist", size: 13 },
+                  bodyFont: { family: "Geist", size: 14, weight: "bold" },
+                  padding: 10,
+                  cornerRadius: 8,
+                  displayColors: false,
+                  callbacks: {
+                    label: (ctx) => ` Active Users: ${ctx.parsed.y}`
+                  }
+                }
+              },
+              scales: {
+                x: {
+                  grid: { display: false },
+                  ticks: { font: { family: "Geist", size: 12 }, color: isDark ? "#a1a1aa" : "#777587" }
+                },
+                y: {
+                  grid: { color: isDark ? "rgba(255, 255, 255, 0.08)" : "#e5eeff" },
+                  ticks: { 
+                    font: { family: "Geist", size: 12 }, 
+                    color: isDark ? "#a1a1aa" : "#777587",
+                    stepSize: 1,
+                    callback: function(value) { return String(value); }
+                  },
+                  beginAtZero: true
+                }
+              },
+              interaction: { mode: "index", intersect: false }
+            }
+          });
         }
+      }
 
-        const counts = {
-          "AI Models": dbProjects.filter(p => p.category === "AI & Intelligence" || p.category === "AI Models").length,
-          "Web Dev": dbProjects.filter(p => p.category === "Web Systems" || p.category === "Web Dev").length,
-          "Cybersec": dbProjects.filter(p => p.category === "Low-Level Shells" || p.category === "Cybersec").length,
-          "Other": dbProjects.filter(p => p.category === "Blockchain & Web3" || p.category === "Other").length,
-        };
+      // 2. Compute Real Category Breakdown
+      const activeProjects = dbProjects.filter((p) => !softDeletedProjectIds.includes(p.id));
+      const webCount = activeProjects.filter((p) => (p.category || "").toLowerCase().includes("web")).length;
+      const aiCount = activeProjects.filter((p) => (p.category || "").toLowerCase().includes("ai") || (p.category || "").toLowerCase().includes("intel")).length;
+      const blockCount = activeProjects.filter((p) => (p.category || "").toLowerCase().includes("block") || (p.category || "").toLowerCase().includes("web3")).length;
+      const shellCount = activeProjects.filter((p) => (p.category || "").toLowerCase().includes("shell") || (p.category || "").toLowerCase().includes("system")).length;
+      const otherCount = Math.max(0, activeProjects.length - (webCount + aiCount + blockCount + shellCount));
 
-        const totalProjects = dbProjects.length;
-        const dataValues = totalProjects > 0
-          ? [counts["AI Models"], counts["Web Dev"], counts["Cybersec"], counts["Other"]]
-          : [45, 30, 15, 10];
+      const dataValues = activeProjects.length > 0
+        ? [webCount, aiCount, blockCount, shellCount + otherCount]
+        : [1, 1, 1, 1];
 
-        categoryChartInstance.current = new Chart(catCtx, {
-          type: "doughnut",
-          data: {
-            labels: ["AI Models", "Web Dev", "Cybersec", "Other"],
-            datasets: [{
-              data: dataValues,
-              backgroundColor: [
-                isDark ? "#00d1ff" : "#4f46e5",
-                isDark ? "#22d3ee" : "#57dffe",
-                isDark ? "#818cf8" : "#4b4dd8",
-                isDark ? "#27272a" : "#d3e4fe"
-              ],
-              borderWidth: 0,
-              hoverOffset: 4
-            }]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            cutout: "75%",
-            plugins: {
-              legend: { display: false },
-              tooltip: {
-                backgroundColor: isDark ? "#0b0e14" : "#213145",
-                bodyFont: { family: "Geist", size: 13 },
-                padding: 10,
-                cornerRadius: 8
+      // Category Chart (Doughnut)
+      const catCanvas = categoryChartRef.current;
+      if (catCanvas) {
+        const catCtx = catCanvas.getContext("2d");
+        if (catCtx) {
+          if (categoryChartInstance.current) {
+            categoryChartInstance.current.destroy();
+            categoryChartInstance.current = null;
+          }
+
+          categoryChartInstance.current = new Chart(catCtx, {
+            type: "doughnut",
+            data: {
+              labels: ["Web Systems", "AI & Intelligence", "Blockchain & Web3", "Shells & Systems"],
+              datasets: [{
+                data: dataValues,
+                backgroundColor: [
+                  "#00d1ff",
+                  "#22d3ee",
+                  "#818cf8",
+                  "#a855f7"
+                ],
+                borderWidth: 0,
+                hoverOffset: 4
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              animation: false,
+              cutout: "75%",
+              plugins: {
+                legend: { display: false },
+                tooltip: {
+                  backgroundColor: isDark ? "#0b0e14" : "#213145",
+                  bodyFont: { family: "Geist", size: 13 },
+                  padding: 10,
+                  cornerRadius: 8,
+                  callbacks: {
+                    label: (ctx) => ` ${ctx.label}: ${ctx.parsed} projects`
+                  }
+                }
               }
             }
-          }
-        });
+          });
+        }
       }
+    } catch (e) {
+      console.warn("Chart rendering error caught safely:", e);
     }
 
     return () => {
-      if (growthChartInstance.current) growthChartInstance.current.destroy();
-      if (categoryChartInstance.current) categoryChartInstance.current.destroy();
+      if (growthChartInstance.current) {
+        growthChartInstance.current.destroy();
+        growthChartInstance.current = null;
+      }
+      if (categoryChartInstance.current) {
+        categoryChartInstance.current.destroy();
+        categoryChartInstance.current = null;
+      }
     };
-  }, [activeSidebarTab, dbUsers, dbProjects, theme]);
+  }, [activeSidebarTab, dbUsers, dbProjects, theme, growthRange, softDeletedUserIds, softDeletedProjectIds]);
 
   // Real-time telemetry load shifts
   useEffect(() => {
@@ -1210,8 +1261,12 @@ export default function Dashboard() {
           <>
             {/* Row 1: Stat Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              {/* Stat 1 */}
-              <div className="glass-card p-6 hover-lift flex flex-col justify-between min-h-[140px] relative overflow-hidden group border border-black/5 dark:border-white/10 rounded-2xl">
+              {/* Stat 1: Total Users */}
+              <div 
+                onClick={() => setActiveSidebarTab("Users")}
+                className="glass-card p-6 hover-lift flex flex-col justify-between min-h-[140px] relative overflow-hidden group border border-black/5 dark:border-white/10 rounded-2xl cursor-pointer hover:border-primary/50 transition-all"
+                title="Click to view User Directory"
+              >
                 <div className="absolute -right-4 -top-4 w-24 h-24 bg-primary/10 rounded-full group-hover:scale-150 transition-transform duration-500 pointer-events-none"></div>
                 <div className="flex justify-between items-start z-10">
                   <div>
@@ -1220,7 +1275,7 @@ export default function Dashboard() {
                       {dbUsers.filter(u => !softDeletedUserIds.includes(u.id)).length}
                     </h3>
                   </div>
-                  <div className="p-3 bg-primary/10 rounded-xl text-primary border border-primary/20">
+                  <div className="p-3 bg-primary/10 rounded-xl text-primary border border-primary/20 group-hover:bg-primary group-hover:text-black transition-all">
                     <span className="material-symbols-outlined text-[20px]">group</span>
                   </div>
                 </div>
@@ -1232,8 +1287,13 @@ export default function Dashboard() {
                   <span className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">vs last month</span>
                 </div>
               </div>
-              {/* Stat 2 */}
-              <div className="glass-card p-6 hover-lift flex flex-col justify-between min-h-[140px] relative overflow-hidden group border border-black/5 dark:border-white/10 rounded-2xl">
+
+              {/* Stat 2: Active Projects */}
+              <div 
+                onClick={() => setActiveSidebarTab("Projects")}
+                className="glass-card p-6 hover-lift flex flex-col justify-between min-h-[140px] relative overflow-hidden group border border-black/5 dark:border-white/10 rounded-2xl cursor-pointer hover:border-cyan-400/50 transition-all"
+                title="Click to manage Active Projects"
+              >
                 <div className="absolute -right-4 -top-4 w-24 h-24 bg-cyan-500/10 rounded-full group-hover:scale-150 transition-transform duration-500 pointer-events-none"></div>
                 <div className="flex justify-between items-start z-10">
                   <div>
@@ -1242,7 +1302,7 @@ export default function Dashboard() {
                       {dbProjects.filter(p => !softDeletedProjectIds.includes(p.id)).length}
                     </h3>
                   </div>
-                  <div className="p-3 bg-cyan-500/10 rounded-xl text-cyan-400 border border-cyan-500/20">
+                  <div className="p-3 bg-cyan-500/10 rounded-xl text-cyan-400 border border-cyan-500/20 group-hover:bg-cyan-400 group-hover:text-black transition-all">
                     <span className="material-symbols-outlined text-[20px]">terminal</span>
                   </div>
                 </div>
@@ -1254,8 +1314,13 @@ export default function Dashboard() {
                   <span className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">vs last month</span>
                 </div>
               </div>
-              {/* Stat 3 */}
-              <div className="glass-card p-6 hover-lift flex flex-col justify-between min-h-[140px] relative overflow-hidden group border border-black/5 dark:border-white/10 rounded-2xl">
+
+              {/* Stat 3: Certificates Issued */}
+              <div 
+                onClick={() => setActiveSidebarTab("Certificates")}
+                className="glass-card p-6 hover-lift flex flex-col justify-between min-h-[140px] relative overflow-hidden group border border-black/5 dark:border-white/10 rounded-2xl cursor-pointer hover:border-indigo-400/50 transition-all"
+                title="Click to manage Certificates"
+              >
                 <div className="absolute -right-4 -top-4 w-24 h-24 bg-indigo-500/10 rounded-full group-hover:scale-150 transition-transform duration-500 pointer-events-none"></div>
                 <div className="flex justify-between items-start z-10">
                   <div>
@@ -1264,7 +1329,7 @@ export default function Dashboard() {
                       {certificates.filter(c => c.status === "Approved").length}
                     </h3>
                   </div>
-                  <div className="p-3 bg-indigo-500/10 rounded-xl text-indigo-400 border border-indigo-500/20">
+                  <div className="p-3 bg-indigo-500/10 rounded-xl text-indigo-400 border border-indigo-500/20 group-hover:bg-indigo-500 group-hover:text-white transition-all">
                     <span className="material-symbols-outlined text-[20px]">verified</span>
                   </div>
                 </div>
@@ -1276,8 +1341,13 @@ export default function Dashboard() {
                   <span className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">vs last month</span>
                 </div>
               </div>
-              {/* Stat 4 */}
-              <div className="glass-card p-6 hover-lift flex flex-col justify-between min-h-[140px] border border-rose-500/30 bg-rose-500/5 relative overflow-hidden group rounded-2xl">
+
+              {/* Stat 4: Reports Pending */}
+              <div 
+                onClick={() => setActiveSidebarTab("Reports")}
+                className="glass-card p-6 hover-lift flex flex-col justify-between min-h-[140px] border border-rose-500/30 bg-rose-500/5 relative overflow-hidden group rounded-2xl cursor-pointer hover:border-rose-500/60 transition-all"
+                title="Click to view Reports Hub"
+              >
                 <div className="absolute -right-4 -top-4 w-24 h-24 bg-rose-500/10 rounded-full group-hover:scale-150 transition-transform duration-500 pointer-events-none"></div>
                 <div className="flex justify-between items-start z-10">
                   <div>
@@ -1286,7 +1356,7 @@ export default function Dashboard() {
                       {reports.filter(r => r.status === "Open" || r.status === "Under Review").length}
                     </h3>
                   </div>
-                  <div className="p-3 bg-rose-500/10 rounded-xl text-rose-400 border border-rose-500/20">
+                  <div className="p-3 bg-rose-500/10 rounded-xl text-rose-400 border border-rose-500/20 group-hover:bg-rose-500 group-hover:text-white transition-all">
                     <span className="material-symbols-outlined text-[20px]">warning</span>
                   </div>
                 </div>
@@ -1305,11 +1375,31 @@ export default function Dashboard() {
                 <div className="flex justify-between items-center mb-6">
                   <div>
                     <h3 className="text-lg font-bold text-zinc-900 dark:text-white font-sans">Monthly User Growth</h3>
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">Platform adoption over the last 6 months</p>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                      {growthRange === "6M" ? "Platform adoption over the last 6 months" : "Platform adoption over the last 12 months"}
+                    </p>
                   </div>
                   <div className="flex gap-2">
-                    <button className="px-3 py-1 text-xs font-mono font-bold bg-primary/10 text-primary border border-primary/20 rounded-lg">6M</button>
-                    <button className="px-3 py-1 text-xs font-mono font-bold text-zinc-400 hover:text-zinc-200 hover:bg-black/5 dark:hover:bg-white/5 rounded-lg transition-colors">1Y</button>
+                    <button 
+                      onClick={() => setGrowthRange("6M")} 
+                      className={`px-3 py-1 text-xs font-mono font-bold rounded-lg border transition-colors cursor-pointer ${
+                        growthRange === "6M" 
+                          ? "bg-primary/10 text-primary border-primary/20" 
+                          : "text-zinc-400 border-transparent hover:text-zinc-200 hover:bg-black/5 dark:hover:bg-white/5"
+                      }`}
+                    >
+                      6M
+                    </button>
+                    <button 
+                      onClick={() => setGrowthRange("1Y")} 
+                      className={`px-3 py-1 text-xs font-mono font-bold rounded-lg border transition-colors cursor-pointer ${
+                        growthRange === "1Y" 
+                          ? "bg-primary/10 text-primary border-primary/20" 
+                          : "text-zinc-400 border-transparent hover:text-zinc-200 hover:bg-black/5 dark:hover:bg-white/5"
+                      }`}
+                    >
+                      1Y
+                    </button>
                   </div>
                 </div>
                 <div className="flex-1 relative min-h-[260px] w-full mt-2">
@@ -1321,7 +1411,7 @@ export default function Dashboard() {
                 <div className="flex justify-between items-center mb-4">
                   <div>
                     <h3 className="text-lg font-bold text-zinc-900 dark:text-white font-sans">Projects by Category</h3>
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Distribution breakdown</p>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Live category breakdown</p>
                   </div>
                 </div>
                 <div className="flex-1 relative flex items-center justify-center min-h-[200px]">
@@ -1334,10 +1424,22 @@ export default function Dashboard() {
                   </div>
                 </div>
                 <div className="mt-4 grid grid-cols-2 gap-2 pt-2 border-t border-black/5 dark:border-white/5">
-                  <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-[#00d1ff]"></div><span className="text-xs text-zinc-400 font-mono">AI Models</span></div>
-                  <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-[#22d3ee]"></div><span className="text-xs text-zinc-400 font-mono">Web Dev</span></div>
-                  <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-[#818cf8]"></div><span className="text-xs text-zinc-400 font-mono">Cybersec</span></div>
-                  <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-[#3f3f46]"></div><span className="text-xs text-zinc-400 font-mono">Other</span></div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-full bg-[#00d1ff]"></div>
+                    <span className="text-xs text-zinc-400 font-mono">Web Systems</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-full bg-[#22d3ee]"></div>
+                    <span className="text-xs text-zinc-400 font-mono">AI Models</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-full bg-[#818cf8]"></div>
+                    <span className="text-xs text-zinc-400 font-mono">Blockchain</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-full bg-[#a855f7]"></div>
+                    <span className="text-xs text-zinc-400 font-mono">Shells & Sys</span>
+                  </div>
                 </div>
               </div>
             </div>
