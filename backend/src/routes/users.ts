@@ -49,6 +49,62 @@ const savePromotedAdmin = (email: string, isMakeAdmin: boolean) => {
   return list;
 };
 
+const AUDIT_LOGS_FILE = path.join(__dirname, "../../audit_logs_db.json");
+
+const getSavedAuditLogs = (): any[] => {
+  try {
+    if (fs.existsSync(AUDIT_LOGS_FILE)) {
+      const data = fs.readFileSync(AUDIT_LOGS_FILE, "utf-8");
+      return JSON.parse(data);
+    }
+  } catch (err) {
+    console.warn("Failed to read audit logs file:", err);
+  }
+  return [];
+};
+
+const saveAuditLog = (entry: any) => {
+  const logs = getSavedAuditLogs();
+  const newEntry = {
+    id: `audit-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+    adminName: entry.adminName || "System Admin",
+    adminEmail: entry.adminEmail || "admin@recodex.in",
+    action: entry.action || "System Action",
+    target: entry.target || "N/A",
+    details: entry.details || "",
+    timestamp: new Date().toISOString(),
+    formattedDate: new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }),
+  };
+  const updated = [newEntry, ...logs].slice(0, 100);
+  try {
+    fs.writeFileSync(AUDIT_LOGS_FILE, JSON.stringify(updated, null, 2), "utf-8");
+  } catch (err) {
+    console.warn("Failed to write audit logs file:", err);
+  }
+  return updated;
+};
+
+/**
+ * GET /api/users/audit-logs
+ * Returns list of attributed admin activities.
+ */
+router.get("/audit-logs", (_req, res) => {
+  return res.json(getSavedAuditLogs());
+});
+
+/**
+ * POST /api/users/audit-logs
+ * Logs an admin action with name and email attribution.
+ */
+router.post("/audit-logs", (req, res) => {
+  const { adminName, adminEmail, action, target, details } = req.body;
+  if (!action) {
+    return res.status(400).json({ error: "Missing required audit action parameter." });
+  }
+  const updatedLogs = saveAuditLog({ adminName, adminEmail, action, target, details });
+  return res.json({ success: true, logs: updatedLogs });
+});
+
 /**
  * GET /api/users/promoted-admins
  * Returns array of all system & promoted admin emails.

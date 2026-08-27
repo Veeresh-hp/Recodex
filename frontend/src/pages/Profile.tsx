@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { useAuth, useUser } from "@clerk/clerk-react";
-import { getUserProfile, getInquiries, getCertificatesApi } from "@/services/api";
+import { getUserProfile, getInquiries, getCertificatesApi, getPromotedAdminsApi } from "@/services/api";
 import {
   User as UserIcon, Shield, Mail, Phone, Cpu, ArrowLeft, ArrowRight,
   CheckCircle, ExternalLink, Camera, Upload, X, Check, CreditCard,
@@ -369,8 +369,12 @@ export default function Profile() {
             const projectsList = enrichedProjects;
 
             const userEmailClean = (user.primaryEmailAddress?.emailAddress || "").toLowerCase().trim();
-            const ROOT_ADMIN_EMAILS = ["veereshhp2004@gmail.com", "veereshhp04@gmail.com"];
-            const isUserAdmin = ROOT_ADMIN_EMAILS.includes(userEmailClean) || localStorage.getItem("recodex_admin_user") === "true" || dbProfile?.role === "admin";
+            const serverPromoted = await getPromotedAdminsApi();
+            const promotedRaw = localStorage.getItem("recodex_promoted_admin_emails");
+            const localPromoted: string[] = promotedRaw ? JSON.parse(promotedRaw) : [];
+            const allAdmins = Array.from(new Set([...serverPromoted, ...localPromoted, "veereshhp2004@gmail.com", "veereshhp04@gmail.com"]));
+
+            const isUserAdmin = allAdmins.includes(userEmailClean) || dbProfile?.role === "admin";
 
             const p: UserProfile = {
               id: dbProfile.id,
@@ -390,8 +394,11 @@ export default function Profile() {
             const savedAvatar = localStorage.getItem(`profile_avatar_${user.id}`);
             const resolvedAvatar = savedAvatar || user.imageUrl || null;
             const userEmailClean = (user.primaryEmailAddress?.emailAddress || "").toLowerCase().trim();
-            const ROOT_ADMIN_EMAILS = ["veereshhp2004@gmail.com", "veereshhp04@gmail.com"];
-            const isUserAdmin = ROOT_ADMIN_EMAILS.includes(userEmailClean) || localStorage.getItem("recodex_admin_user") === "true";
+            const serverPromoted = await getPromotedAdminsApi();
+            const promotedRaw = localStorage.getItem("recodex_promoted_admin_emails");
+            const localPromoted: string[] = promotedRaw ? JSON.parse(promotedRaw) : [];
+            const allAdmins = Array.from(new Set([...serverPromoted, ...localPromoted, "veereshhp2004@gmail.com", "veereshhp04@gmail.com"]));
+            const isUserAdmin = allAdmins.includes(userEmailClean);
             
             const demoProjects: any[] = [];
 

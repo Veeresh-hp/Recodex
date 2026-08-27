@@ -472,6 +472,77 @@ export async function promoteUserAdminApi(email: string, role: string): Promise<
   }
 }
 
+export interface AuditLogEntry {
+  id: string;
+  adminName: string;
+  adminEmail: string;
+  action: string;
+  target: string;
+  details?: string;
+  timestamp: string;
+  formattedDate: string;
+}
+
+/**
+ * Fetches all attributed admin audit logs.
+ */
+export async function getAuditLogsApi(): Promise<AuditLogEntry[]> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/users/audit-logs`);
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data)) return data;
+    }
+  } catch (err) {
+    console.warn("Failed to fetch audit logs from backend:", err);
+  }
+  const rawLocal = typeof window !== "undefined" ? localStorage.getItem("recodex_audit_logs") : null;
+  return rawLocal ? JSON.parse(rawLocal) : [];
+}
+
+/**
+ * Logs an attributed admin action to backend API & local storage.
+ */
+export async function logAdminActivityApi(logData: {
+  adminName: string;
+  adminEmail: string;
+  action: string;
+  target: string;
+  details?: string;
+}): Promise<any> {
+  const newEntry: AuditLogEntry = {
+    id: `audit-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+    adminName: logData.adminName || "System Admin",
+    adminEmail: logData.adminEmail || "admin@recodex.in",
+    action: logData.action,
+    target: logData.target || "N/A",
+    details: logData.details || "",
+    timestamp: new Date().toISOString(),
+    formattedDate: new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" })
+  };
+
+  try {
+    if (typeof window !== "undefined") {
+      const rawLocal = localStorage.getItem("recodex_audit_logs");
+      const list: AuditLogEntry[] = rawLocal ? JSON.parse(rawLocal) : [];
+      const updated = [newEntry, ...list].slice(0, 100);
+      localStorage.setItem("recodex_audit_logs", JSON.stringify(updated));
+    }
+  } catch (e) {
+    console.warn("Local audit log save warning:", e);
+  }
+
+  try {
+    await fetch(`${API_BASE_URL}/users/audit-logs`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(logData),
+    });
+  } catch (err) {
+    console.warn("Failed to post audit log to backend:", err);
+  }
+}
+
 /**
  * Updates a user's details inside the PostgreSQL database.
  */

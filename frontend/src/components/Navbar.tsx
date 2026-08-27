@@ -39,13 +39,9 @@ export default function Navbar() {
           (u: any) => u.email && u.email.toLowerCase().trim() === userEmail
         );
 
-        const ROOT_ADMIN_EMAILS = ["veereshhp2004@gmail.com", "veereshhp04@gmail.com"];
-        const isUserAdmin =
-          ROOT_ADMIN_EMAILS.includes(userEmail) ||
-          localStorage.getItem("recodex_admin_user") === "true" ||
-          (dbUserRecord && dbUserRecord.role === "admin");
-
-        setIsAdmin(Boolean(isUserAdmin));
+        // Header Dashboard button is strictly reserved for the Owner account (veereshhp2004@gmail.com)
+        const isOwner = userEmail === "veereshhp2004@gmail.com";
+        setIsAdmin(isOwner);
 
         const savedAvatar = localStorage.getItem(`profile_avatar_${userId}`);
         setNavAvatar(savedAvatar || user.imageUrl || null);

@@ -16,7 +16,8 @@ import {
   updateProject, deleteProject, getInquiries, 
   deleteInquiry, replyToInquiry, getUserProfile,
   getCertificatesApi, saveCertificateApi, deleteCertificateApi,
-  promoteUserAdminApi
+  promoteUserAdminApi, getPromotedAdminsApi, getAuditLogsApi, logAdminActivityApi,
+  AuditLogEntry
 } from "../services/api";
 import { useTheme } from "../context/ThemeContext";
 
@@ -210,6 +211,23 @@ export default function Dashboard() {
     { id: "#cam-k0012", repo: "user-profile-edge", status: "FAILED", env: "BETA", timestamp: "1h ago", timeAgoInSeconds: 3600 },
   ]);
 
+  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
+
+  const fetchAuditLogs = async () => {
+    try {
+      const logs = await getAuditLogsApi();
+      setAuditLogs(logs);
+    } catch (err) {
+      console.warn("Audit log fetch error:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchAuditLogs();
+    const interval = setInterval(fetchAuditLogs, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
   // Search & Filtration states
   const [userSearch, setUserSearch] = useState("");
   const [userRoleFilter, setUserRoleFilter] = useState("All");
@@ -378,20 +396,18 @@ export default function Dashboard() {
 
       if (userId && user) {
         const userEmail = (user.primaryEmailAddress?.emailAddress || "").toLowerCase().trim();
-        const ROOT_ADMIN_EMAILS = ["veereshhp2004@gmail.com", "veereshhp04@gmail.com"];
-        const isRootAdmin = ROOT_ADMIN_EMAILS.includes(userEmail);
+        const serverAdmins = await getPromotedAdminsApi();
+        const promotedRaw = localStorage.getItem("recodex_promoted_admin_emails");
+        const localPromoted: string[] = promotedRaw ? JSON.parse(promotedRaw) : [];
+        const allAdmins = Array.from(new Set([...serverAdmins, ...localPromoted, "veereshhp2004@gmail.com", "veereshhp04@gmail.com"]));
 
-        const syncedUsersRaw = localStorage.getItem("recodex_synced_users");
-        const syncedUsers: any[] = syncedUsersRaw ? JSON.parse(syncedUsersRaw) : [];
-        const dbUserRecord = syncedUsers.find(
-          (u: any) => u.email && u.email.toLowerCase().trim() === userEmail
-        );
-        const isPromotedAdmin = dbUserRecord && dbUserRecord.role === "admin";
+        const isAuthorizedAdmin = allAdmins.includes(userEmail);
 
-        if (isRootAdmin || isPromotedAdmin) {
+        if (isAuthorizedAdmin) {
           localStorage.setItem("recodex_admin_user", "true");
           setAdminEmail(userEmail);
-          setAdminName(user.fullName || (dbUserRecord && dbUserRecord.name) || "Admin");
+          const displayName = user.fullName || user.username || userEmail.split("@")[0] || "Admin";
+          setAdminName(displayName);
           return;
         }
 
@@ -1093,6 +1109,14 @@ export default function Dashboard() {
       setDbUsers((prev) => 
         prev.map((u) => u.id === editingUser.id ? { ...u, name: newEditName, role: newEditRole } : u)
       );
+      logAdminActivityApi({
+        adminName: adminName || user?.fullName || "Admin",
+        adminEmail: adminEmail || user?.primaryEmailAddress?.emailAddress || "",
+        action: "EDITED USER PROFILE",
+        target: `${newEditName} (${editingUser.email})`,
+        details: `Updated name to ${newEditName} and role to ${newEditRole}`
+      });
+      fetchAuditLogs();
       fetchUsers();
       setToast({ message: "User profile details updated successfully.", type: "success" });
       setEditingUser(null);
@@ -1157,6 +1181,14 @@ export default function Dashboard() {
       }
 
       setDbUsers((prev) => prev.map((u) => u.id === userId ? { ...u, role: targetRole } : u));
+      logAdminActivityApi({
+        adminName: adminName || user?.fullName || "Admin",
+        adminEmail: adminEmail || user?.primaryEmailAddress?.emailAddress || "",
+        action: makeAdmin ? "PROMOTED USER TO ADMIN" : "DEMOTED USER TO DEVELOPER",
+        target: `${userToModify.name} (${userToModify.email})`,
+        details: `Updated role to ${targetRole.toUpperCase()}`
+      });
+      fetchAuditLogs();
       fetchUsers();
       setToast({ message: `User role changed to ${targetRole.toUpperCase()}.`, type: "success" });
     } catch (err) {
@@ -1291,6 +1323,7 @@ export default function Dashboard() {
     { label: "Reports", icon: "assessment" },
     { label: "Inquiries", icon: "question_answer" },
     { label: "Certificates", icon: "verified" },
+    { label: "Audit Logs", icon: "history" },
     { label: "Notifications", icon: "notifications" },
     { label: "Settings", icon: "settings" },
     { label: "Recycle Bin", icon: "delete" },
@@ -2724,6 +2757,64 @@ export default function Dashboard() {
               document.body
             )}
 
+          </div>
+        );
+
+      case "Audit Logs":
+        return (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between border-b border-black/5 dark:border-white/5 pb-4">
+              <div>
+                <h2 className="text-xl font-bold font-mono text-zinc-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                  <span className="material-symbols-outlined text-primary">history</span>
+                  Admin Activity & Audit Log
+                </h2>
+                <p className="text-xs text-zinc-500 font-sans mt-0.5">
+                  Attributed history of admin actions shared across all administrator accounts.
+                </p>
+              </div>
+              <span className="px-3 py-1 bg-primary/10 text-primary dark:text-[#00d1ff] text-xs font-mono font-bold uppercase rounded-full border border-primary/20">
+                {auditLogs.length} Actions Logged
+              </span>
+            </div>
+
+            {auditLogs.length === 0 ? (
+              <div className="py-12 text-center text-xs font-mono text-zinc-400 uppercase tracking-wider bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5 rounded-2xl">
+                No admin activity recorded yet.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {auditLogs.map((log) => (
+                  <div key={log.id} className="p-4 bg-black/5 dark:bg-[#07090e] border border-black/10 dark:border-zinc-800 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all hover:border-primary/40">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="px-2.5 py-0.5 bg-primary/10 text-primary dark:text-[#00d1ff] text-[10px] font-mono font-bold uppercase rounded-md border border-primary/20">
+                          {log.action}
+                        </span>
+                        <span className="text-xs font-bold text-zinc-900 dark:text-white font-sans">
+                          {log.target}
+                        </span>
+                      </div>
+                      {log.details && (
+                        <p className="text-xs text-zinc-600 dark:text-zinc-400 font-sans italic pl-1">
+                          "{log.details}"
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-4 text-xs font-mono text-zinc-500 shrink-0">
+                      <div className="text-right">
+                        <span className="block font-bold text-zinc-800 dark:text-zinc-200">{log.adminName}</span>
+                        <span className="block text-[10px] text-zinc-400">{log.adminEmail}</span>
+                      </div>
+                      <span className="px-2.5 py-1 bg-black/10 dark:bg-white/5 text-zinc-400 text-[10px] rounded-lg">
+                        {log.formattedDate || log.timestamp}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         );
 
