@@ -8,6 +8,7 @@ import { generateIndustryInsights } from "./inngest/functions";
 import projectRoutes from "./routes/projects";
 import userRoutes from "./routes/users";
 import contactRoutes from "./routes/contacts";
+import certificateRoutes from "./routes/certificates";
 
 // Initialize environment variables from .env
 dotenv.config();
@@ -56,6 +57,7 @@ app.use((req: Request, _res: Response, next: NextFunction) => {
 app.use("/api/projects", projectRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/contacts", contactRoutes);
+app.use("/api/certificates", certificateRoutes);
 app.use("/api/inngest", serve({ client: inngest, functions: [generateIndustryInsights] }));
 
 // Basic Health Check Endpoint

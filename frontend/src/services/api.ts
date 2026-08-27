@@ -681,3 +681,84 @@ export async function replyToInquiry(id: string, reply: string, token: string): 
 
   return { id, reply, status: "Replied" };
 }
+
+/**
+ * Fetches all issued certificates from Express backend API with localStorage fallback.
+ */
+export async function getCertificatesApi(): Promise<any[]> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/certificates`, {
+      method: "GET",
+      headers: { "Accept": "application/json" },
+    });
+    if (response.ok) {
+      const data = await response.json();
+      if (Array.isArray(data) && data.length > 0) {
+        localStorage.setItem("recodex_global_certificates", JSON.stringify(data));
+        return data;
+      }
+    }
+  } catch (e) {
+    console.warn("[CERTIFICATES API] Backend fetch warning (using local fallback):", e);
+  }
+  const stored = localStorage.getItem("recodex_global_certificates");
+  return stored ? JSON.parse(stored) : [];
+}
+
+/**
+ * Saves/issues a certificate to Express backend API and syncs to localStorage.
+ */
+export async function saveCertificateApi(cert: any): Promise<any> {
+  try {
+    const stored = localStorage.getItem("recodex_global_certificates");
+    const certs: any[] = stored ? JSON.parse(stored) : [];
+    const idx = certs.findIndex((c: any) => c.id === cert.id || (cert.userEmail && c.userEmail === cert.userEmail));
+    if (idx >= 0) {
+      certs[idx] = cert;
+    } else {
+      certs.unshift(cert);
+    }
+    localStorage.setItem("recodex_global_certificates", JSON.stringify(certs));
+    window.dispatchEvent(new Event("recodex-certificates-update"));
+  } catch (e) {
+    console.warn("Local cert sync error:", e);
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/certificates`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Accept": "application/json" },
+      body: JSON.stringify(cert),
+    });
+    if (response.ok) {
+      return await response.json();
+    }
+  } catch (err) {
+    console.warn("[CERTIFICATES API] Save backend warning (saved locally):", err);
+  }
+  return cert;
+}
+
+/**
+ * Deletes/revokes a certificate via backend API and syncs to localStorage.
+ */
+export async function deleteCertificateApi(id: string): Promise<boolean> {
+  try {
+    const stored = localStorage.getItem("recodex_global_certificates");
+    if (stored) {
+      let certs: any[] = JSON.parse(stored);
+      certs = certs.filter((c: any) => c.id !== id);
+      localStorage.setItem("recodex_global_certificates", JSON.stringify(certs));
+      window.dispatchEvent(new Event("recodex-certificates-update"));
+    }
+  } catch (e) {
+    console.warn("Local cert delete error:", e);
+  }
+
+  try {
+    await fetch(`${API_BASE_URL}/certificates/${id}`, { method: "DELETE" });
+  } catch (err) {
+    console.warn("[CERTIFICATES API] Delete backend warning:", err);
+  }
+  return true;
+}

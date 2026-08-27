@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { useAuth, useUser } from "@clerk/clerk-react";
-import { getUserProfile, getInquiries } from "@/services/api";
+import { getUserProfile, getInquiries, getCertificatesApi } from "@/services/api";
 import {
   User as UserIcon, Shield, Mail, Phone, Cpu, ArrowLeft, ArrowRight,
   CheckCircle, ExternalLink, Camera, Upload, X, Check, CreditCard,
@@ -204,11 +204,10 @@ export default function Profile() {
   const [selectedCertView, setSelectedCertView] = useState<Certificate | null>(null);
 
   useEffect(() => {
-    const loadCertificates = () => {
+    const loadCertificates = async () => {
       try {
-        const stored = localStorage.getItem("recodex_global_certificates");
-        if (stored && profile) {
-          const allCerts: Certificate[] = JSON.parse(stored);
+        const allCerts: Certificate[] = await getCertificatesApi();
+        if (allCerts && profile) {
           const userEmailClean = (profile.email || "").toLowerCase().trim();
           const userNameClean = (profile.name || "").toLowerCase().trim();
           const userFirstName = userNameClean.split(" ")[0].replace(/[^a-z]/g, "");

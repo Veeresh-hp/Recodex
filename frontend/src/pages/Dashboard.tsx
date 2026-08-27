@@ -14,7 +14,8 @@ import Chart from "chart.js/auto";
 import { 
   getProjects, getUsers, updateUser, deleteUser, 
   updateProject, deleteProject, getInquiries, 
-  deleteInquiry, replyToInquiry, getUserProfile 
+  deleteInquiry, replyToInquiry, getUserProfile,
+  getCertificatesApi, saveCertificateApi, deleteCertificateApi
 } from "../services/api";
 import { useTheme } from "../context/ThemeContext";
 
@@ -302,6 +303,20 @@ export default function Dashboard() {
       setTick((t) => t + 1);
     }, 30000);
     return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    const fetchCerts = async () => {
+      try {
+        const certs = await getCertificatesApi();
+        if (certs && certs.length > 0) {
+          setCertificates(certs);
+        }
+      } catch (e) {
+        console.warn("Failed to fetch certs from API:", e);
+      }
+    };
+    fetchCerts();
   }, []);
 
   useEffect(() => {
@@ -894,6 +909,8 @@ export default function Dashboard() {
       fileType: certFileTypeVal || editingCertItem?.fileType,
     };
 
+    saveCertificateApi(newCert);
+
     setCertificates((prev) => {
       const existingIdx = prev.findIndex((c) => c.id === certId || (targetUser.email && c.userEmail === targetUser.email));
       if (existingIdx >= 0) {
@@ -934,6 +951,7 @@ export default function Dashboard() {
 
   const handleDeleteCertificate = (certId: string) => {
     if (!window.confirm("Are you sure you want to delete this certificate record?")) return;
+    deleteCertificateApi(certId);
     setCertificates((prev) => prev.filter((c) => c.id !== certId));
     setToast({ message: "Certificate record removed.", type: "success" });
   };
