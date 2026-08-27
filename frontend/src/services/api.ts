@@ -281,7 +281,7 @@ const REAL_ECOSYSTEM_USERS = [
     id: "user_3G82d9FackVcHk09TD8V9uHKJEt",
     name: "VEERESH H P",
     email: "veereshhp04@gmail.com",
-    role: "admin",
+    role: "developer",
     status: "Active",
     createdAt: "2026-07-11T15:58:52.253Z",
     profileImage: "https://img.clerk.com/eyJ0eXBlIjoicHJveHkiLCJzcmMiOiJodHRwczovL2ltYWdlcy5jbGVyay5kZXYvb2F1dGhfZ29vZ2xlL2ltZ18zRzgyZDN3UllpRWpTc3dlV1FnQ2o2eEN4c2kifQ"
@@ -414,7 +414,7 @@ export async function getUsers(): Promise<any[]> {
 
   const promotedAdminsRaw = typeof window !== "undefined" ? localStorage.getItem("recodex_promoted_admin_emails") : null;
   const localPromotedAdmins: string[] = promotedAdminsRaw ? JSON.parse(promotedAdminsRaw) : [];
-  const ROOT_ADMIN_EMAILS = ["veereshhp2004@gmail.com", "veereshhp04@gmail.com"];
+  const ROOT_ADMIN_EMAILS = ["veereshhp2004@gmail.com"];
 
   const allPromotedAdmins = Array.from(new Set([
     ...ROOT_ADMIN_EMAILS,
@@ -454,7 +454,7 @@ export async function getPromotedAdminsApi(): Promise<string[]> {
   } catch (err) {
     console.warn("Failed to fetch promoted admins from backend:", err);
   }
-  return ["veereshhp2004@gmail.com", "veereshhp04@gmail.com"];
+  return ["veereshhp2004@gmail.com"];
 }
 
 /**

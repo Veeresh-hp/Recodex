@@ -1145,10 +1145,10 @@ export default function Dashboard() {
 
   const handleToggleUserAdmin = async (userId: string, makeAdmin: boolean) => {
     const userToModify = dbUsers.find((u) => u.id === userId);
-    const ROOT_ADMIN_EMAILS = ["veereshhp2004@gmail.com", "veereshhp04@gmail.com"];
-    if (userToModify && !makeAdmin && ROOT_ADMIN_EMAILS.includes((userToModify.email || "").toLowerCase().trim())) {
+    const OWNER_EMAIL = "veereshhp2004@gmail.com";
+    if (userToModify && !makeAdmin && (userToModify.email || "").toLowerCase().trim() === OWNER_EMAIL) {
       setToast({
-        message: "Demoting root administrator accounts is prohibited to maintain security clearance.",
+        message: "Demoting the root platform owner account is prohibited to maintain security clearance.",
         type: "warning",
       });
       return;

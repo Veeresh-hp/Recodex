@@ -18,7 +18,7 @@ const upload = multer({
 const PROMOTED_ADMINS_FILE = path.join(__dirname, "../../promoted_admins_db.json");
 
 const getSavedPromotedAdmins = (): string[] => {
-  const rootAdmins = ["veereshhp2004@gmail.com", "veereshhp04@gmail.com"];
+  const rootAdmins = ["veereshhp2004@gmail.com"];
   try {
     if (fs.existsSync(PROMOTED_ADMINS_FILE)) {
       const data = fs.readFileSync(PROMOTED_ADMINS_FILE, "utf-8");
@@ -37,7 +37,7 @@ const savePromotedAdmin = (email: string, isMakeAdmin: boolean) => {
   if (isMakeAdmin) {
     if (!list.includes(emailClean)) list.push(emailClean);
   } else {
-    if (!["veereshhp2004@gmail.com", "veereshhp04@gmail.com"].includes(emailClean)) {
+    if (emailClean !== "veereshhp2004@gmail.com") {
       list = list.filter((e) => e !== emailClean);
     }
   }
@@ -176,7 +176,7 @@ router.get("/profile", requireAuth, async (req: AuthenticatedRequest, res: Respo
  */
 const FALLBACK_USERS = [
   { id: "user_3GMUgXnuLD5lHb6Rn9O8P2TIPMW", name: "Veeresh H P", email: "veereshhp2004@gmail.com", role: "admin", status: "Active" },
-  { id: "user_3G82d9FackVcHk09TD8V9uHKJEt", name: "VEERESH H P", email: "veereshhp04@gmail.com", role: "admin", status: "Active" },
+  { id: "user_3G82d9FackVcHk09TD8V9uHKJEt", name: "VEERESH H P", email: "veereshhp04@gmail.com", role: "developer", status: "Active" },
   { id: "user_3IKkzxTelZizaJk8JgKn4iGZXHi", name: "veer_thinks", email: "veerthinks@gmail.com", role: "developer", status: "Active" },
   { id: "user_3IKE3zF8zNPvnmxWhNQqnscyFB3", name: "Vaibhav joshi", email: "vaibhavjoshi18660@gmail.com", role: "developer", status: "Active" },
   { id: "user_3IKF89Diganth0719Gowda001", name: "Diganth Gowda", email: "diganthgowda0719@gmail.com", role: "developer", status: "Active" },
@@ -202,8 +202,7 @@ router.get("/", async (_req, res) => {
             const firstName = u.first_name || "";
             const lastName = u.last_name || "";
             const fullName = [firstName, lastName].filter(Boolean).join(" ") || u.username || email.split("@")[0];
-            const ROOT_ADMIN_EMAILS = ["veereshhp2004@gmail.com", "veereshhp04@gmail.com"];
-            const isRootAdmin = ROOT_ADMIN_EMAILS.includes(email.toLowerCase());
+            const isRootAdmin = email.toLowerCase() === "veereshhp2004@gmail.com";
             const img = u.image_url || u.profile_image_url || null;
 
             const existingUser = await prisma.user.findUnique({ where: { id: u.id } });
@@ -288,8 +287,7 @@ router.post("/sync", async (req, res) => {
   }
 
   try {
-    const ROOT_ADMIN_EMAILS = ["veereshhp2004@gmail.com", "veereshhp04@gmail.com"];
-    const isRootAdmin = ROOT_ADMIN_EMAILS.includes(email.toLowerCase());
+    const isRootAdmin = email.toLowerCase() === "veereshhp2004@gmail.com";
     const existingUser = await prisma.user.findUnique({ where: { id } });
     const userRole = isRootAdmin ? "admin" : (existingUser?.role || role || "client");
 
