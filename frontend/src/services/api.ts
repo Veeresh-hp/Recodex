@@ -482,28 +482,7 @@ export async function submitInquiry(inquiryData: {
     message: inquiryData.message,
   };
 
-  // 1. Direct browser fetch to Google Apps Script Webhook (both text/plain & form-encoded for 100% compatibility)
-  try {
-    fetch(GOOGLE_SCRIPT_WEBHOOK_URL, {
-      method: "POST",
-      mode: "no-cors",
-      headers: { "Content-Type": "text/plain" },
-      body: JSON.stringify(payload),
-    }).catch(() => {});
-
-    const formParams = new URLSearchParams();
-    Object.entries(payload).forEach(([k, v]) => formParams.append(k, String(v)));
-    fetch(GOOGLE_SCRIPT_WEBHOOK_URL, {
-      method: "POST",
-      mode: "no-cors",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: formParams.toString(),
-    }).catch(() => {});
-  } catch (gErr) {
-    console.warn("[CONTACT WEBHOOK] Direct Google Apps Script dispatch error:", gErr);
-  }
-
-  // 2. Persist locally for immediate offline/client-side access & Admin Dashboard
+  // 1. Persist locally for immediate offline/client-side access & Admin Dashboard
   try {
     if (typeof window !== "undefined") {
       const raw = localStorage.getItem("recodex_submitted_inquiries");
@@ -519,7 +498,8 @@ export async function submitInquiry(inquiryData: {
     console.warn("[RECODEX API] Local storage inquiry save warning:", lErr);
   }
 
-  // 3. Attempt primary Express backend POST request
+  // 2. Attempt primary Express backend POST request (which syncs to Google Sheets once)
+  let backendSuccess = false;
   try {
     const response = await fetch(`${API_BASE_URL}/contacts`, {
       method: "POST",
@@ -531,13 +511,27 @@ export async function submitInquiry(inquiryData: {
     });
 
     if (response.ok) {
+      backendSuccess = true;
       return await response.json();
     }
   } catch (backendError) {
-    console.warn("[RECODEX API] Backend submit inquiry warning (Google Sheet synced directly):", backendError);
+    console.warn("[RECODEX API] Backend submit inquiry warning (using direct Google Sheet sync fallback):", backendError);
   }
 
-  // Return success response if Google Sheet / LocalSync succeeded so form never blocks user
+  // 3. Fallback direct client fetch to Google Apps Script Webhook ONLY if backend is unavailable
+  if (!backendSuccess) {
+    try {
+      await fetch(GOOGLE_SCRIPT_WEBHOOK_URL, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify(payload),
+      });
+    } catch (gErr) {
+      console.warn("[CONTACT WEBHOOK] Direct Google Apps Script dispatch error:", gErr);
+    }
+  }
+
   return { success: true, message: "Inquiry submitted and synced successfully.", data: payload };
 }
 

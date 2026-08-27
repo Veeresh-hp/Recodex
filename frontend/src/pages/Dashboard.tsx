@@ -7,7 +7,7 @@ import {
   Settings as SettingsIcon, Users, BarChart3, 
   Trash2, Plus, Edit3, Globe,
   AlertTriangle, Search, FileText, CheckCircle, Award, XCircle, RefreshCw, Send, Menu, X,
-  Mail, MessageSquare
+  Mail, MessageSquare, Upload, Download, Eye, FileUp, PlusCircle, Calendar, Slash, CheckCircle2, HelpCircle
 } from "lucide-react";
 import { useAuth, useUser, useClerk } from "@clerk/clerk-react";
 import Chart from "chart.js/auto";
@@ -39,10 +39,16 @@ interface Report {
 
 interface Certificate {
   id: string;
+  userId?: string;
+  userEmail?: string;
   studentName: string;
   projectName: string;
   issueDate: string;
-  status: "Approved" | "Pending" | "Revoked";
+  status: "Approved" | "Pending" | "Revoked" | "Not Issued";
+  fileData?: string;
+  fileName?: string;
+  fileType?: string;
+  description?: string;
 }
 
 interface Announcement {
@@ -217,23 +223,57 @@ export default function Dashboard() {
 
   const [reports, setReports] = useState<Report[]>(() => {
     const stored = localStorage.getItem("recodex_global_reports");
-    return stored ? JSON.parse(stored) : [
-      { id: "rep-01", type: "Fake Client", target: "John Skynet", reporter: "@zero_ptr", description: "Spam project postings with unreachable deposit endpoints.", status: "Open", date: "2h ago" },
-      { id: "rep-02", type: "Fake Student", target: "Bob Malicious", reporter: "@rust_lord", description: "Copied code block answers verified as pre-compiled malware downloads.", status: "Under Review", date: "1d ago" },
-      { id: "rep-03", type: "Payment Issue", target: "Order #cam-8d2a1", reporter: "@j_doe_stack", description: "Commission clearance delay on decentralized vault settlement.", status: "Resolved", date: "4d ago" }
-    ];
+    if (!stored) return [];
+    try {
+      const parsed: Report[] = JSON.parse(stored);
+      const cleaned = parsed.filter(
+        (r) =>
+          !["john skynet", "bob malicious", "order #cam-8d2a1"].includes((r.target || "").toLowerCase().trim()) &&
+          !["rep-01", "rep-02", "rep-03"].includes((r.id || "").toLowerCase().trim())
+      );
+      if (cleaned.length !== parsed.length) {
+        localStorage.setItem("recodex_global_reports", JSON.stringify(cleaned));
+      }
+      return cleaned;
+    } catch {
+      return [];
+    }
   });
   const [reportsFilter, setReportsFilter] = useState("All");
 
   const [certificates, setCertificates] = useState<Certificate[]>(() => {
     const stored = localStorage.getItem("recodex_global_certificates");
-    return stored ? JSON.parse(stored) : [
-      { id: "CERT-9402", studentName: "John Doe", projectName: "Quantum-Flux Core Integration", issueDate: "2026-05-24", status: "Approved" },
-      { id: "CERT-1842", studentName: "Alice Vance", projectName: "Nebula Arch Node Auto-Scaler", issueDate: "2026-05-27", status: "Pending" },
-      { id: "CERT-0691", studentName: "Sarah Connor", projectName: "Neural Sift AI Vulnerability Scanner", issueDate: "2026-05-20", status: "Approved" }
-    ];
+    if (!stored) return [];
+    try {
+      const parsed: Certificate[] = JSON.parse(stored);
+      const cleaned = parsed.filter(
+        (c) =>
+          !["john doe", "alice vance", "sarah connor"].includes(c.studentName?.toLowerCase() || "") &&
+          !["cert-9402", "cert-1842", "cert-0691"].includes(c.id?.toLowerCase() || "")
+      );
+      if (cleaned.length !== parsed.length) {
+        localStorage.setItem("recodex_global_certificates", JSON.stringify(cleaned));
+      }
+      return cleaned;
+    } catch {
+      return [];
+    }
   });
   const [selectedCertDownload, setSelectedCertDownload] = useState<Certificate | null>(null);
+
+  // Certificate Management modal & upload states
+  const [uploadingCertUser, setUploadingCertUser] = useState<any | null>(null);
+  const [editingCertItem, setEditingCertItem] = useState<Certificate | null>(null);
+  const [selectedCertView, setSelectedCertView] = useState<Certificate | null>(null);
+
+  const [certProjectTitleInput, setCertProjectTitleInput] = useState("Software Solution Project");
+  const [certIssueDateInput, setCertIssueDateInput] = useState(() => new Date().toISOString().split("T")[0]);
+  const [certStatusInput, setCertStatusInput] = useState<"Approved" | "Pending" | "Revoked">("Approved");
+  const [certFileDataUrl, setCertFileDataUrl] = useState<string>("");
+  const [certFileNameVal, setCertFileNameVal] = useState<string>("");
+  const [certFileTypeVal, setCertFileTypeVal] = useState<string>("");
+  const [certSearchTerm, setCertSearchTerm] = useState("");
+  const [showHelpModal, setShowHelpModal] = useState(false);
 
   const [announcements, setAnnouncements] = useState<Announcement[]>(() => {
     const stored = localStorage.getItem("recodex_global_announcements");
@@ -274,6 +314,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     localStorage.setItem("recodex_global_certificates", JSON.stringify(certificates));
+    window.dispatchEvent(new Event("recodex-certificates-update"));
   }, [certificates]);
 
   useEffect(() => {
@@ -776,9 +817,147 @@ export default function Dashboard() {
     setToast({ message: `Report marked as ${nextStatus}.`, type: "success" });
   };
 
-  const handleModifyCertStatus = (id: string, nextStatus: "Approved" | "Pending" | "Revoked") => {
+  const handleModifyCertStatus = (id: string, nextStatus: "Approved" | "Pending" | "Revoked" | "Not Issued") => {
     setCertificates(certificates.map((cert) => cert.id === id ? { ...cert, status: nextStatus } : cert));
     setToast({ message: `Certificate status updated to ${nextStatus}.`, type: "success" });
+  };
+
+  const handleUpdateCertField = (
+    certId: string,
+    userItem: any,
+    field: "projectName" | "issueDate" | "status",
+    value: string
+  ) => {
+    setCertificates((prev) => {
+      const targetEmail = userItem?.email;
+      const targetId = userItem?.id;
+
+      const existingIndex = prev.findIndex(
+        (c) =>
+          (certId !== "--" && c.id === certId) ||
+          (targetEmail && c.userEmail && c.userEmail.toLowerCase() === targetEmail.toLowerCase()) ||
+          (targetId && c.userId === targetId)
+      );
+
+      if (existingIndex >= 0) {
+        const updated = [...prev];
+        updated[existingIndex] = {
+          ...updated[existingIndex],
+          [field]: value,
+        };
+        return updated;
+      } else {
+        const newCert: Certificate = {
+          id: `CERT-${Math.floor(1000 + Math.random() * 9000)}`,
+          userId: userItem?.id,
+          userEmail: userItem?.email,
+          studentName: userItem?.name || "Student Developer",
+          projectName: field === "projectName" ? value : "Software Solution Project",
+          issueDate: field === "issueDate" ? value : new Date().toISOString().split("T")[0],
+          status: field === "status" ? (value as any) : "Approved",
+        };
+        return [newCert, ...prev];
+      }
+    });
+  };
+
+  const handleCertFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const result = evt.target?.result as string;
+      setCertFileDataUrl(result);
+      setCertFileNameVal(file.name);
+      setCertFileTypeVal(file.type);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSaveCertificate = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!uploadingCertUser && !editingCertItem) return;
+
+    const targetUser = uploadingCertUser || { name: editingCertItem?.studentName, email: editingCertItem?.userEmail, id: editingCertItem?.userId };
+    const certId = editingCertItem ? editingCertItem.id : `CERT-${Math.floor(1000 + Math.random() * 9000)}`;
+
+    const newCert: Certificate = {
+      id: certId,
+      userId: targetUser.id,
+      userEmail: targetUser.email,
+      studentName: targetUser.name || "Student Developer",
+      projectName: certProjectTitleInput.trim() || "Software Solution Project",
+      issueDate: certIssueDateInput || new Date().toISOString().split("T")[0],
+      status: certStatusInput,
+      fileData: certFileDataUrl || editingCertItem?.fileData,
+      fileName: certFileNameVal || editingCertItem?.fileName,
+      fileType: certFileTypeVal || editingCertItem?.fileType,
+    };
+
+    setCertificates((prev) => {
+      const existingIdx = prev.findIndex((c) => c.id === certId || (targetUser.email && c.userEmail === targetUser.email));
+      if (existingIdx >= 0) {
+        const copy = [...prev];
+        copy[existingIdx] = newCert;
+        return copy;
+      }
+      return [newCert, ...prev];
+    });
+
+    // Create & dispatch notification for target user
+    try {
+      const annListRaw = localStorage.getItem("recodex_global_announcements");
+      const annList: any[] = annListRaw ? JSON.parse(annListRaw) : [];
+      const newAnn = {
+        id: `ann-cert-${certId}-${Date.now()}`,
+        title: `🏆 Certificate Issued: ${newCert.projectName}`,
+        message: `Official project completion certificate [${certId}] has been verified and issued for ${targetUser.name} (${targetUser.email}).`,
+        type: "New Feature",
+        date: new Date().toISOString(),
+      };
+      annList.unshift(newAnn);
+      localStorage.setItem("recodex_global_announcements", JSON.stringify(annList));
+      window.dispatchEvent(new Event("recodex-announcements-update"));
+    } catch (e) {
+      console.warn("Failed to dispatch certificate notification:", e);
+    }
+
+    setToast({ message: `Certificate ${certId} issued/updated for ${targetUser.name} successfully.`, type: "success" });
+
+    // Reset modal state
+    setUploadingCertUser(null);
+    setEditingCertItem(null);
+    setCertFileDataUrl("");
+    setCertFileNameVal("");
+    setCertFileTypeVal("");
+  };
+
+  const handleDeleteCertificate = (certId: string) => {
+    if (!window.confirm("Are you sure you want to delete this certificate record?")) return;
+    setCertificates((prev) => prev.filter((c) => c.id !== certId));
+    setToast({ message: "Certificate record removed.", type: "success" });
+  };
+
+  const handleDownloadCertFile = (cert: Certificate) => {
+    if (cert.fileData) {
+      const link = document.createElement("a");
+      link.href = cert.fileData;
+      link.download = cert.fileName || `Certificate_${cert.studentName.replace(/\s+/g, "_")}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } else {
+      const certText = `RECODEX VERIFIED CERTIFICATE OF COMPLETION\n============================================\nCertificate ID: ${cert.id}\nStudent/Developer Name: ${cert.studentName}\nProject Title: ${cert.projectName}\nIssue Date: ${cert.issueDate}\nStatus: VERIFIED & APPROVED\nIssuer: RecodeX Developer Marketplace & Software Solutions\nVerification Signature: ${Math.random().toString(36).substring(2, 15).toUpperCase()}\n`;
+      const blob = new Blob([certText], { type: "text/plain" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `RecodeX_Certificate_${cert.studentName.replace(/\s+/g, "_")}.txt`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    }
   };
 
   const handleModifyUserStatus = async (userId: string, targetStatus: string) => {
@@ -1694,48 +1873,56 @@ export default function Dashboard() {
               </select>
             </div>
 
-            <div className="grid grid-cols-1 gap-4 pt-2 select-text">
-              {filteredReports.map((rep) => (
-                <div key={rep.id} className="p-5 bg-black/5 dark:bg-zinc-900/30 border border-black/5 dark:border-zinc-900 rounded-xl space-y-4">
-                  <div className="flex flex-wrap justify-between items-center gap-2">
-                    <div className="flex items-center gap-2.5">
-                      <span className="text-[7px] font-mono px-1.5 py-0.5 rounded bg-red-500/10 border border-red-500/25 text-red-500 font-bold uppercase">{rep.type}</span>
-                      <span className="text-xs font-mono font-extrabold text-foreground dark:text-white">{rep.target}</span>
+            {filteredReports.length === 0 ? (
+              <div className="p-12 text-center text-zinc-400 font-mono text-xs border border-dashed border-black/10 dark:border-zinc-800 rounded-xl space-y-2">
+                <AlertTriangle size={32} className="mx-auto text-zinc-500" />
+                <p className="uppercase font-bold text-foreground dark:text-white">No User Reports or Complaints Filed</p>
+                <p className="text-[11px] text-zinc-500 font-sans">Ecosystem telemetry is clean. User complaints and security flags will appear here when filed.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-4 pt-2 select-text">
+                {filteredReports.map((rep) => (
+                  <div key={rep.id} className="p-5 bg-black/5 dark:bg-zinc-900/30 border border-black/5 dark:border-zinc-900 rounded-xl space-y-4">
+                    <div className="flex flex-wrap justify-between items-center gap-2">
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-[7px] font-mono px-1.5 py-0.5 rounded bg-red-500/10 border border-red-500/25 text-red-500 font-bold uppercase">{rep.type}</span>
+                        <span className="text-xs font-mono font-extrabold text-foreground dark:text-white">{rep.target}</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-[8px] font-mono text-zinc-500">Filed by {rep.reporter} • {rep.date}</span>
+                        <span className={`px-2 py-0.5 rounded text-[8px] font-mono font-black uppercase border ${
+                          rep.status === "Resolved" ? "bg-green-500/10 border-green-500/25 text-green-500" :
+                          rep.status === "Under Review" ? "bg-yellow-500/10 border-yellow-500/25 text-yellow-500 animate-pulse" :
+                          "bg-red-500/10 border-red-500/25 text-red-500"
+                        }`}>
+                          {rep.status}
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-[8px] font-mono text-zinc-500">Filed by {rep.reporter} • {rep.date}</span>
-                      <span className={`px-2 py-0.5 rounded text-[8px] font-mono font-black uppercase border ${
-                        rep.status === "Resolved" ? "bg-green-500/10 border-green-500/25 text-green-500" :
-                        rep.status === "Under Review" ? "bg-yellow-500/10 border-yellow-500/25 text-yellow-500 animate-pulse" :
-                        "bg-red-500/10 border-red-500/25 text-red-500"
-                      }`}>
-                        {rep.status}
-                      </span>
-                    </div>
-                  </div>
-                  <p className="text-xs text-zinc-650 dark:text-zinc-350 leading-relaxed font-sans">{rep.description}</p>
-                  
-                  {rep.status !== "Resolved" && (
-                    <div className="flex justify-end gap-2 select-none">
-                      {rep.status === "Open" && (
+                    <p className="text-xs text-zinc-650 dark:text-zinc-350 leading-relaxed font-sans">{rep.description}</p>
+                    
+                    {rep.status !== "Resolved" && (
+                      <div className="flex justify-end gap-2 select-none">
+                        {rep.status === "Open" && (
+                          <button
+                            onClick={() => handleModifyReportStatus(rep.id, "Under Review")}
+                            className="px-2.5 py-1.5 bg-yellow-500/10 border border-yellow-500/20 text-yellow-500 hover:bg-yellow-500/20 rounded text-[8px] font-mono font-bold uppercase tracking-wider transition-all"
+                          >
+                            Investigate
+                          </button>
+                        )}
                         <button
-                          onClick={() => handleModifyReportStatus(rep.id, "Under Review")}
-                          className="px-2.5 py-1.5 bg-yellow-500/10 border border-yellow-500/20 text-yellow-500 hover:bg-yellow-500/20 rounded text-[8px] font-mono font-bold uppercase tracking-wider transition-all"
+                          onClick={() => handleModifyReportStatus(rep.id, "Resolved")}
+                          className="px-2.5 py-1.5 bg-green-500/10 border border-green-500/20 text-green-500 hover:bg-green-500/20 rounded text-[8px] font-mono font-bold uppercase tracking-wider transition-all"
                         >
-                          Investigate
+                          Resolve
                         </button>
-                      )}
-                      <button
-                        onClick={() => handleModifyReportStatus(rep.id, "Resolved")}
-                        className="px-2.5 py-1.5 bg-green-500/10 border border-green-500/20 text-green-500 hover:bg-green-500/20 rounded text-[8px] font-mono font-bold uppercase tracking-wider transition-all"
-                      >
-                        Resolve
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         );
 
@@ -1943,95 +2130,437 @@ export default function Dashboard() {
         );
 
       case "Certificates":
+        // Combine registered real users (dbUsers) with issued certificates
+        const activeUsersList = dbUsers.filter((u) => !softDeletedUserIds.includes(u.id));
+
+        // Create a unified list of certificate rows for all real registered users
+        const certRowsMap = new Map<string, any>();
+
+        // 1. Add all certificates in certificates state
+        certificates.forEach((c) => {
+          const key = (c.userEmail || c.studentName || c.id).toLowerCase();
+          certRowsMap.set(key, c);
+        });
+
+        // 2. Map all real users so every registered user appears automatically
+        const combinedCertRows = activeUsersList.map((userItem) => {
+          const key = (userItem.email || userItem.name).toLowerCase();
+          const existingCert = certRowsMap.get(key) || certificates.find(c => c.userId === userItem.id);
+
+          if (existingCert) {
+            return {
+              certId: existingCert.id,
+              userItem,
+              studentName: existingCert.studentName || userItem.name,
+              userEmail: userItem.email,
+              projectName: existingCert.projectName || "Software Solution Project",
+              issueDate: existingCert.issueDate || new Date().toISOString().split("T")[0],
+              status: existingCert.status || "Approved",
+              cert: existingCert,
+              isIssued: true,
+            };
+          }
+
+          return {
+            certId: "--",
+            userItem,
+            studentName: userItem.name,
+            userEmail: userItem.email,
+            projectName: "Software Solution Project",
+            issueDate: "--",
+            status: "Not Issued",
+            cert: null,
+            isIssued: false,
+          };
+        });
+
+        // Add standalone certs that don't match dbUsers
+        certificates.forEach((c) => {
+          if (["john doe", "alice vance", "sarah connor"].includes(c.studentName?.toLowerCase() || "")) return;
+          if (["cert-9402", "cert-1842", "cert-0691"].includes(c.id?.toLowerCase() || "")) return;
+
+          const hasMatched = activeUsersList.some(
+            (u) => (c.userEmail && u.email.toLowerCase() === c.userEmail.toLowerCase()) || (c.userId && u.id === c.userId)
+          );
+          if (!hasMatched) {
+            combinedCertRows.push({
+              certId: c.id,
+              userItem: { name: c.studentName, email: c.userEmail || "" },
+              studentName: c.studentName,
+              userEmail: c.userEmail || "",
+              projectName: c.projectName,
+              issueDate: c.issueDate,
+              status: c.status,
+              cert: c,
+              isIssued: true,
+            });
+          }
+        });
+
+        // Filter rows by search term
+        const filteredCertRows = combinedCertRows.filter((r) =>
+          !["john doe", "alice vance", "sarah connor"].includes(r.studentName?.toLowerCase() || "") &&
+          !["cert-9402", "cert-1842", "cert-0691"].includes(r.certId?.toLowerCase() || "") &&
+          (!certSearchTerm ||
+          r.studentName.toLowerCase().includes(certSearchTerm.toLowerCase()) ||
+          r.userEmail.toLowerCase().includes(certSearchTerm.toLowerCase()) ||
+          r.projectName.toLowerCase().includes(certSearchTerm.toLowerCase()) ||
+          r.certId.toLowerCase().includes(certSearchTerm.toLowerCase()))
+        );
+
         return (
-          <div className="bg-white dark:bg-[#0b0e14] border border-black/10 dark:border-zinc-900 rounded-2xl p-8 space-y-6 shadow-lg transition-colors duration-300">
-            <div>
-              <h3 className="text-lg font-bold text-foreground dark:text-white font-sans font-extrabold uppercase">Certificate Management</h3>
-              <p className="text-xs text-zinc-400 dark:text-zinc-500">Approve, issue, revoke, and generate developer project completion credentials.</p>
+          <div className="bg-white dark:bg-[#0b0e14] border border-black/10 dark:border-zinc-900 rounded-2xl p-6 sm:p-8 space-y-6 shadow-lg transition-colors duration-300 select-text">
+            {/* Header & Controls */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-black/5 dark:border-zinc-900 pb-4">
+              <div>
+                <h3 className="text-lg font-bold text-foreground dark:text-white font-sans font-extrabold uppercase flex items-center gap-2">
+                  <Award className="text-primary dark:text-[#00d1ff]" size={20} />
+                  Certificate & Credential Management
+                </h3>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                  Automatically mapped to registered users. Project Title & Issue Date are editable inline.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                {/* Search */}
+                <div className="relative w-48 sm:w-56">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+                  <input
+                    type="text"
+                    value={certSearchTerm}
+                    onChange={(e) => setCertSearchTerm(e.target.value)}
+                    placeholder="Search users/certs..."
+                    className="w-full pl-8 pr-3 py-1.5 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl text-xs text-foreground dark:text-white placeholder-zinc-400 focus:outline-none focus:border-primary dark:focus:border-[#00d1ff] transition-all font-mono"
+                  />
+                </div>
+
+                {/* Issue New Certificate Button */}
+                <button
+                  onClick={() => {
+                    const firstUser = activeUsersList[0];
+                    setUploadingCertUser(firstUser || { name: "User", email: "user@example.com" });
+                    setEditingCertItem(null);
+                    setCertProjectTitleInput("Software Solution Project");
+                    setCertIssueDateInput(new Date().toISOString().split("T")[0]);
+                    setCertStatusInput("Approved");
+                    setCertFileDataUrl("");
+                    setCertFileNameVal("");
+                  }}
+                  className="px-3.5 py-1.5 bg-primary dark:bg-[#00d1ff] text-white dark:text-black font-extrabold rounded-xl text-xs flex items-center gap-1.5 uppercase hover:brightness-110 active:scale-95 transition-all shadow-sm shrink-0 cursor-pointer"
+                >
+                  <PlusCircle size={14} />
+                  <span>Issue Certificate</span>
+                </button>
+              </div>
             </div>
 
-            <div className="overflow-x-auto text-xs font-mono w-full select-text">
+            {/* Table */}
+            <div className="overflow-x-auto text-xs font-mono w-full">
               <table className="w-full border-collapse text-left">
                 <thead>
-                  <tr className="border-b border-black/10 dark:border-zinc-900 text-[8px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest h-10 select-none">
-                    <th className="pb-3">Certificate ID</th>
-                    <th className="pb-3">Student Name</th>
-                    <th className="pb-3">Project Title</th>
-                    <th className="pb-3">Issue Date</th>
-                    <th className="pb-3">Status</th>
-                    <th className="pb-3 text-right">Actions</th>
+                  <tr className="border-b border-black/10 dark:border-zinc-900 text-[9px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest h-10 select-none">
+                    <th className="pb-3 px-3">Certificate ID</th>
+                    <th className="pb-3 px-3">Registered User / Student</th>
+                    <th className="pb-3 px-3">Project Title (Editable)</th>
+                    <th className="pb-3 px-3">Issue Date (Editable)</th>
+                    <th className="pb-3 px-3">Status</th>
+                    <th className="pb-3 px-3 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-black/5 dark:divide-zinc-900">
-                  {certificates.map((cert) => (
-                    <tr key={cert.id} className="h-14 hover:bg-black/5 dark:hover:bg-[#07090e]/25 transition-colors">
-                      <td className="text-primary dark:text-[#00d1ff] font-extrabold">{cert.id}</td>
-                      <td className="text-foreground dark:text-white font-semibold font-sans">{cert.studentName}</td>
-                      <td className="text-zinc-500 dark:text-zinc-400 font-sans max-w-[150px] truncate">{cert.projectName}</td>
-                      <td className="text-zinc-500 dark:text-zinc-400 font-mono">{cert.issueDate}</td>
-                      <td>
-                        <span className={`px-2 py-0.5 rounded text-[8px] font-mono font-black uppercase border ${
-                          cert.status === "Approved" ? "bg-green-500/10 border-green-500/25 text-green-500" :
-                          cert.status === "Revoked" ? "bg-red-500/10 border-red-500/25 text-red-500" :
-                          "bg-yellow-500/10 border-yellow-500/25 text-yellow-500 animate-pulse"
-                        }`}>
-                          {cert.status}
-                        </span>
-                      </td>
-                      <td className="py-2 text-right">
-                        <div className="flex justify-end gap-1.5 select-none">
-                          {cert.status === "Pending" && (
-                            <button
-                              onClick={() => handleModifyCertStatus(cert.id, "Approved")}
-                              className="px-2 py-1 bg-green-500/10 border border-green-500/20 text-green-500 hover:bg-green-500/20 rounded text-[8px] font-mono font-bold uppercase tracking-wider"
-                            >
-                              Approve
-                            </button>
-                          )}
-                          {cert.status === "Approved" && (
-                            <button
-                              onClick={() => setSelectedCertDownload(cert)}
-                              className="px-2 py-1 bg-primary/10 border border-primary/20 text-primary dark:text-[#00d1ff] hover:bg-primary/20 rounded text-[8px] font-mono font-bold uppercase tracking-wider"
-                            >
-                              Download
-                            </button>
-                          )}
-                          {cert.status !== "Revoked" && (
-                            <button
-                              onClick={() => handleModifyCertStatus(cert.id, "Revoked")}
-                              className="px-2 py-1 bg-red-500/10 border border-red-500/20 text-red-500 hover:bg-red-500/20 rounded text-[8px] font-mono font-bold uppercase tracking-wider"
-                            >
-                              Revoke
-                            </button>
-                          )}
-                        </div>
+                  {filteredCertRows.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="py-8 text-center text-zinc-400 font-mono text-xs">
+                        No registered users or certificates match your search query.
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    filteredCertRows.map((row, idx) => {
+                      const cert = row.cert;
+                      return (
+                        <tr key={row.certId !== "--" ? row.certId : `row-usr-${idx}`} className="h-14 hover:bg-black/5 dark:hover:bg-white/[0.02] transition-colors">
+                          <td className="px-3 font-extrabold text-primary dark:text-[#00d1ff] font-mono">
+                            {row.certId}
+                          </td>
+                          <td className="px-3">
+                            <div className="font-semibold text-foreground dark:text-white font-sans">{row.studentName}</div>
+                            <div className="text-[10px] text-zinc-400 font-mono">{row.userEmail}</div>
+                          </td>
+                          <td className="px-3">
+                            <input
+                              type="text"
+                              value={row.projectName}
+                              onChange={(e) => handleUpdateCertField(row.certId, row.userItem, "projectName", e.target.value)}
+                              placeholder="Enter Project Title..."
+                              className="w-full max-w-[210px] px-2.5 py-1 bg-black/5 dark:bg-white/5 border border-transparent hover:border-black/20 dark:hover:border-white/20 focus:border-primary dark:focus:border-[#00d1ff] focus:bg-white dark:focus:bg-[#07090e] rounded-lg text-xs font-sans font-medium text-foreground dark:text-white transition-all outline-none"
+                            />
+                          </td>
+                          <td className="px-3">
+                            <input
+                              type="date"
+                              value={row.issueDate !== "--" ? row.issueDate : ""}
+                              onChange={(e) => handleUpdateCertField(row.certId, row.userItem, "issueDate", e.target.value)}
+                              className="px-2.5 py-1 bg-black/5 dark:bg-white/5 border border-transparent hover:border-black/20 dark:hover:border-white/20 focus:border-primary dark:focus:border-[#00d1ff] focus:bg-white dark:focus:bg-[#07090e] rounded-lg text-xs font-mono text-zinc-650 dark:text-zinc-300 transition-all outline-none cursor-pointer"
+                            />
+                          </td>
+                          <td className="px-3">
+                            <span className={`px-2.5 py-0.5 rounded-md text-[9px] font-mono font-extrabold uppercase border ${
+                              row.status === "Approved" ? "bg-emerald-500/10 border-emerald-500/25 text-emerald-500" :
+                              row.status === "Revoked" ? "bg-rose-500/10 border-rose-500/25 text-rose-500" :
+                              row.status === "Pending" ? "bg-amber-500/10 border-amber-500/25 text-amber-500" :
+                              "bg-zinc-500/10 border-zinc-500/20 text-zinc-400"
+                            }`}>
+                              {row.status}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2 text-right">
+                            <div className="flex justify-end items-center gap-1 select-none">
+
+                              {/* Action 1: Upload / Edit Certificate File */}
+                              <button
+                                title={cert ? "Upload / Replace Certificate File" : "Issue / Upload Certificate for User"}
+                                onClick={() => {
+                                  setUploadingCertUser(row.userItem);
+                                  setEditingCertItem(cert || null);
+                                  setCertProjectTitleInput(row.projectName);
+                                  setCertIssueDateInput(row.issueDate !== "--" ? row.issueDate : new Date().toISOString().split("T")[0]);
+                                  setCertStatusInput(row.status === "Not Issued" ? "Approved" : row.status);
+                                  setCertFileDataUrl(cert?.fileData || "");
+                                  setCertFileNameVal(cert?.fileName || "");
+                                }}
+                                className="p-1.5 text-zinc-400 hover:text-primary dark:hover:text-[#00d1ff] rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
+                              >
+                                <Upload size={15} />
+                              </button>
+
+                              {/* Action 2: View Certificate */}
+                              {cert && (
+                                <button
+                                  title="View Certificate Details"
+                                  onClick={() => setSelectedCertView(cert)}
+                                  className="p-1.5 text-zinc-400 hover:text-cyan-500 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
+                                >
+                                  <Eye size={15} />
+                                </button>
+                              )}
+
+                              {/* Action 3: Download Certificate File */}
+                              {cert && (
+                                <button
+                                  title="Download Certificate File"
+                                  onClick={() => handleDownloadCertFile(cert)}
+                                  className="p-1.5 text-zinc-400 hover:text-emerald-500 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
+                                >
+                                  <Download size={15} />
+                                </button>
+                              )}
+
+                              {/* Action 4: Revoke / Toggle Certificate */}
+                              {cert && (
+                                <button
+                                  title={cert.status === "Revoked" ? "Approve Certificate" : "Revoke Certificate"}
+                                  onClick={() => handleModifyCertStatus(cert.id, cert.status === "Revoked" ? "Approved" : "Revoked")}
+                                  className={`p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer ${
+                                    cert.status === "Revoked" ? "text-emerald-500" : "text-amber-500 hover:text-rose-500"
+                                  }`}
+                                >
+                                  <Slash size={15} />
+                                </button>
+                              )}
+
+                              {/* Action 5: Delete Certificate Record */}
+                              {cert && (
+                                <button
+                                  title="Delete Certificate Record"
+                                  onClick={() => handleDeleteCertificate(cert.id)}
+                                  className="p-1.5 text-zinc-400 hover:text-rose-500 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
+                                >
+                                  <Trash2 size={15} />
+                                </button>
+                              )}
+
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
                 </tbody>
               </table>
             </div>
 
-            {/* Cert download popup modal */}
-            {selectedCertDownload && (
-              <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-6 select-none">
-                <div className="bg-white dark:bg-[#07090e] border border-black/10 dark:border-zinc-800 p-8 rounded-2xl w-full max-w-lg shadow-2xl relative text-center space-y-6">
-                  <button onClick={() => setSelectedCertDownload(null)} className="absolute top-4 right-4 text-zinc-500 hover:text-foreground dark:hover:text-white cursor-pointer"><XCircle size={18} /></button>
-                  <Award size={48} className="text-[#00d1ff] mx-auto animate-bounce" />
-                  <div className="space-y-2">
-                    <h3 className="text-sm font-mono tracking-widest text-zinc-500 uppercase leading-none">Security Certificate Generated</h3>
-                    <h2 className="text-xl font-extrabold text-foreground dark:text-white font-sans">{selectedCertDownload.studentName}</h2>
-                    <p className="text-xs text-zinc-500 leading-normal max-w-sm mx-auto">This confirms the successful validation and cryptographic signoff on project **{selectedCertDownload.projectName}**.</p>
+            {/* Modal 1: Upload / Issue / Replace Certificate Popup */}
+            {(uploadingCertUser || editingCertItem) && createPortal(
+              <div className="fixed top-0 left-0 w-screen h-screen bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-6 select-text animate-in fade-in duration-200">
+                <div className="bg-white dark:bg-[#07090e] border border-black/10 dark:border-zinc-800 p-8 rounded-2xl w-[480px] max-w-full shrink-0 shadow-2xl relative font-sans space-y-6">
+                  <button
+                    onClick={() => {
+                      setUploadingCertUser(null);
+                      setEditingCertItem(null);
+                    }}
+                    className="absolute top-4 right-4 text-zinc-400 hover:text-zinc-700 dark:hover:text-white cursor-pointer"
+                  >
+                    <XCircle size={18} />
+                  </button>
+
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 text-primary dark:text-[#00d1ff]">
+                      <Upload size={20} />
+                      <h3 className="text-sm font-mono tracking-widest text-foreground dark:text-white font-extrabold uppercase">
+                        {editingCertItem ? "Replace / Edit Certificate" : "Issue Certificate for User"}
+                      </h3>
+                    </div>
+                    <p className="text-xs text-zinc-500 font-sans">
+                      Target User: <strong className="text-foreground dark:text-white font-semibold">{uploadingCertUser?.name || editingCertItem?.studentName}</strong> ({uploadingCertUser?.email || editingCertItem?.userEmail})
+                    </p>
                   </div>
-                  <div className="p-4 border border-dashed border-black/10 dark:border-zinc-800 rounded-xl space-y-1 font-mono text-[9px] text-zinc-500 uppercase">
-                    <div>CERTIFICATE ID: {selectedCertDownload.id}</div>
-                    <div>COMPILATION STATUS: verified_secure</div>
-                    <div>ISSUE DATE: {selectedCertDownload.issueDate}</div>
-                  </div>
-                  <button onClick={() => setSelectedCertDownload(null)} className="px-6 py-2 bg-primary dark:bg-[#00d1ff] text-on-primary dark:text-black font-extrabold rounded-lg text-xs uppercase hover:brightness-110 active:scale-95 transition-all w-full">Close Portal view</button>
+
+                  <form onSubmit={handleSaveCertificate} className="space-y-4 text-xs font-sans">
+                    {/* User Selection Dropdown if no specific user pre-selected */}
+                    {!editingCertItem && (
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-mono text-zinc-500 dark:text-zinc-400 uppercase tracking-wider block font-bold">Select Registered User</label>
+                        <select
+                          value={uploadingCertUser?.id || ""}
+                          onChange={(e) => {
+                            const found = activeUsersList.find(u => u.id === e.target.value);
+                            if (found) setUploadingCertUser(found);
+                          }}
+                          className="w-full px-3 py-2 bg-black/5 dark:bg-[#0b0e14] border border-black/10 dark:border-zinc-800 rounded-xl text-xs text-foreground dark:text-white font-mono outline-none"
+                        >
+                          {activeUsersList.map(u => (
+                            <option key={u.id} value={u.id}>{u.name} ({u.email})</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-mono text-zinc-500 dark:text-zinc-400 uppercase tracking-wider block font-bold">Project Title / Qualification</label>
+                      <input
+                        type="text"
+                        required
+                        value={certProjectTitleInput}
+                        onChange={(e) => setCertProjectTitleInput(e.target.value)}
+                        placeholder="e.g., Quantum-Flux Core Integration"
+                        className="w-full px-3 py-2 bg-black/5 dark:bg-[#0b0e14] border border-black/10 dark:border-zinc-800 rounded-xl text-xs text-foreground dark:text-white focus:outline-none focus:border-primary dark:focus:border-[#00d1ff] transition-all font-sans"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-mono text-zinc-500 dark:text-zinc-400 uppercase tracking-wider block font-bold">Issue Date</label>
+                        <input
+                          type="date"
+                          required
+                          value={certIssueDateInput}
+                          onChange={(e) => setCertIssueDateInput(e.target.value)}
+                          className="w-full px-3 py-2 bg-black/5 dark:bg-[#0b0e14] border border-black/10 dark:border-zinc-800 rounded-xl text-xs text-foreground dark:text-white font-mono focus:outline-none focus:border-primary dark:focus:border-[#00d1ff]"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-mono text-zinc-500 dark:text-zinc-400 uppercase tracking-wider block font-bold">Credential Status</label>
+                        <select
+                          value={certStatusInput}
+                          onChange={(e: any) => setCertStatusInput(e.target.value)}
+                          className="w-full px-3 py-2 bg-black/5 dark:bg-[#0b0e14] border border-black/10 dark:border-zinc-800 rounded-xl text-xs text-foreground dark:text-white font-mono outline-none"
+                        >
+                          <option value="Approved">Approved / Verified</option>
+                          <option value="Pending">Pending Review</option>
+                          <option value="Revoked">Revoked</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* File Upload Box */}
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-mono text-zinc-500 dark:text-zinc-400 uppercase tracking-wider block font-bold">Upload Certificate Document (PDF / Image)</label>
+                      <div className="p-4 border-2 border-dashed border-black/10 dark:border-zinc-800 rounded-xl text-center space-y-2 bg-black/5 dark:bg-white/[0.01]">
+                        <FileUp className="mx-auto text-primary dark:text-[#00d1ff]" size={24} />
+                        <div className="text-[11px] text-zinc-500">
+                          {certFileNameVal ? (
+                            <span className="font-mono text-emerald-500 font-bold block truncate">Selected: {certFileNameVal}</span>
+                          ) : (
+                            <span>Drag and drop certificate PDF / image or click browse</span>
+                          )}
+                        </div>
+                        <input
+                          type="file"
+                          accept=".pdf,image/*"
+                          onChange={handleCertFileSelected}
+                          className="hidden"
+                          id="cert-file-picker"
+                        />
+                        <label
+                          htmlFor="cert-file-picker"
+                          className="inline-block px-3 py-1 bg-black/10 dark:bg-white/10 text-foreground dark:text-white rounded-lg text-[10px] font-mono font-bold uppercase tracking-wider hover:bg-black/20 dark:hover:bg-white/20 transition-all cursor-pointer"
+                        >
+                          {certFileNameVal ? "Change File" : "Browse Computer"}
+                        </label>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-3 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setUploadingCertUser(null);
+                          setEditingCertItem(null);
+                        }}
+                        className="w-1/2 py-2.5 bg-zinc-100 dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 rounded-xl text-[10px] font-mono font-bold uppercase tracking-wider hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-all cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="w-1/2 py-2.5 bg-primary dark:bg-[#00d1ff] text-white dark:text-black font-extrabold rounded-xl text-[10px] uppercase hover:brightness-110 active:scale-95 transition-all cursor-pointer shadow-md"
+                      >
+                        Save & Issue Certificate
+                      </button>
+                    </div>
+                  </form>
                 </div>
-              </div>
+              </div>,
+              document.body
             )}
+
+            {/* Modal 2: View Certificate Details Popup */}
+            {selectedCertView && createPortal(
+              <div className="fixed top-0 left-0 w-screen h-screen bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-6 select-text animate-in fade-in duration-200">
+                <div className="bg-white dark:bg-[#07090e] border border-black/10 dark:border-zinc-800 p-8 rounded-2xl w-full max-w-md shadow-2xl relative space-y-6 text-center">
+                  <button onClick={() => setSelectedCertView(null)} className="absolute top-4 right-4 text-zinc-400 hover:text-foreground dark:hover:text-white cursor-pointer"><XCircle size={18} /></button>
+                  <Award size={48} className="text-primary dark:text-[#00d1ff] mx-auto animate-pulse" />
+                  <div className="space-y-1">
+                    <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest block">RecodeX Verified Credential</span>
+                    <h2 className="text-xl font-extrabold text-foreground dark:text-white font-sans">{selectedCertView.studentName}</h2>
+                    <p className="text-xs text-zinc-500 font-sans">{selectedCertView.projectName}</p>
+                  </div>
+
+                  <div className="p-4 border border-dashed border-black/10 dark:border-zinc-800 rounded-xl space-y-1.5 font-mono text-[10px] text-zinc-500 uppercase text-left">
+                    <div className="flex justify-between"><span>Certificate ID:</span> <strong className="text-primary dark:text-[#00d1ff]">{selectedCertView.id}</strong></div>
+                    <div className="flex justify-between"><span>Issue Date:</span> <strong className="text-foreground dark:text-white">{selectedCertView.issueDate}</strong></div>
+                    <div className="flex justify-between"><span>Verification Status:</span> <strong className="text-emerald-500">{selectedCertView.status}</strong></div>
+                    {selectedCertView.fileName && (
+                      <div className="flex justify-between"><span>Attached Document:</span> <strong className="text-zinc-700 dark:text-zinc-300 truncate max-w-[160px]">{selectedCertView.fileName}</strong></div>
+                    )}
+                  </div>
+
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => handleDownloadCertFile(selectedCertView)}
+                      className="w-full py-2.5 bg-primary dark:bg-[#00d1ff] text-white dark:text-black font-extrabold rounded-xl text-xs uppercase flex items-center justify-center gap-2 hover:brightness-110 active:scale-95 transition-all cursor-pointer shadow-md"
+                    >
+                      <Download size={14} />
+                      Download Certificate Document
+                    </button>
+                  </div>
+                </div>
+              </div>,
+              document.body
+            )}
+
           </div>
         );
 
@@ -2285,16 +2814,16 @@ export default function Dashboard() {
       )}
 
       {/* SideNavBar */}
-      <aside className={`fixed md:static inset-y-0 left-0 z-50 w-64 shrink-0 h-full bg-[#06080c]/95 dark:bg-[#07090e]/95 backdrop-blur-xl border-r border-black/10 dark:border-white/10 flex flex-col justify-between select-none transition-transform duration-300 ${
+      <aside className={`fixed md:static inset-y-0 left-0 z-50 w-64 shrink-0 h-full bg-white/95 dark:bg-[#07090e]/95 backdrop-blur-xl border-r border-zinc-200/80 dark:border-white/10 flex flex-col justify-between select-none transition-transform duration-300 ${
         isMobileMenuOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
       }`}>
-        <div className="p-5 border-b border-black/5 dark:border-white/5 flex items-center justify-between">
+        <div className="p-5 border-b border-zinc-200/80 dark:border-white/5 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2 hover:opacity-90 transition-opacity">
             <img src="/recodeXlogo.png" alt="RecodeX Logo" className="brand-logo-img h-8 w-auto object-contain" />
           </Link>
           <button
             onClick={() => setIsMobileMenuOpen(false)}
-            className="md:hidden text-zinc-400 hover:text-white p-1"
+            className="md:hidden text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white p-1 rounded-lg"
           >
             <X size={18} />
           </button>
@@ -2306,7 +2835,7 @@ export default function Dashboard() {
               setActiveSidebarTab("Projects");
               setIsMobileMenuOpen(false);
             }} 
-            className="w-full py-2.5 px-4 bg-primary text-white dark:text-black rounded-xl font-mono text-xs font-extrabold uppercase tracking-wider hover:brightness-110 transition-all shadow-[0_0_20px_rgba(0,209,255,0.25)] hover-lift flex items-center justify-center gap-2 cursor-pointer"
+            className="w-full py-2.5 px-4 bg-primary text-white dark:text-black rounded-xl font-mono text-xs font-extrabold uppercase tracking-wider hover:brightness-110 active:scale-95 transition-all shadow-md dark:shadow-[0_0_20px_rgba(0,209,255,0.25)] hover-lift flex items-center justify-center gap-2 cursor-pointer"
           >
             <span className="material-symbols-outlined text-[18px]">add</span>
             Create Project
@@ -2325,41 +2854,41 @@ export default function Dashboard() {
                 }}
                 className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all duration-150 cursor-pointer font-sans text-xs font-semibold ${
                   isActive 
-                    ? "bg-primary/10 text-primary dark:text-[#00d1ff] font-bold border-l-4 border-primary dark:border-[#00d1ff] pl-3 shadow-[inset_0_0_15px_rgba(0,209,255,0.05)]" 
-                    : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5"
+                    ? "bg-primary/10 text-primary dark:text-[#00d1ff] font-bold border-l-4 border-primary dark:border-[#00d1ff] pl-3 shadow-xs dark:shadow-[inset_0_0_15px_rgba(0,209,255,0.05)]" 
+                    : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5"
                 }`}
               >
-                <span className={`material-symbols-outlined text-[20px] ${isActive ? "text-primary dark:text-[#00d1ff]" : ""}`}>{item.icon}</span>
+                <span className={`material-symbols-outlined text-[20px] ${isActive ? "text-primary dark:text-[#00d1ff]" : "text-zinc-400 dark:text-zinc-500"}`}>{item.icon}</span>
                 <span>{item.label}</span>
               </button>
             );
           })}
         </nav>
 
-        <div className="p-3 border-t border-black/5 dark:border-white/5 space-y-1 bg-black/5 dark:bg-white/[0.02]">
+        <div className="p-3 border-t border-zinc-200/80 dark:border-white/5 space-y-1 bg-zinc-50/80 dark:bg-white/[0.02]">
           <button 
             onClick={() => {
               setActiveSidebarTab("Inquiries");
               setIsMobileMenuOpen(false);
             }} 
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-all text-xs font-semibold cursor-pointer text-left"
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-200/60 dark:hover:bg-white/5 transition-all text-xs font-semibold cursor-pointer text-left"
           >
             <span className="material-symbols-outlined text-[18px]">support_agent</span>
             <span>Support</span>
           </button>
           <button 
             onClick={() => {
-              setActiveSidebarTab("Settings");
+              setShowHelpModal(true);
               setIsMobileMenuOpen(false);
             }} 
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-all text-xs font-semibold cursor-pointer text-left"
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-200/60 dark:hover:bg-white/5 transition-all text-xs font-semibold cursor-pointer text-left"
           >
             <span className="material-symbols-outlined text-[18px]">help</span>
             <span>Help</span>
           </button>
           <button 
             onClick={handleSignOut} 
-            className="w-full flex items-center gap-3 px-3 py-2 mt-1 rounded-xl text-rose-500 hover:bg-rose-500/10 transition-all text-xs font-bold cursor-pointer text-left"
+            className="w-full flex items-center gap-3 px-3 py-2 mt-1 rounded-xl text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 transition-all text-xs font-bold cursor-pointer text-left"
           >
             <span className="material-symbols-outlined text-[18px]">logout</span>
             <span>Logout</span>
@@ -2625,6 +3154,84 @@ export default function Dashboard() {
           >
             <XCircle size={14} className="shrink-0" />
           </button>
+        </div>,
+        document.body
+      )}
+
+      {/* Admin Help & Operator Guide Modal */}
+      {showHelpModal && createPortal(
+        <div className="fixed top-0 left-0 w-screen h-screen bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-6 select-text animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#07090e] border border-black/10 dark:border-zinc-800 p-8 rounded-2xl w-[600px] max-w-full shrink-0 shadow-2xl relative font-sans space-y-6 max-h-[85vh] overflow-y-auto">
+            <button
+              onClick={() => setShowHelpModal(false)}
+              className="absolute top-4 right-4 text-zinc-400 hover:text-zinc-700 dark:hover:text-white cursor-pointer"
+            >
+              <XCircle size={18} />
+            </button>
+
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 text-primary dark:text-[#00d1ff]">
+                <HelpCircle size={22} />
+                <h3 className="text-base font-bold text-foreground dark:text-white font-sans uppercase">
+                  RecodeX Admin Console Help & Operator Guide
+                </h3>
+              </div>
+              <p className="text-xs text-zinc-500 font-sans">
+                Quick operator reference guide for managing developers, certificates, support inquiries, and ecosystem security.
+              </p>
+            </div>
+
+            <div className="space-y-4 text-xs font-sans text-zinc-600 dark:text-zinc-300">
+              <div className="p-4 bg-black/5 dark:bg-zinc-900/50 rounded-xl border border-black/5 dark:border-zinc-800/80 space-y-1.5">
+                <h4 className="font-bold text-foreground dark:text-white flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-[#00d1ff]"></span>
+                  👥 1. User & Developer Management
+                </h4>
+                <p className="text-[11px] leading-relaxed text-zinc-500 dark:text-zinc-400">
+                  Search developers by name or email. Edit user roles, suspend/activate accounts, reset passwords, or soft-delete accounts to the Recycle Bin.
+                </p>
+              </div>
+
+              <div className="p-4 bg-black/5 dark:bg-zinc-900/50 rounded-xl border border-black/5 dark:border-zinc-800/80 space-y-1.5">
+                <h4 className="font-bold text-foreground dark:text-white flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                  📜 2. Certificate & Credential Management
+                </h4>
+                <p className="text-[11px] leading-relaxed text-zinc-500 dark:text-zinc-400">
+                  All registered users auto-populate in the Certificate table. Edit Project Titles and Issue Dates inline. Click 📤 Upload to attach PDF/Image certificates, which auto-sync to the user's account page.
+                </p>
+              </div>
+
+              <div className="p-4 bg-black/5 dark:bg-zinc-900/50 rounded-xl border border-black/5 dark:border-zinc-800/80 space-y-1.5">
+                <h4 className="font-bold text-foreground dark:text-white flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-amber-400"></span>
+                  📩 3. Support Inquiries & Webhook Sync
+                </h4>
+                <p className="text-[11px] leading-relaxed text-zinc-500 dark:text-zinc-400">
+                  Inquiries submitted via the Contact page sync live to MongoDB and Google Sheets. Admins can view messages, compose replies, and export CSV files.
+                </p>
+              </div>
+
+              <div className="p-4 bg-black/5 dark:bg-zinc-900/50 rounded-xl border border-black/5 dark:border-zinc-800/80 space-y-1.5">
+                <h4 className="font-bold text-foreground dark:text-white flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-purple-400"></span>
+                  ♻️ 4. Recycle Bin & Data Safety
+                </h4>
+                <p className="text-[11px] leading-relaxed text-zinc-500 dark:text-zinc-400">
+                  Deleted users and projects are moved to the Recycle Bin first, allowing full restoration before permanent removal.
+                </p>
+              </div>
+            </div>
+
+            <div className="pt-2 text-right">
+              <button
+                onClick={() => setShowHelpModal(false)}
+                className="px-5 py-2 bg-[#00d1ff] text-black font-extrabold rounded-lg text-xs font-mono uppercase tracking-wider hover:brightness-110 cursor-pointer"
+              >
+                Got It, Close Guide
+              </button>
+            </div>
+          </div>
         </div>,
         document.body
       )}

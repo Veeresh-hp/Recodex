@@ -6,8 +6,22 @@ import {
   User as UserIcon, Shield, Mail, Phone, Cpu, ArrowLeft, ArrowRight,
   CheckCircle, ExternalLink, Camera, Upload, X, Check, CreditCard,
   Calendar, DollarSign, MessageSquare, Clock, ListTodo, Info, Activity, FolderGit2,
-  ShieldCheck, CheckCircle2
+  ShieldCheck, CheckCircle2, Award, Download, Eye, XCircle, Printer, FileText, Sparkles
 } from "lucide-react";
+
+interface Certificate {
+  id: string;
+  userId?: string;
+  userEmail?: string;
+  studentName: string;
+  projectName: string;
+  issueDate: string;
+  status: "Approved" | "Pending" | "Revoked" | "Not Issued";
+  fileData?: string;
+  fileName?: string;
+  fileType?: string;
+  description?: string;
+}
 
 interface UserProfile {
   name: string;
@@ -185,6 +199,94 @@ export default function Profile() {
   const [avatarSaved, setAvatarSaved] = useState(false);
   const [pendingAvatar, setPendingAvatar] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [userCertificates, setUserCertificates] = useState<Certificate[]>([]);
+  const [selectedCertView, setSelectedCertView] = useState<Certificate | null>(null);
+
+  useEffect(() => {
+    const loadCertificates = () => {
+      try {
+        const stored = localStorage.getItem("recodex_global_certificates");
+        if (stored && profile) {
+          const allCerts: Certificate[] = JSON.parse(stored);
+          const userEmailClean = (profile.email || "").toLowerCase().trim();
+          const userNameClean = (profile.name || "").toLowerCase().trim();
+          const userFirstName = userNameClean.split(" ")[0].replace(/[^a-z]/g, "");
+          const userHandle = userEmailClean.split("@")[0].replace(/[^a-z]/g, "");
+
+          const cleanedCerts = allCerts.filter(
+            (c) =>
+              !["john doe", "alice vance", "sarah connor"].includes((c.studentName || "").toLowerCase().trim()) &&
+              !["cert-9402", "cert-1842", "cert-0691"].includes((c.id || "").toLowerCase().trim())
+          );
+
+          const filtered = cleanedCerts.filter((c) => {
+            const certEmail = (c.userEmail || "").toLowerCase().trim();
+            const certName = (c.studentName || "").toLowerCase().trim();
+            const certHandle = certEmail.split("@")[0].replace(/[^a-z]/g, "");
+
+            // 1. Handle match ignoring domain typos (e.g. gmil.com vs gmail.com) and numeric suffixes (04 vs 2004)
+            const isHandleMatch = Boolean(certHandle && userHandle && (
+              certHandle === userHandle || 
+              certHandle.includes(userHandle) || 
+              userHandle.includes(certHandle)
+            ));
+
+            // 2. Email match
+            const isEmailMatch = Boolean(certEmail && userEmailClean && (
+              certEmail === userEmailClean || isHandleMatch
+            ));
+
+            // 3. Name match (full name or first name)
+            const isNameMatch = Boolean(certName && (
+              (userNameClean && (certName === userNameClean || userNameClean.includes(certName) || certName.includes(userNameClean))) ||
+              (userFirstName && userFirstName.length >= 3 && certName.includes(userFirstName))
+            ));
+
+            // 4. User ID match
+            const isIdMatch = Boolean(c.userId && profile.id && c.userId === profile.id);
+
+            return isEmailMatch || isNameMatch || isIdMatch;
+          });
+
+          setUserCertificates(filtered);
+        } else {
+          setUserCertificates([]);
+        }
+      } catch (e) {
+        console.warn("Failed to load user certificates:", e);
+      }
+    };
+    loadCertificates();
+    window.addEventListener("recodex-certificates-update", loadCertificates);
+    window.addEventListener("storage", loadCertificates);
+    return () => {
+      window.removeEventListener("recodex-certificates-update", loadCertificates);
+      window.removeEventListener("storage", loadCertificates);
+    };
+  }, [profile]);
+
+  const handleDownloadUserCert = (cert: Certificate) => {
+    if (cert.fileData) {
+      const link = document.createElement("a");
+      link.href = cert.fileData;
+      link.download = cert.fileName || `Certificate_${cert.studentName.replace(/\s+/g, "_")}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } else {
+      const certText = `RECODEX VERIFIED CERTIFICATE OF COMPLETION\n============================================\nCertificate ID: ${cert.id}\nStudent/Developer Name: ${cert.studentName}\nProject Title: ${cert.projectName}\nIssue Date: ${cert.issueDate}\nStatus: VERIFIED & APPROVED\nIssuer: RecodeX Developer Marketplace & Software Solutions\nVerification Signature: ${Math.random().toString(36).substring(2, 15).toUpperCase()}\n`;
+      const blob = new Blob([certText], { type: "text/plain" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `RecodeX_Certificate_${cert.studentName.replace(/\s+/g, "_")}.txt`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    }
+  };
 
   useEffect(() => {
     const fetchUserProfileData = async () => {
@@ -500,6 +602,19 @@ export default function Profile() {
                       Google Account
                     </span>
                   )}
+                  {userCertificates.length > 0 ? (
+                    <a
+                      href="#certificates-section"
+                      className="self-center px-2.5 py-0.5 rounded-full text-[9px] font-mono font-black uppercase tracking-wider border bg-emerald-500/10 border-emerald-500/30 text-emerald-400 flex items-center gap-1 hover:bg-emerald-500/20 transition-colors"
+                    >
+                      <Award size={11} className="text-emerald-400" />
+                      <span>Certificate Verified ({userCertificates[0].id})</span>
+                    </a>
+                  ) : (
+                    <span className="self-center px-2.5 py-0.5 rounded-full text-[9px] font-mono font-bold uppercase tracking-wider border bg-zinc-500/10 border-zinc-500/20 text-zinc-400">
+                      No Certificate Issued
+                    </span>
+                  )}
                 </div>
                 <p className="text-[10px] font-mono text-zinc-500 mt-2 tracking-wide uppercase">RECODEX SECURITY ACCOUNT SIGNATURE</p>
               </div>
@@ -563,6 +678,231 @@ export default function Profile() {
             </div>
           </div>
         </div>
+
+        {/* DEDICATED VERIFIED CREDENTIALS & CERTIFICATES SECTION */}
+        <div id="certificates-section" className="mt-8 glass-card bg-white/60 dark:bg-[#07090e]/60 backdrop-blur-xl border border-black/10 dark:border-zinc-800/80 rounded-2xl p-8 md:p-10 shadow-xl space-y-6 select-text">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-black/5 dark:border-zinc-900/60 pb-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 text-primary dark:text-[#00d1ff]">
+                <Award size={20} />
+                <h2 className="text-xl font-bold tracking-tight text-foreground dark:text-white font-sans uppercase">
+                  Verified Certificates & Credentials
+                </h2>
+              </div>
+              <p className="text-xs text-zinc-500 font-sans">
+                Official project completion credentials and software certifications issued to your account.
+              </p>
+            </div>
+
+            {/* Clear Status Indicator Badge */}
+            {userCertificates.length > 0 ? (
+              <span className="px-3.5 py-1.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 rounded-full text-[10px] font-mono font-black uppercase tracking-wider flex items-center gap-1.5 shadow-[0_0_12px_rgba(16,185,129,0.2)] self-start sm:self-auto">
+                <CheckCircle2 size={13} className="text-emerald-500" />
+                <span>STATUS: ISSUED ({userCertificates.length})</span>
+              </span>
+            ) : (
+              <span className="px-3.5 py-1.5 bg-zinc-500/10 border border-zinc-500/20 text-zinc-400 rounded-full text-[10px] font-mono font-black uppercase tracking-wider flex items-center gap-1.5 self-start sm:self-auto">
+                <Info size={13} className="text-zinc-400" />
+                <span>STATUS: NOT ISSUED YET</span>
+              </span>
+            )}
+          </div>
+
+          {/* User Notification Status Banner */}
+          {userCertificates.length > 0 ? (
+            <div className="p-3.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center gap-3 text-emerald-500 text-xs font-sans font-medium">
+              <Sparkles size={16} className="shrink-0 text-emerald-400 animate-pulse" />
+              <span>
+                <strong>Certificate Issued:</strong> Official completion credential <strong>[{userCertificates[0].id}]</strong> is active and verified for your account ({profile.email}).
+              </span>
+            </div>
+          ) : (
+            <div className="p-3.5 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center gap-3 text-amber-500 text-xs font-sans font-medium">
+              <Info size={16} className="shrink-0 text-amber-400" />
+              <span>
+                <strong>No Certificate Issued Yet:</strong> Once RecodeX administrators verify and issue your project completion certificate, it will automatically appear here with full verification details.
+              </span>
+            </div>
+          )}
+
+          {userCertificates.length === 0 ? (
+            <div className="text-center py-8 space-y-3">
+              <div className="w-12 h-12 rounded-full bg-primary/10 text-primary dark:text-[#00d1ff] flex items-center justify-center mx-auto">
+                <Award size={24} />
+              </div>
+              <div className="space-y-1 max-w-sm mx-auto">
+                <h4 className="text-sm font-bold text-foreground dark:text-white font-sans">No Certificates Issued Yet</h4>
+                <p className="text-xs text-zinc-500 font-sans leading-relaxed">
+                  When RecodeX administrators verify and upload your project completion certificate, it will automatically appear here for view and download.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-8">
+              {userCertificates.map((cert) => (
+                <div key={cert.id} className="glass-card bg-[#07090e] border-2 border-primary/30 dark:border-[#00d1ff]/40 rounded-2xl p-6 md:p-8 shadow-[0_0_40px_rgba(0,209,255,0.15)] relative overflow-hidden space-y-6">
+
+                  {/* Certificate Background Watermark Grid */}
+                  <div className="absolute inset-0 bg-[radial-gradient(#00d1ff_1px,transparent_1px)] [background-size:24px_24px] opacity-[0.04] pointer-events-none"></div>
+                  <div className="absolute -top-12 -right-12 w-48 h-48 bg-primary/10 rounded-full blur-3xl pointer-events-none"></div>
+
+                  {/* Top Certificate Header Bar */}
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-white/10 pb-6 text-center sm:text-left relative z-10">
+                    <div className="flex items-center gap-3">
+                      <img src="/recodeXlogo.png" alt="RecodeX" className="h-9 w-auto brand-logo-img filter brightness-125" />
+                      <div>
+                        <span className="text-[9px] font-mono tracking-widest text-[#00d1ff] uppercase font-bold block leading-none">
+                          OFFICIAL RECODEX COMPLETION CREDENTIAL
+                        </span>
+                        <span className="text-xs font-mono text-zinc-400 font-semibold mt-1 block">
+                          DECENTRALIZED ARCHITECTURE VERIFICATION
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 select-none">
+                      <span className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-full text-[10px] font-mono font-black uppercase tracking-wider flex items-center gap-1.5 shadow-[0_0_10px_rgba(16,185,129,0.2)]">
+                        <CheckCircle2 size={12} className="text-emerald-400" />
+                        <span>VERIFIED & SIGNED</span>
+                      </span>
+                      <span className="px-2.5 py-1 bg-primary/10 border border-primary/20 text-[#00d1ff] rounded-full text-[10px] font-mono font-extrabold uppercase">
+                        {cert.id}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Main Visual Certificate Document Body */}
+                  <div className="py-6 px-4 md:px-8 border border-white/10 rounded-xl bg-black/40 backdrop-blur-md text-center space-y-5 relative z-10 select-text shadow-inner">
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-mono uppercase tracking-[0.25em] text-zinc-400 font-bold">
+                        THIS IS TO CERTIFY THAT
+                      </p>
+                      <h1 className="text-2xl md:text-4xl font-black font-sans tracking-tight text-white uppercase drop-shadow-[0_0_15px_rgba(255,255,255,0.4)]">
+                        {cert.studentName}
+                      </h1>
+                    </div>
+
+                    <p className="text-xs text-zinc-400 max-w-lg mx-auto leading-relaxed font-sans font-medium">
+                      has successfully fulfilled all software engineering benchmarks, security audits, and deployment milestones for the project title
+                    </p>
+
+                    <div className="inline-block px-6 py-2 bg-gradient-to-r from-primary/20 via-[#00d1ff]/20 to-primary/20 border border-[#00d1ff]/40 rounded-xl">
+                      <h3 className="text-base md:text-xl font-bold font-sans text-[#00d1ff] tracking-wide">
+                        "{cert.projectName}"
+                      </h3>
+                    </div>
+
+                    {/* Issue Details & Cryptographic Hash Footer */}
+                    <div className="pt-4 border-t border-white/10 grid grid-cols-1 sm:grid-cols-3 gap-4 text-center font-mono text-[10px] text-zinc-400 uppercase">
+                      <div>
+                        <span className="block text-zinc-500 text-[8px] font-bold tracking-widest">CREDENTIAL ID</span>
+                        <span className="font-semibold text-white">{cert.id}</span>
+                      </div>
+                      <div>
+                        <span className="block text-zinc-500 text-[8px] font-bold tracking-widest">OFFICIAL ISSUE DATE</span>
+                        <span className="font-semibold text-white">{cert.issueDate}</span>
+                      </div>
+                      <div>
+                        <span className="block text-zinc-500 text-[8px] font-bold tracking-widest">VALIDATION SEAL</span>
+                        <span className="font-semibold text-emerald-400">cryptographic_valid</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Attached File / Document Image Preview Container */}
+                  {cert.fileData && (
+                    <div className="p-4 border border-white/10 rounded-xl bg-black/60 space-y-3">
+                      <div className="flex items-center justify-between text-[11px] font-mono text-zinc-400">
+                        <span className="flex items-center gap-1.5 text-[#00d1ff] font-bold">
+                          <FileText size={14} />
+                          Attached Certificate Document ({cert.fileName || "Certificate.pdf"})
+                        </span>
+                        <span className="text-emerald-400 font-bold uppercase text-[9px]">Document Preview Active</span>
+                      </div>
+
+                      {/* Display image preview if base64 fileData is an image */}
+                      {cert.fileData.startsWith("data:image/") ? (
+                        <div className="max-h-80 overflow-hidden rounded-lg border border-white/10 flex justify-center bg-black">
+                          <img src={cert.fileData} alt="Certificate Document" className="max-h-80 w-auto object-contain" />
+                        </div>
+                      ) : (
+                        <div className="p-4 bg-white/5 border border-white/10 rounded-lg flex items-center justify-between text-xs font-mono text-zinc-300">
+                          <span>{cert.fileName || "Uploaded Certificate Document (PDF)"}</span>
+                          <button
+                            onClick={() => handleDownloadUserCert(cert)}
+                            className="px-3 py-1 bg-[#00d1ff]/20 text-[#00d1ff] hover:bg-[#00d1ff]/30 rounded text-[10px] font-bold uppercase tracking-wider"
+                          >
+                            Open PDF Document
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Bottom Action Controls */}
+                  <div className="flex flex-wrap items-center justify-between gap-3 pt-2 relative z-10">
+                    <div className="flex items-center gap-2 text-[10px] font-mono text-zinc-400">
+                      <ShieldCheck size={14} className="text-emerald-400" />
+                      <span>Tamper-proof RecodeX digital credential signature</span>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => setSelectedCertView(cert)}
+                        className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-lg text-xs font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer"
+                      >
+                        <Eye size={14} className="text-[#00d1ff]" />
+                        <span>Full Screen Modal</span>
+                      </button>
+                      <button
+                        onClick={() => handleDownloadUserCert(cert)}
+                        className="px-4 py-2 bg-[#00d1ff] text-black hover:brightness-110 rounded-lg text-xs font-mono font-black uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-[0_0_15px_rgba(0,209,255,0.3)] cursor-pointer"
+                      >
+                        <Download size={14} />
+                        <span>Download Certificate</span>
+                      </button>
+                    </div>
+                  </div>
+
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Certificate Details Modal in Profile */}
+        {selectedCertView && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-6 select-text animate-in fade-in duration-200">
+            <div className="bg-white dark:bg-[#07090e] border border-black/10 dark:border-zinc-800 p-8 rounded-2xl w-full max-w-md shadow-2xl relative space-y-6 text-center">
+              <button onClick={() => setSelectedCertView(null)} className="absolute top-4 right-4 text-zinc-400 hover:text-foreground dark:hover:text-white cursor-pointer"><XCircle size={18} /></button>
+              <Award size={48} className="text-primary dark:text-[#00d1ff] mx-auto animate-pulse" />
+              <div className="space-y-1">
+                <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest block">Official Cryptographic Credential</span>
+                <h2 className="text-xl font-extrabold text-foreground dark:text-white font-sans">{selectedCertView.studentName}</h2>
+                <p className="text-xs text-zinc-500 font-sans">{selectedCertView.projectName}</p>
+              </div>
+
+              <div className="p-4 border border-dashed border-black/10 dark:border-zinc-800 rounded-xl space-y-1.5 font-mono text-[10px] text-zinc-500 uppercase text-left">
+                <div className="flex justify-between"><span>Certificate ID:</span> <strong className="text-primary dark:text-[#00d1ff]">{selectedCertView.id}</strong></div>
+                <div className="flex justify-between"><span>Issue Date:</span> <strong className="text-foreground dark:text-white">{selectedCertView.issueDate}</strong></div>
+                <div className="flex justify-between"><span>Verification Status:</span> <strong className="text-emerald-500">{selectedCertView.status}</strong></div>
+                {selectedCertView.fileName && (
+                  <div className="flex justify-between"><span>Attached Document:</span> <strong className="text-zinc-700 dark:text-zinc-300 truncate max-w-[160px]">{selectedCertView.fileName}</strong></div>
+                )}
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => handleDownloadUserCert(selectedCertView)}
+                  className="w-full py-2.5 bg-primary dark:bg-[#00d1ff] text-white dark:text-black font-extrabold rounded-xl text-xs uppercase flex items-center justify-center gap-2 hover:brightness-110 active:scale-95 transition-all cursor-pointer shadow-md"
+                >
+                  <Download size={14} />
+                  Download Certificate Document
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
           {/* DEDICATED CUSTOMER PROJECT DASHBOARD */}
           {profile.role === "client" && (

@@ -138,9 +138,8 @@ export default function AdminDashboard() {
       <header className="border-b border-black/5 dark:border-zinc-900 bg-white/90 dark:bg-[#06080c]/90 backdrop-blur-md sticky top-0 z-50 px-6 py-4 flex items-center justify-between select-text transition-colors duration-300">
         <div className="flex items-center gap-12">
           {/* Logo split color */}
-          <Link to="/" className="text-xl font-black tracking-tight font-sans">
-            <span className="text-primary dark:text-[#00d1ff]">Recode</span>
-            <span className="text-foreground dark:text-white">X</span>
+          <Link to="/" className="flex items-center gap-2 hover:opacity-90 transition-opacity">
+            <img src="/recodeXlogo.png" alt="RecodeX Logo" className="brand-logo-img h-8 w-auto object-contain" />
           </Link>
           
           {/* Navigation Links */}
