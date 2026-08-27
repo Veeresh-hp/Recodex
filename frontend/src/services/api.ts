@@ -401,7 +401,16 @@ export async function getUsers(): Promise<any[]> {
     }
   });
 
-  const finalUsers = Array.from(userMap.values());
+  const promotedAdminsRaw = typeof window !== "undefined" ? localStorage.getItem("recodex_promoted_admin_emails") : null;
+  const promotedAdmins: string[] = promotedAdminsRaw ? JSON.parse(promotedAdminsRaw) : [];
+
+  const finalUsers = Array.from(userMap.values()).map((u: any) => {
+    const emailClean = (u.email || "").toLowerCase().trim();
+    if (promotedAdmins.includes(emailClean) || emailClean === "veereshhp2004@gmail.com") {
+      return { ...u, role: "admin" };
+    }
+    return u;
+  });
 
   try {
     if (typeof window !== "undefined") {

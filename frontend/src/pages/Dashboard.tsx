@@ -1066,8 +1066,27 @@ export default function Dashboard() {
     if (!editingUser) return;
     setIsSavingUser(true);
     try {
-      const token = await getAuthToken();
-      await updateUser(editingUser.id, { name: newEditName, role: newEditRole }, token);
+      const userEmailClean = (editingUser.email || "").toLowerCase().trim();
+      const promotedRaw = localStorage.getItem("recodex_promoted_admin_emails");
+      let promotedList: string[] = promotedRaw ? JSON.parse(promotedRaw) : [];
+
+      if (newEditRole === "admin") {
+        if (!promotedList.includes(userEmailClean)) {
+          promotedList.push(userEmailClean);
+        }
+      } else {
+        promotedList = promotedList.filter((e) => e !== userEmailClean);
+      }
+      localStorage.setItem("recodex_promoted_admin_emails", JSON.stringify(promotedList));
+      window.dispatchEvent(new Event("recodex-auth-update"));
+
+      try {
+        const token = await getAuthToken();
+        await updateUser(editingUser.id, { name: newEditName, role: newEditRole }, token);
+      } catch (apiErr) {
+        console.warn("API update user role failed, saved in local store anyway:", apiErr);
+      }
+
       setDbUsers((prev) => 
         prev.map((u) => u.id === editingUser.id ? { ...u, name: newEditName, role: newEditRole } : u)
       );
@@ -1109,10 +1128,29 @@ export default function Dashboard() {
     
     const targetRole = makeAdmin ? "admin" : "developer";
     try {
-      const token = await getAuthToken();
-      const userToModify = dbUsers.find((u) => u.id === userId);
       if (!userToModify) return;
-      await updateUser(userId, { name: userToModify.name, role: targetRole }, token);
+
+      const userEmailClean = (userToModify.email || "").toLowerCase().trim();
+      const promotedRaw = localStorage.getItem("recodex_promoted_admin_emails");
+      let promotedList: string[] = promotedRaw ? JSON.parse(promotedRaw) : [];
+
+      if (makeAdmin) {
+        if (!promotedList.includes(userEmailClean)) {
+          promotedList.push(userEmailClean);
+        }
+      } else {
+        promotedList = promotedList.filter((e) => e !== userEmailClean);
+      }
+      localStorage.setItem("recodex_promoted_admin_emails", JSON.stringify(promotedList));
+      window.dispatchEvent(new Event("recodex-auth-update"));
+
+      try {
+        const token = await getAuthToken();
+        await updateUser(userId, { name: userToModify.name, role: targetRole }, token);
+      } catch (apiErr) {
+        console.warn("API update user role failed, saved in local store anyway:", apiErr);
+      }
+
       setDbUsers((prev) => prev.map((u) => u.id === userId ? { ...u, role: targetRole } : u));
       fetchUsers();
       setToast({ message: `User role changed to ${targetRole.toUpperCase()}.`, type: "success" });
