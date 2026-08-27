@@ -401,12 +401,12 @@ export async function getUsers(): Promise<any[]> {
     }
   });
 
-  let serverAdmins: string[] = [];
+  let serverAdmins: string[] | null = null;
   try {
     const adminRes = await fetch(`${API_BASE_URL}/users/promoted-admins`);
     if (adminRes.ok) {
       const data = await adminRes.json();
-      if (Array.isArray(data)) serverAdmins = data;
+      if (Array.isArray(data)) serverAdmins = data.map((e: string) => e.toLowerCase().trim());
     }
   } catch (e) {
     console.warn("Server promoted admins sync warning:", e);
@@ -416,16 +416,30 @@ export async function getUsers(): Promise<any[]> {
   const localPromotedAdmins: string[] = promotedAdminsRaw ? JSON.parse(promotedAdminsRaw) : [];
   const ROOT_ADMIN_EMAILS = ["veereshhp2004@gmail.com"];
 
-  const allPromotedAdmins = Array.from(new Set([
-    ...ROOT_ADMIN_EMAILS,
-    ...serverAdmins.map((e: string) => e.toLowerCase().trim()),
-    ...localPromotedAdmins.map((e: string) => e.toLowerCase().trim())
-  ]));
+  // Use server admins as source of truth if available, otherwise fallback to localPromotedAdmins
+  const effectivePromotedAdmins: string[] = serverAdmins !== null
+    ? Array.from(new Set([...ROOT_ADMIN_EMAILS, ...serverAdmins]))
+    : Array.from(new Set([...ROOT_ADMIN_EMAILS, ...localPromotedAdmins.map((e: string) => e.toLowerCase().trim())]));
+
+  // Keep localStorage promoted admin cache cleanly updated
+  if (typeof window !== "undefined" && serverAdmins !== null) {
+    localStorage.setItem(
+      "recodex_promoted_admin_emails",
+      JSON.stringify(serverAdmins.filter((e) => !ROOT_ADMIN_EMAILS.includes(e)))
+    );
+  }
 
   const finalUsers = Array.from(userMap.values()).map((u: any) => {
     const emailClean = (u.email || "").toLowerCase().trim();
-    if (allPromotedAdmins.includes(emailClean)) {
+    const isRoot = ROOT_ADMIN_EMAILS.includes(emailClean);
+    const isPromoted = effectivePromotedAdmins.includes(emailClean);
+
+    if (isRoot || isPromoted) {
       return { ...u, role: "admin" };
+    }
+    // If not promoted and not root, demote/revert any stale admin role
+    if (u.role === "admin") {
+      return { ...u, role: "developer" };
     }
     return u;
   });
@@ -462,11 +476,14 @@ export async function getPromotedAdminsApi(): Promise<string[]> {
  */
 export async function promoteUserAdminApi(email: string, role: string): Promise<any> {
   try {
-    await fetch(`${API_BASE_URL}/users/promote-admin`, {
+    const res = await fetch(`${API_BASE_URL}/users/promote-admin`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, role }),
     });
+    if (res.ok) {
+      return await res.json();
+    }
   } catch (err) {
     console.warn("Failed to post promoted admin to backend:", err);
   }

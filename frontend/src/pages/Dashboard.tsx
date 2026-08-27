@@ -399,7 +399,7 @@ export default function Dashboard() {
         const serverAdmins = await getPromotedAdminsApi();
         const promotedRaw = localStorage.getItem("recodex_promoted_admin_emails");
         const localPromoted: string[] = promotedRaw ? JSON.parse(promotedRaw) : [];
-        const allAdmins = Array.from(new Set([...serverAdmins, ...localPromoted, "veereshhp2004@gmail.com", "veereshhp04@gmail.com"]));
+        const allAdmins = Array.from(new Set([...serverAdmins, ...localPromoted, "veereshhp2004@gmail.com"]));
 
         const isAuthorizedAdmin = allAdmins.includes(userEmail);
 
@@ -1096,8 +1096,23 @@ export default function Dashboard() {
         promotedList = promotedList.filter((e) => e !== userEmailClean);
       }
       localStorage.setItem("recodex_promoted_admin_emails", JSON.stringify(promotedList));
+
+      // Update cached synced users in localStorage
+      const syncedRaw = localStorage.getItem("recodex_synced_users");
+      if (syncedRaw) {
+        try {
+          const syncedList = JSON.parse(syncedRaw);
+          const updatedSynced = syncedList.map((u: any) =>
+            (u.email || "").toLowerCase().trim() === userEmailClean
+              ? { ...u, name: newEditName, role: newEditRole }
+              : u
+          );
+          localStorage.setItem("recodex_synced_users", JSON.stringify(updatedSynced));
+        } catch (e) {}
+      }
+
       window.dispatchEvent(new Event("recodex-auth-update"));
-      promoteUserAdminApi(userEmailClean, newEditRole);
+      await promoteUserAdminApi(userEmailClean, newEditRole);
 
       try {
         const token = await getAuthToken();
@@ -1117,7 +1132,7 @@ export default function Dashboard() {
         details: `Updated name to ${newEditName} and role to ${newEditRole}`
       });
       fetchAuditLogs();
-      fetchUsers();
+      await fetchUsers();
       setToast({ message: "User profile details updated successfully.", type: "success" });
       setEditingUser(null);
     } catch (err: any) {
@@ -1170,8 +1185,23 @@ export default function Dashboard() {
         promotedList = promotedList.filter((e) => e !== userEmailClean);
       }
       localStorage.setItem("recodex_promoted_admin_emails", JSON.stringify(promotedList));
+
+      // Update cached synced users in localStorage
+      const syncedRaw = localStorage.getItem("recodex_synced_users");
+      if (syncedRaw) {
+        try {
+          const syncedList = JSON.parse(syncedRaw);
+          const updatedSynced = syncedList.map((u: any) =>
+            (u.email || "").toLowerCase().trim() === userEmailClean
+              ? { ...u, role: targetRole }
+              : u
+          );
+          localStorage.setItem("recodex_synced_users", JSON.stringify(updatedSynced));
+        } catch (e) {}
+      }
+
       window.dispatchEvent(new Event("recodex-auth-update"));
-      promoteUserAdminApi(userEmailClean, targetRole);
+      await promoteUserAdminApi(userEmailClean, targetRole);
 
       try {
         const token = await getAuthToken();
@@ -1189,7 +1219,7 @@ export default function Dashboard() {
         details: `Updated role to ${targetRole.toUpperCase()}`
       });
       fetchAuditLogs();
-      fetchUsers();
+      await fetchUsers();
       setToast({ message: `User role changed to ${targetRole.toUpperCase()}.`, type: "success" });
     } catch (err) {
       console.error("Failed to modify user admin status:", err);

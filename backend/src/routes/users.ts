@@ -37,11 +37,16 @@ const savePromotedAdmin = (email: string, isMakeAdmin: boolean) => {
   if (isMakeAdmin) {
     if (!list.includes(emailClean)) list.push(emailClean);
   } else {
+    // If removing admin, remove from list (except root platform owner)
     if (emailClean !== "veereshhp2004@gmail.com") {
-      list = list.filter((e) => e !== emailClean);
+      list = list.filter((e) => e.toLowerCase().trim() !== emailClean);
     }
   }
   try {
+    const dir = path.dirname(PROMOTED_ADMINS_FILE);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
     fs.writeFileSync(PROMOTED_ADMINS_FILE, JSON.stringify(list, null, 2), "utf-8");
   } catch (err) {
     console.warn("Failed to save promoted admins file:", err);
@@ -123,8 +128,27 @@ router.post("/promote-admin", async (req, res) => {
   if (!email) {
     return res.status(400).json({ error: "Missing email parameter." });
   }
+  const emailClean = email.toLowerCase().trim();
   const isMakeAdmin = role === "admin";
-  const updatedList = savePromotedAdmin(email, isMakeAdmin);
+  const updatedList = savePromotedAdmin(emailClean, isMakeAdmin);
+  const targetRole = isMakeAdmin ? "admin" : (role || "developer");
+
+  try {
+    await prisma.user.updateMany({
+      where: {
+        email: {
+          equals: emailClean,
+          mode: "insensitive",
+        },
+      },
+      data: {
+        role: targetRole,
+      },
+    });
+  } catch (dbErr) {
+    console.warn("Failed to update user role in DB on promote-admin:", dbErr);
+  }
+
   return res.json({ success: true, promotedAdmins: updatedList });
 });
 
@@ -248,16 +272,31 @@ router.get("/", async (_req, res) => {
       return emailStr;
     };
 
+    const promotedAdmins = getSavedPromotedAdmins();
+
     const userMap = new Map<string, any>();
-    FALLBACK_USERS.forEach((u: any) => userMap.set(getUserKey(u), u));
+    FALLBACK_USERS.forEach((u: any) => userMap.set(getUserKey(u), { ...u }));
     dbUsers.forEach((u: any) => {
       const key = getUserKey(u);
       userMap.set(key, { ...userMap.get(key), ...u });
     });
 
-    return res.json(Array.from(userMap.values()));
+    const finalUsers = Array.from(userMap.values()).map((u: any) => {
+      const emailClean = (u.email || "").toLowerCase().trim();
+      const isRoot = emailClean === "veereshhp2004@gmail.com";
+      const isPromoted = promotedAdmins.includes(emailClean);
+      if (isRoot || isPromoted) {
+        return { ...u, role: "admin" };
+      } else if (u.role === "admin") {
+        return { ...u, role: "developer" };
+      }
+      return u;
+    });
+
+    return res.json(finalUsers);
   } catch (error: any) {
     console.error("Error retrieving all ecosystem users:", error);
+    const promotedAdmins = getSavedPromotedAdmins();
     const getUserKey = (u: any): string => {
       const emailStr = (u.email || "").trim().toLowerCase();
       const nameStr = (u.name || "").trim().toLowerCase().replace(/[^a-z]/g, "");
@@ -269,8 +308,19 @@ router.get("/", async (_req, res) => {
       return emailStr;
     };
     const userMap = new Map<string, any>();
-    FALLBACK_USERS.forEach((u: any) => userMap.set(getUserKey(u), u));
-    return res.json(Array.from(userMap.values()));
+    FALLBACK_USERS.forEach((u: any) => userMap.set(getUserKey(u), { ...u }));
+    const finalUsers = Array.from(userMap.values()).map((u: any) => {
+      const emailClean = (u.email || "").toLowerCase().trim();
+      const isRoot = emailClean === "veereshhp2004@gmail.com";
+      const isPromoted = promotedAdmins.includes(emailClean);
+      if (isRoot || isPromoted) {
+        return { ...u, role: "admin" };
+      } else if (u.role === "admin") {
+        return { ...u, role: "developer" };
+      }
+      return u;
+    });
+    return res.json(finalUsers);
   }
 });
 
@@ -287,9 +337,19 @@ router.post("/sync", async (req, res) => {
   }
 
   try {
-    const isRootAdmin = email.toLowerCase() === "veereshhp2004@gmail.com";
+    const isRootAdmin = email.toLowerCase().trim() === "veereshhp2004@gmail.com";
+    const promotedAdmins = getSavedPromotedAdmins();
+    const isPromoted = promotedAdmins.includes(email.toLowerCase().trim());
     const existingUser = await prisma.user.findUnique({ where: { id } });
-    const userRole = isRootAdmin ? "admin" : (existingUser?.role || role || "client");
+
+    let userRole = "client";
+    if (isRootAdmin || isPromoted) {
+      userRole = "admin";
+    } else if (existingUser?.role) {
+      userRole = existingUser.role === "admin" ? "developer" : existingUser.role;
+    } else if (role) {
+      userRole = role === "admin" ? "developer" : role;
+    }
 
     const user = await prisma.user.upsert({
       where: { id },
@@ -303,7 +363,7 @@ router.post("/sync", async (req, res) => {
         id,
         email,
         name,
-        role: isRootAdmin ? "admin" : "client",
+        role: userRole,
         profileImage: profileImage || null,
       },
     });

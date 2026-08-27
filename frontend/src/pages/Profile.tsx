@@ -372,7 +372,7 @@ export default function Profile() {
             const serverPromoted = await getPromotedAdminsApi();
             const promotedRaw = localStorage.getItem("recodex_promoted_admin_emails");
             const localPromoted: string[] = promotedRaw ? JSON.parse(promotedRaw) : [];
-            const allAdmins = Array.from(new Set([...serverPromoted, ...localPromoted, "veereshhp2004@gmail.com", "veereshhp04@gmail.com"]));
+            const allAdmins = Array.from(new Set([...serverPromoted, ...localPromoted, "veereshhp2004@gmail.com"]));
 
             const isUserAdmin = allAdmins.includes(userEmailClean) || dbProfile?.role === "admin";
 
@@ -397,7 +397,7 @@ export default function Profile() {
             const serverPromoted = await getPromotedAdminsApi();
             const promotedRaw = localStorage.getItem("recodex_promoted_admin_emails");
             const localPromoted: string[] = promotedRaw ? JSON.parse(promotedRaw) : [];
-            const allAdmins = Array.from(new Set([...serverPromoted, ...localPromoted, "veereshhp2004@gmail.com", "veereshhp04@gmail.com"]));
+            const allAdmins = Array.from(new Set([...serverPromoted, ...localPromoted, "veereshhp2004@gmail.com"]));
             const isUserAdmin = allAdmins.includes(userEmailClean);
             
             const demoProjects: any[] = [];
