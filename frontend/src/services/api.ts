@@ -281,7 +281,7 @@ const REAL_ECOSYSTEM_USERS = [
     id: "user_3G82d9FackVcHk09TD8V9uHKJEt",
     name: "VEERESH H P",
     email: "veereshhp04@gmail.com",
-    role: "developer",
+    role: "admin",
     status: "Active",
     createdAt: "2026-07-11T15:58:52.253Z",
     profileImage: "https://img.clerk.com/eyJ0eXBlIjoicHJveHkiLCJzcmMiOiJodHRwczovL2ltYWdlcy5jbGVyay5kZXYvb2F1dGhfZ29vZ2xlL2ltZ18zRzgyZDN3UllpRWpTc3dlV1FnQ2o2eEN4c2kifQ"
@@ -403,10 +403,11 @@ export async function getUsers(): Promise<any[]> {
 
   const promotedAdminsRaw = typeof window !== "undefined" ? localStorage.getItem("recodex_promoted_admin_emails") : null;
   const promotedAdmins: string[] = promotedAdminsRaw ? JSON.parse(promotedAdminsRaw) : [];
+  const ROOT_ADMIN_EMAILS = ["veereshhp2004@gmail.com", "veereshhp04@gmail.com"];
 
   const finalUsers = Array.from(userMap.values()).map((u: any) => {
     const emailClean = (u.email || "").toLowerCase().trim();
-    if (promotedAdmins.includes(emailClean) || emailClean === "veereshhp2004@gmail.com") {
+    if (promotedAdmins.includes(emailClean) || ROOT_ADMIN_EMAILS.includes(emailClean)) {
       return { ...u, role: "admin" };
     }
     return u;

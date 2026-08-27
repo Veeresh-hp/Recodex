@@ -39,8 +39,9 @@ export default function Navbar() {
           (u: any) => u.email && u.email.toLowerCase().trim() === userEmail
         );
 
+        const ROOT_ADMIN_EMAILS = ["veereshhp2004@gmail.com", "veereshhp04@gmail.com"];
         const isUserAdmin =
-          userEmail === "veereshhp2004@gmail.com" ||
+          ROOT_ADMIN_EMAILS.includes(userEmail) ||
           localStorage.getItem("recodex_admin_user") === "true" ||
           (dbUserRecord && dbUserRecord.role === "admin");
 

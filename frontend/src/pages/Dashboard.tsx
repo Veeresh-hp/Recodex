@@ -377,7 +377,8 @@ export default function Dashboard() {
 
       if (userId && user) {
         const userEmail = (user.primaryEmailAddress?.emailAddress || "").toLowerCase().trim();
-        const isRootAdmin = userEmail === "veereshhp2004@gmail.com";
+        const ROOT_ADMIN_EMAILS = ["veereshhp2004@gmail.com", "veereshhp04@gmail.com"];
+        const isRootAdmin = ROOT_ADMIN_EMAILS.includes(userEmail);
 
         const syncedUsersRaw = localStorage.getItem("recodex_synced_users");
         const syncedUsers: any[] = syncedUsersRaw ? JSON.parse(syncedUsersRaw) : [];
@@ -1118,7 +1119,8 @@ export default function Dashboard() {
 
   const handleToggleUserAdmin = async (userId: string, makeAdmin: boolean) => {
     const userToModify = dbUsers.find((u) => u.id === userId);
-    if (userToModify && !makeAdmin && userToModify.email === "veereshhp2004@gmail.com") {
+    const ROOT_ADMIN_EMAILS = ["veereshhp2004@gmail.com", "veereshhp04@gmail.com"];
+    if (userToModify && !makeAdmin && ROOT_ADMIN_EMAILS.includes((userToModify.email || "").toLowerCase().trim())) {
       setToast({
         message: "Demoting root administrator accounts is prohibited to maintain security clearance.",
         type: "warning",

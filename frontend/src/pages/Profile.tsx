@@ -368,13 +368,17 @@ export default function Profile() {
 
             const projectsList = enrichedProjects;
 
+            const userEmailClean = (user.primaryEmailAddress?.emailAddress || "").toLowerCase().trim();
+            const ROOT_ADMIN_EMAILS = ["veereshhp2004@gmail.com", "veereshhp04@gmail.com"];
+            const isUserAdmin = ROOT_ADMIN_EMAILS.includes(userEmailClean) || localStorage.getItem("recodex_admin_user") === "true" || dbProfile?.role === "admin";
+
             const p: UserProfile = {
               id: dbProfile.id,
               name: dbProfile.name || user.fullName || "RecodeX Engineer",
               email: dbProfile.email || user.primaryEmailAddress?.emailAddress || "",
               phone: user.primaryPhoneNumber?.phoneNumber || "No phone linked",
               avatar: resolvedAvatar,
-              role: dbProfile.role || "client",
+              role: isUserAdmin ? "admin" : (dbProfile.role || "client"),
               isGoogleUser: user.externalAccounts.some(acc => acc.provider === "google"),
               projects: projectsList
             };
@@ -385,7 +389,9 @@ export default function Profile() {
             const fullName = user.fullName || user.username || user.primaryEmailAddress?.emailAddress?.split("@")[0] || "RecodeX Engineer";
             const savedAvatar = localStorage.getItem(`profile_avatar_${user.id}`);
             const resolvedAvatar = savedAvatar || user.imageUrl || null;
-            const isUserAdmin = user.primaryEmailAddress?.emailAddress === "veereshhp2004@gmail.com" || localStorage.getItem("recodex_admin_user") === "true";
+            const userEmailClean = (user.primaryEmailAddress?.emailAddress || "").toLowerCase().trim();
+            const ROOT_ADMIN_EMAILS = ["veereshhp2004@gmail.com", "veereshhp04@gmail.com"];
+            const isUserAdmin = ROOT_ADMIN_EMAILS.includes(userEmailClean) || localStorage.getItem("recodex_admin_user") === "true";
             
             const demoProjects: any[] = [];
 
