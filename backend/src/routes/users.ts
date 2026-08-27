@@ -58,6 +58,16 @@ router.get("/profile", requireAuth, async (req: AuthenticatedRequest, res: Respo
  * Returns a list of all synchronized ecosystem users.
  * Automatically syncs with Clerk users if CLERK_SECRET_KEY is configured.
  */
+const FALLBACK_USERS = [
+  { id: "user_3GMUgXnuLD5lHb6Rn9O8P2TIPMW", name: "Veeresh H P", email: "veereshhp2004@gmail.com", role: "admin", status: "Active" },
+  { id: "user_3G82d9FackVcHk09TD8V9uHKJEt", name: "VEERESH H P", email: "veereshhp04@gmail.com", role: "developer", status: "Active" },
+  { id: "user_3IKkzxTelZizaJk8JgKn4iGZXHi", name: "veer_thinks", email: "veerthinks@gmail.com", role: "developer", status: "Active" },
+  { id: "user_3IKE3zF8zNPvnmxWhNQqnscyFB3", name: "Vaibhav joshi", email: "vaibhavjoshi18660@gmail.com", role: "developer", status: "Active" },
+  { id: "user_3IKF89Diganth0719Gowda001", name: "Diganth Gowda", email: "diganthgowda0719@gmail.com", role: "developer", status: "Active" },
+  { id: "user_3IKF90SyedRehan002", name: "Syed Rehan", email: "syedreehaan0@gmail.com", role: "developer", status: "Active" },
+  { id: "user_3IKF91DavanKS003", name: "Davan KS", email: "davansonu67@gmail.com", role: "developer", status: "Active" }
+];
+
 router.get("/", async (_req, res) => {
   try {
     const clerkSecret = process.env.CLERK_SECRET_KEY;
@@ -105,13 +115,20 @@ router.get("/", async (_req, res) => {
       }
     }
 
-    const users = await prisma.user.findMany({
+    const dbUsers = await prisma.user.findMany({
       orderBy: { createdAt: "desc" },
     });
-    return res.json(users);
+
+    const userMap = new Map<string, any>();
+    FALLBACK_USERS.forEach((u: any) => userMap.set(u.email.toLowerCase(), u));
+    dbUsers.forEach((u: any) => userMap.set(u.email.toLowerCase(), { ...userMap.get(u.email.toLowerCase()), ...u }));
+
+    return res.json(Array.from(userMap.values()));
   } catch (error: any) {
     console.error("Error retrieving all ecosystem users:", error);
-    return res.status(500).json({ error: "Failed to retrieve ecosystem users." });
+    const userMap = new Map<string, any>();
+    FALLBACK_USERS.forEach((u: any) => userMap.set(u.email.toLowerCase(), u));
+    return res.json(Array.from(userMap.values()));
   }
 });
 

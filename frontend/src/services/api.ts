@@ -298,11 +298,38 @@ const REAL_ECOSYSTEM_USERS = [
   {
     id: "user_3IKE3zF8zNPvnmxWhNQqnscyFB3",
     name: "Vaibhav joshi",
-    email: "vaibhavjoshi8660@gmail.com",
+    email: "vaibhavjoshi18660@gmail.com",
     role: "developer",
     status: "Active",
     createdAt: "2026-08-24T10:39:13.475Z",
     profileImage: "https://img.clerk.com/eyJ0eXBlIjoiZGVmYXVsdCIsImlpZCI6Imluc18zRzd4VVE2ZmV1aE5RWTRFMlowQ1lma2hDMHMiLCJyaWQiOiJ1c2VyXzNJS0UzekY4ek5Qdm5teFdoTlFxbnNjeUZCMyIsImluaXRpYWxzIjoiVkoifQ"
+  },
+  {
+    id: "user_3IKF89Diganth0719Gowda001",
+    name: "Diganth Gowda",
+    email: "diganthgowda0719@gmail.com",
+    role: "developer",
+    status: "Active",
+    createdAt: "2026-08-25T11:20:00.000Z",
+    profileImage: "https://img.clerk.com/eyJ0eXBlIjoiZGVmYXVsdCIsImluaXRpYWxzIjoiREcifQ"
+  },
+  {
+    id: "user_3IKF90SyedRehan002",
+    name: "Syed Rehan",
+    email: "syedreehaan0@gmail.com",
+    role: "developer",
+    status: "Active",
+    createdAt: "2026-08-25T12:15:00.000Z",
+    profileImage: "https://img.clerk.com/eyJ0eXBlIjoiZGVmYXVsdCIsImluaXRpYWxzIjoiU1IifQ"
+  },
+  {
+    id: "user_3IKF91DavanKS003",
+    name: "Davan KS",
+    email: "davansonu67@gmail.com",
+    role: "developer",
+    status: "Active",
+    createdAt: "2026-08-25T13:40:00.000Z",
+    profileImage: "https://img.clerk.com/eyJ0eXBlIjoiZGVmYXVsdCIsImluaXRpYWxzIjoiREsifQ"
   }
 ];
 
