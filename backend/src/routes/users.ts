@@ -17,8 +17,10 @@ const upload = multer({
 
 const PROMOTED_ADMINS_FILE = path.join(__dirname, "../../promoted_admins_db.json");
 
+const ROOT_ADMIN_EMAILS = ["veereshhp2004@gmail.com", "udaykumaras34@gmail.com"];
+
 const getSavedPromotedAdmins = (): string[] => {
-  const rootAdmins = ["veereshhp2004@gmail.com"];
+  const rootAdmins = ROOT_ADMIN_EMAILS;
   try {
     if (fs.existsSync(PROMOTED_ADMINS_FILE)) {
       const data = fs.readFileSync(PROMOTED_ADMINS_FILE, "utf-8");
@@ -37,8 +39,8 @@ const savePromotedAdmin = (email: string, isMakeAdmin: boolean) => {
   if (isMakeAdmin) {
     if (!list.includes(emailClean)) list.push(emailClean);
   } else {
-    // If removing admin, remove from list (except root platform owner)
-    if (emailClean !== "veereshhp2004@gmail.com") {
+    // If removing admin, remove from list (except root platform owners)
+    if (!ROOT_ADMIN_EMAILS.includes(emailClean)) {
       list = list.filter((e) => e.toLowerCase().trim() !== emailClean);
     }
   }
@@ -199,13 +201,14 @@ router.get("/profile", requireAuth, async (req: AuthenticatedRequest, res: Respo
  * Automatically syncs with Clerk users if CLERK_SECRET_KEY is configured.
  */
 const FALLBACK_USERS = [
-  { id: "user_3GMUgXnuLD5lHb6Rn9O8P2TIPMW", name: "Veeresh H P", email: "veereshhp2004@gmail.com", role: "admin", status: "Active" },
-  { id: "user_3G82d9FackVcHk09TD8V9uHKJEt", name: "VEERESH H P", email: "veereshhp04@gmail.com", role: "developer", status: "Active" },
-  { id: "user_3IKkzxTelZizaJk8JgKn4iGZXHi", name: "veer_thinks", email: "veerthinks@gmail.com", role: "developer", status: "Active" },
-  { id: "user_3IKE3zF8zNPvnmxWhNQqnscyFB3", name: "Vaibhav joshi", email: "vaibhavjoshi18660@gmail.com", role: "developer", status: "Active" },
-  { id: "user_3IKF89Diganth0719Gowda001", name: "Diganth Gowda", email: "diganthgowda0719@gmail.com", role: "developer", status: "Active" },
-  { id: "user_3IKF90SyedRehan002", name: "Syed Rehan", email: "syedreehaan0@gmail.com", role: "developer", status: "Active" },
-  { id: "user_3IKF91DavanKS003", name: "Davan KS", email: "davansonu67@gmail.com", role: "developer", status: "Active" }
+  { id: "user_3GMUgXnuLD5lHb6Rn9O8P2TIPMW", name: "Veeresh H P", email: "veereshhp2004@gmail.com", role: "admin", status: "Active", createdAt: "2026-07-11T16:02:39.730Z" },
+  { id: "user_3G8UdayKumarAs34Admin001", name: "Mr._.Ratha._", email: "udaykumaras34@gmail.com", role: "admin", status: "Active", createdAt: new Date().toISOString() },
+  { id: "user_3G82d9FackVcHk09TD8V9uHKJEt", name: "VEERESH H P", email: "veereshhp04@gmail.com", role: "client", status: "Active", createdAt: "2026-07-11T15:58:52.253Z" },
+  { id: "user_3IKkzxTelZizaJk8JgKn4iGZXHi", name: "veer_thinks", email: "veerthinks@gmail.com", role: "client", status: "Active", createdAt: "2026-08-24T10:39:11.708Z" },
+  { id: "user_3IKE3zF8zNPvnmxWhNQqnscyFB3", name: "Vaibhav Joshi", email: "vaibhavjoshi18660@gmail.com", role: "client", status: "Active", createdAt: "2026-08-24T10:39:13.475Z" },
+  { id: "user_3IKF89Diganth0719Gowda001", name: "Diganth Gowda", email: "diganthgowda0719@gmail.com", role: "client", status: "Active", createdAt: "2026-08-27T11:20:00.000Z" },
+  { id: "user_3IKF90SyedRehan002", name: "Syed Rehan", email: "syedreehaan0@gmail.com", role: "client", status: "Active", createdAt: "2026-08-27T12:15:00.000Z" },
+  { id: "user_3IKF91DavanKS003", name: "Davan KS", email: "davansonu67@gmail.com", role: "client", status: "Active", createdAt: "2026-08-27T13:40:00.000Z" }
 ];
 
 router.get("/", async (_req, res) => {
@@ -226,11 +229,11 @@ router.get("/", async (_req, res) => {
             const firstName = u.first_name || "";
             const lastName = u.last_name || "";
             const fullName = [firstName, lastName].filter(Boolean).join(" ") || u.username || email.split("@")[0];
-            const isRootAdmin = email.toLowerCase() === "veereshhp2004@gmail.com";
+            const isRootAdmin = ROOT_ADMIN_EMAILS.includes(email.toLowerCase().trim());
             const img = u.image_url || u.profile_image_url || null;
 
             const existingUser = await prisma.user.findUnique({ where: { id: u.id } });
-            const targetRole = isRootAdmin ? "admin" : (existingUser?.role || "client");
+            const targetRole = isRootAdmin ? "admin" : (existingUser?.role === "suspended" ? "suspended" : "client");
 
             await prisma.user.upsert({
               where: { id: u.id },
@@ -265,6 +268,7 @@ router.get("/", async (_req, res) => {
       const emailHandle = emailStr.split("@")[0].replace(/[^a-z]/g, "");
 
       if (emailStr.includes("veereshhp2004")) return "veereshhp2004@gmail.com";
+      if (emailStr.includes("udaykumaras34")) return "udaykumaras34@gmail.com";
       if (emailStr.includes("veereshhp04")) return "veereshhp04@gmail.com";
 
       if (nameStr && nameStr.length > 3) return nameStr;
@@ -283,14 +287,24 @@ router.get("/", async (_req, res) => {
 
     const finalUsers = Array.from(userMap.values()).map((u: any) => {
       const emailClean = (u.email || "").toLowerCase().trim();
-      const isRoot = emailClean === "veereshhp2004@gmail.com";
+      const isRoot = ROOT_ADMIN_EMAILS.includes(emailClean);
       const isPromoted = promotedAdmins.includes(emailClean);
       if (isRoot || isPromoted) {
         return { ...u, role: "admin" };
-      } else if (u.role === "admin") {
-        return { ...u, role: "developer" };
       }
-      return u;
+      return { ...u, role: u.role === "suspended" ? "suspended" : "client" };
+    }).sort((a: any, b: any) => {
+      const emailA = (a.email || "").toLowerCase().trim();
+      const emailB = (b.email || "").toLowerCase().trim();
+      if (emailA === "veereshhp2004@gmail.com") return -1;
+      if (emailB === "veereshhp2004@gmail.com") return 1;
+      const isAdminA = a.role === "admin" || ROOT_ADMIN_EMAILS.includes(emailA);
+      const isAdminB = b.role === "admin" || ROOT_ADMIN_EMAILS.includes(emailB);
+      if (isAdminA && !isAdminB) return -1;
+      if (!isAdminA && isAdminB) return 1;
+      const dateA = new Date(a.createdAt || 0).getTime();
+      const dateB = new Date(b.createdAt || 0).getTime();
+      return dateB - dateA;
     });
 
     return res.json(finalUsers);
@@ -302,6 +316,7 @@ router.get("/", async (_req, res) => {
       const nameStr = (u.name || "").trim().toLowerCase().replace(/[^a-z]/g, "");
       const emailHandle = emailStr.split("@")[0].replace(/[^a-z]/g, "");
       if (emailStr.includes("veereshhp2004")) return "veereshhp2004@gmail.com";
+      if (emailStr.includes("udaykumaras34")) return "udaykumaras34@gmail.com";
       if (emailStr.includes("veereshhp04")) return "veereshhp04@gmail.com";
       if (nameStr && nameStr.length > 3) return nameStr;
       if (emailHandle && emailHandle.length > 3) return emailHandle;
@@ -311,14 +326,24 @@ router.get("/", async (_req, res) => {
     FALLBACK_USERS.forEach((u: any) => userMap.set(getUserKey(u), { ...u }));
     const finalUsers = Array.from(userMap.values()).map((u: any) => {
       const emailClean = (u.email || "").toLowerCase().trim();
-      const isRoot = emailClean === "veereshhp2004@gmail.com";
+      const isRoot = ROOT_ADMIN_EMAILS.includes(emailClean);
       const isPromoted = promotedAdmins.includes(emailClean);
       if (isRoot || isPromoted) {
         return { ...u, role: "admin" };
-      } else if (u.role === "admin") {
-        return { ...u, role: "developer" };
       }
-      return u;
+      return { ...u, role: u.role === "suspended" ? "suspended" : "client" };
+    }).sort((a: any, b: any) => {
+      const emailA = (a.email || "").toLowerCase().trim();
+      const emailB = (b.email || "").toLowerCase().trim();
+      if (emailA === "veereshhp2004@gmail.com") return -1;
+      if (emailB === "veereshhp2004@gmail.com") return 1;
+      const isAdminA = a.role === "admin" || ROOT_ADMIN_EMAILS.includes(emailA);
+      const isAdminB = b.role === "admin" || ROOT_ADMIN_EMAILS.includes(emailB);
+      if (isAdminA && !isAdminB) return -1;
+      if (!isAdminA && isAdminB) return 1;
+      const dateA = new Date(a.createdAt || 0).getTime();
+      const dateB = new Date(b.createdAt || 0).getTime();
+      return dateB - dateA;
     });
     return res.json(finalUsers);
   }
@@ -337,7 +362,7 @@ router.post("/sync", async (req, res) => {
   }
 
   try {
-    const isRootAdmin = email.toLowerCase().trim() === "veereshhp2004@gmail.com";
+    const isRootAdmin = ROOT_ADMIN_EMAILS.includes(email.toLowerCase().trim());
     const promotedAdmins = getSavedPromotedAdmins();
     const isPromoted = promotedAdmins.includes(email.toLowerCase().trim());
     const existingUser = await prisma.user.findUnique({ where: { id } });

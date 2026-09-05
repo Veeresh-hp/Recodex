@@ -39,8 +39,8 @@ export default function Navbar() {
           (u: any) => u.email && u.email.toLowerCase().trim() === userEmail
         );
 
-        // Header Dashboard button is strictly reserved for the Owner account (veereshhp2004@gmail.com)
-        const isOwner = userEmail === "veereshhp2004@gmail.com";
+        const ROOT_ADMIN_EMAILS = ["veereshhp2004@gmail.com", "udaykumaras34@gmail.com"];
+        const isOwner = ROOT_ADMIN_EMAILS.includes(userEmail) || dbUserRecord?.role === "admin";
         setIsAdmin(isOwner);
 
         const savedAvatar = localStorage.getItem(`profile_avatar_${userId}`);

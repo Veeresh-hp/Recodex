@@ -1,0 +1,22 @@
+[
+  {
+    "id": "audit-1788608351601-1y0ab",
+    "adminName": "Veeresh H P",
+    "adminEmail": "veereshhp2004@gmail.com",
+    "action": "DELETED CONTACT INQUIRY",
+    "target": "Vinayaka P S (vinayakaps04@gmail.com)",
+    "details": "Deleted inquiry regarding \"mini\"",
+    "timestamp": "2026-09-05T11:39:11.601Z",
+    "formattedDate": "9/5/2026, 5:09:11 PM"
+  },
+  {
+    "id": "audit-1788607971757-8x0bl",
+    "adminName": "Veeresh H P",
+    "adminEmail": "veereshhp2004@gmail.com",
+    "action": "ISSUED OFFICIAL CERTIFICATE",
+    "target": "VEERESH H P (veereshhp04@gmail.com)",
+    "details": "Issued Certificate [CERT-6259] for \"Software Solution Project\" (Approved)",
+    "timestamp": "2026-09-05T11:32:51.757Z",
+    "formattedDate": "9/5/2026, 5:02:51 PM"
+  }
+]

@@ -9,6 +9,7 @@ import projectRoutes from "./routes/projects";
 import userRoutes from "./routes/users";
 import contactRoutes from "./routes/contacts";
 import certificateRoutes from "./routes/certificates";
+import { startCertificateScheduler } from "./services/scheduler";
 
 // Initialize environment variables from .env
 dotenv.config();
@@ -84,6 +85,8 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
 
 // Boot Server (only in non-serverless environments)
 if (!process.env.VERCEL) {
+  startCertificateScheduler(60000);
+
   app.listen(PORT, () => {
     console.log("====================================================");
     console.log(`⚡️ RECODEX BACKEND API CORE BOOTED SUCCESSFULLY ⚡️`);

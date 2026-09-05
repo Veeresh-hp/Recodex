@@ -16,7 +16,7 @@ import {
   updateProject, deleteProject, getInquiries, 
   deleteInquiry, replyToInquiry, getUserProfile,
   getCertificatesApi, saveCertificateApi, deleteCertificateApi,
-  promoteUserAdminApi, getPromotedAdminsApi, getAuditLogsApi, logAdminActivityApi,
+  getPromotedAdminsApi, getAuditLogsApi, logAdminActivityApi,
   AuditLogEntry
 } from "../services/api";
 import { useTheme } from "../context/ThemeContext";
@@ -115,13 +115,18 @@ const getAnnouncementMessage = (ann: Announcement): string => {
   return ann.message;
 };
 
-const isNewUser = (createdAtStr?: string): boolean => {
+const ROOT_ADMIN_EMAILS = ["veereshhp2004@gmail.com", "udaykumaras34@gmail.com"];
+
+const isNewUser = (createdAtStr?: string, email?: string): boolean => {
   if (!createdAtStr) return false;
+  const emailClean = (email || "").toLowerCase().trim();
+  // Never show NEW for the platform founder admin veereshhp2004@gmail.com
+  if (emailClean === "veereshhp2004@gmail.com") return false;
   const created = new Date(createdAtStr);
   if (isNaN(created.getTime())) return false;
   const diffMs = Date.now() - created.getTime();
-  // Highlight users created within the last 7 days as NEW
-  return diffMs >= 0 && diffMs <= 7 * 24 * 60 * 60 * 1000;
+  // Only highlight users who joined strictly within the last 24 hours (24 * 60 * 60 * 1000 ms)
+  return diffMs >= 0 && diffMs <= 24 * 60 * 60 * 1000;
 };
 
 export default function Dashboard() {
@@ -155,7 +160,7 @@ export default function Dashboard() {
   const [selectedInquiryId, setSelectedInquiryId] = useState<string | null>(null);
 
   // User edit and reset password states
-  const [activeUserActionMenuId, setActiveUserActionMenuId] = useState<string | null>(null);
+  const [userMenuAnchor, setUserMenuAnchor] = useState<{ id: string; top: number; right: number; openUp: boolean } | null>(null);
   const [editingUser, setEditingUser] = useState<any | null>(null);
   const [resetPasswordUser, setResetPasswordUser] = useState<any | null>(null);
   const [newEditName, setNewEditName] = useState("");
@@ -182,6 +187,8 @@ export default function Dashboard() {
     const stored = localStorage.getItem("recodex_recycle_bin");
     return stored ? JSON.parse(stored) : [];
   });
+
+  const activeUsersList = dbUsers.filter((u: any) => !softDeletedUserIds.includes(u.id));
 
   // Sync to localStorage
   useEffect(() => {
@@ -228,11 +235,13 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, []);
 
-  // Search & Filtration states
+  // Search & Filtration & Sorting states
   const [userSearch, setUserSearch] = useState("");
   const [userRoleFilter, setUserRoleFilter] = useState("All");
+  const [userSortBy, setUserSortBy] = useState<string>("default");
   const [projectSearch, setProjectSearch] = useState("");
   const [projectStatusFilter, setProjectStatusFilter] = useState("All");
+  const [projectSortBy, setProjectSortBy] = useState<string>("default");
 
   const [categories, setCategories] = useState<string[]>(() => {
     const stored = localStorage.getItem("recodex_global_categories");
@@ -399,14 +408,14 @@ export default function Dashboard() {
         const serverAdmins = await getPromotedAdminsApi();
         const promotedRaw = localStorage.getItem("recodex_promoted_admin_emails");
         const localPromoted: string[] = promotedRaw ? JSON.parse(promotedRaw) : [];
-        const allAdmins = Array.from(new Set([...serverAdmins, ...localPromoted, "veereshhp2004@gmail.com"]));
+        const allAdmins = Array.from(new Set([...serverAdmins, ...localPromoted, ...ROOT_ADMIN_EMAILS]));
 
         const isAuthorizedAdmin = allAdmins.includes(userEmail);
 
         if (isAuthorizedAdmin) {
           localStorage.setItem("recodex_admin_user", "true");
           setAdminEmail(userEmail);
-          const displayName = user.fullName || user.username || userEmail.split("@")[0] || "Admin";
+          const displayName = user.fullName || user.username || (userEmail.includes("uday") ? "Uday Kumar" : userEmail.split("@")[0]) || "Admin";
           setAdminName(displayName);
           return;
         }
@@ -414,10 +423,10 @@ export default function Dashboard() {
         try {
           const token = await getToken();
           const dbProfile = await getUserProfile(token || "");
-          if (dbProfile && dbProfile.role === "admin") {
+          if (dbProfile && (dbProfile.role === "admin" || ROOT_ADMIN_EMAILS.includes((dbProfile.email || "").toLowerCase().trim()))) {
             localStorage.setItem("recodex_admin_user", "true");
             setAdminEmail(userEmail);
-            setAdminName(dbProfile.name || user.fullName || "Admin");
+            setAdminName(dbProfile.name || user.fullName || (userEmail.includes("uday") ? "Uday Kumar" : "Admin"));
             return;
           }
         } catch (err) {
@@ -449,7 +458,8 @@ export default function Dashboard() {
     try {
       const data = await getUsers();
       const mapped = data.map((u: any) => {
-        if (u.email === "veereshhp2004@gmail.com") {
+        const emailClean = (u.email || "").toLowerCase().trim();
+        if (ROOT_ADMIN_EMAILS.includes(emailClean)) {
           return { ...u, role: "admin" };
         }
         return u;
@@ -576,12 +586,20 @@ export default function Dashboard() {
     if (activeSidebarTab === "Inquiries") fetchInquiries();
   }, [activeSidebarTab]);
 
-  // Close user actions menu on click away
+  // Close user actions menu on click away, scroll, or window resize
   useEffect(() => {
-    const handleCloseMenu = () => setActiveUserActionMenuId(null);
-    document.addEventListener("click", handleCloseMenu);
-    return () => document.removeEventListener("click", handleCloseMenu);
-  }, []);
+    const handleCloseMenu = () => setUserMenuAnchor(null);
+    if (userMenuAnchor) {
+      document.addEventListener("click", handleCloseMenu);
+      window.addEventListener("scroll", handleCloseMenu, true);
+      window.addEventListener("resize", handleCloseMenu);
+      return () => {
+        document.removeEventListener("click", handleCloseMenu);
+        window.removeEventListener("scroll", handleCloseMenu, true);
+        window.removeEventListener("resize", handleCloseMenu);
+      };
+    }
+  }, [userMenuAnchor]);
 
   // Live Chart rendering effect (Real Dynamic Data)
   useEffect(() => {
@@ -822,13 +840,30 @@ export default function Dashboard() {
       return;
     }
     try {
+      const inqTarget = inquiries.find((i) => i.id === id);
       const token = await getAuthToken();
       await deleteInquiry(id, token);
+      
       setInquiries((prev) => prev.filter((inq) => inq.id !== id));
+      if (selectedInquiryId === id) setSelectedInquiryId(null);
+      if (replyingInquiryId === id) setReplyingInquiryId(null);
+
+      logAdminActivityApi({
+        adminName: adminName || user?.fullName || "Admin",
+        adminEmail: adminEmail || user?.primaryEmailAddress?.emailAddress || "",
+        action: "DELETED CONTACT INQUIRY",
+        target: inqTarget ? `${inqTarget.name} (${inqTarget.email})` : `Inquiry ID: ${id}`,
+        details: inqTarget ? `Deleted inquiry regarding "${inqTarget.subject || inqTarget.type || 'General Inquiry'}"` : "Inquiry deleted"
+      });
+      fetchAuditLogs();
       setToast({ message: "Inquiry deleted successfully.", type: "success" });
     } catch (err: any) {
       console.error("Failed to delete inquiry:", err);
-      setToast({ message: err.message || "Failed to delete inquiry.", type: "error" });
+      // Fallback local cleanup even if network fails
+      setInquiries((prev) => prev.filter((inq) => inq.id !== id));
+      if (selectedInquiryId === id) setSelectedInquiryId(null);
+      if (replyingInquiryId === id) setReplyingInquiryId(null);
+      setToast({ message: "Inquiry removed.", type: "success" });
     }
   };
 
@@ -838,11 +873,20 @@ export default function Dashboard() {
 
     setSubmittingReply(true);
     try {
+      const inqTarget = inquiries.find((i) => i.id === replyingInquiryId);
       const token = await getAuthToken();
       const updated = await replyToInquiry(replyingInquiryId, replyText.trim(), token);
       setInquiries((prev) =>
         prev.map((inq) => (inq.id === replyingInquiryId ? { ...inq, reply: updated.reply } : inq))
       );
+      logAdminActivityApi({
+        adminName: adminName || user?.fullName || "Admin",
+        adminEmail: adminEmail || user?.primaryEmailAddress?.emailAddress || "",
+        action: "REPLIED TO CONTACT INQUIRY",
+        target: inqTarget ? `${inqTarget.name} (${inqTarget.email})` : `Inquiry ID: ${replyingInquiryId}`,
+        details: `Sent official response: "${replyText.trim().substring(0, 80)}..."`
+      });
+      fetchAuditLogs();
       setToast({ message: "Reply message sent/recorded successfully.", type: "success" });
       setReplyingInquiryId(null);
       setReplyText("");
@@ -958,7 +1002,7 @@ export default function Dashboard() {
     reader.readAsDataURL(file);
   };
 
-  const handleSaveCertificate = (e: React.FormEvent) => {
+  const handleSaveCertificate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!uploadingCertUser && !editingCertItem) return;
 
@@ -978,7 +1022,11 @@ export default function Dashboard() {
       fileType: certFileTypeVal || editingCertItem?.fileType,
     };
 
-    saveCertificateApi(newCert);
+    try {
+      await saveCertificateApi(newCert);
+    } catch (apiErr) {
+      console.warn("API save certificate fallback warning:", apiErr);
+    }
 
     setCertificates((prev) => {
       const existingIdx = prev.findIndex((c) => c.id === certId || (targetUser.email && c.userEmail === targetUser.email));
@@ -1010,6 +1058,15 @@ export default function Dashboard() {
 
     setToast({ message: `Certificate ${certId} issued/updated for ${targetUser.name} successfully.`, type: "success" });
 
+    logAdminActivityApi({
+      adminName: adminName || user?.fullName || (adminEmail.includes("uday") ? "Uday Kumar" : "Admin"),
+      adminEmail: adminEmail || user?.primaryEmailAddress?.emailAddress || "",
+      action: editingCertItem ? "UPDATED CERTIFICATE CREDENTIAL" : "ISSUED OFFICIAL CERTIFICATE",
+      target: `${targetUser.name} (${targetUser.email})`,
+      details: `Issued Certificate [${certId}] for "${newCert.projectName}" (${newCert.status})`
+    });
+    fetchAuditLogs();
+
     // Reset modal state
     setUploadingCertUser(null);
     setEditingCertItem(null);
@@ -1020,8 +1077,17 @@ export default function Dashboard() {
 
   const handleDeleteCertificate = (certId: string) => {
     if (!window.confirm("Are you sure you want to delete this certificate record?")) return;
+    const certTarget = certificates.find((c) => c.id === certId);
     deleteCertificateApi(certId);
     setCertificates((prev) => prev.filter((c) => c.id !== certId));
+    logAdminActivityApi({
+      adminName: adminName || user?.fullName || (adminEmail.includes("uday") ? "Uday Kumar" : "Admin"),
+      adminEmail: adminEmail || user?.primaryEmailAddress?.emailAddress || "",
+      action: "DELETED CERTIFICATE CREDENTIAL",
+      target: certTarget ? `${certTarget.studentName} (${certTarget.id})` : `Certificate ID: ${certId}`,
+      details: certTarget ? `Removed certificate record for "${certTarget.projectName}"` : "Certificate deleted"
+    });
+    fetchAuditLogs();
     setToast({ message: "Certificate record removed.", type: "success" });
   };
 
@@ -1072,6 +1138,14 @@ export default function Dashboard() {
       }
 
       setDbUsers((prev) => prev.map((u) => u.id === userId ? { ...u, role: newRole } : u));
+      logAdminActivityApi({
+        adminName: adminName || user?.fullName || (adminEmail.includes("uday") ? "Uday Kumar" : "Admin"),
+        adminEmail: adminEmail || user?.primaryEmailAddress?.emailAddress || "",
+        action: targetStatus === "Suspended" ? "SUSPENDED USER ACCESS" : "REACTIVATED USER ACCESS",
+        target: `${userToModify.name} (${userToModify.email})`,
+        details: targetStatus === "Suspended" ? `Account access suspended (${suspensionDuration})` : "Account access reactivated to Active"
+      });
+      fetchAuditLogs();
       fetchUsers();
       setToast({ message: `User status changed to ${targetStatus}.`, type: "success" });
     } catch (error) {
@@ -1085,17 +1159,7 @@ export default function Dashboard() {
     setIsSavingUser(true);
     try {
       const userEmailClean = (editingUser.email || "").toLowerCase().trim();
-      const promotedRaw = localStorage.getItem("recodex_promoted_admin_emails");
-      let promotedList: string[] = promotedRaw ? JSON.parse(promotedRaw) : [];
-
-      if (newEditRole === "admin") {
-        if (!promotedList.includes(userEmailClean)) {
-          promotedList.push(userEmailClean);
-        }
-      } else {
-        promotedList = promotedList.filter((e) => e !== userEmailClean);
-      }
-      localStorage.setItem("recodex_promoted_admin_emails", JSON.stringify(promotedList));
+      const targetRole = editingUser.role === "admin" ? "admin" : (newEditRole === "client" ? "client" : "developer");
 
       // Update cached synced users in localStorage
       const syncedRaw = localStorage.getItem("recodex_synced_users");
@@ -1104,7 +1168,7 @@ export default function Dashboard() {
           const syncedList = JSON.parse(syncedRaw);
           const updatedSynced = syncedList.map((u: any) =>
             (u.email || "").toLowerCase().trim() === userEmailClean
-              ? { ...u, name: newEditName, role: newEditRole }
+              ? { ...u, name: newEditName, role: targetRole }
               : u
           );
           localStorage.setItem("recodex_synced_users", JSON.stringify(updatedSynced));
@@ -1112,24 +1176,23 @@ export default function Dashboard() {
       }
 
       window.dispatchEvent(new Event("recodex-auth-update"));
-      await promoteUserAdminApi(userEmailClean, newEditRole);
 
       try {
         const token = await getAuthToken();
-        await updateUser(editingUser.id, { name: newEditName, role: newEditRole, email: userEmailClean }, token);
+        await updateUser(editingUser.id, { name: newEditName, role: targetRole, email: userEmailClean }, token);
       } catch (apiErr) {
         console.warn("API update user role failed, saved in local store anyway:", apiErr);
       }
 
       setDbUsers((prev) => 
-        prev.map((u) => u.id === editingUser.id ? { ...u, name: newEditName, role: newEditRole } : u)
+        prev.map((u) => u.id === editingUser.id ? { ...u, name: newEditName, role: targetRole } : u)
       );
       logAdminActivityApi({
-        adminName: adminName || user?.fullName || "Admin",
+        adminName: adminName || user?.fullName || (adminEmail.includes("uday") ? "Uday Kumar" : "Admin"),
         adminEmail: adminEmail || user?.primaryEmailAddress?.emailAddress || "",
         action: "EDITED USER PROFILE",
         target: `${newEditName} (${editingUser.email})`,
-        details: `Updated name to ${newEditName} and role to ${newEditRole}`
+        details: `Updated name to ${newEditName} and role to ${targetRole}`
       });
       fetchAuditLogs();
       await fetchUsers();
@@ -1148,6 +1211,14 @@ export default function Dashboard() {
     setIsSavingUser(true);
     try {
       await new Promise((resolve) => setTimeout(resolve, 800)); // Simulate API call
+      logAdminActivityApi({
+        adminName: adminName || user?.fullName || (adminEmail.includes("uday") ? "Uday Kumar" : "Admin"),
+        adminEmail: adminEmail || user?.primaryEmailAddress?.emailAddress || "",
+        action: "DISPATCHED PASSWORD RESET",
+        target: `${resetPasswordUser.name} (${resetPasswordUser.email})`,
+        details: "Dispatched verified password reset verification instructions"
+      });
+      fetchAuditLogs();
       setToast({ message: `Password reset instructions sent to ${resetPasswordUser.email} successfully.`, type: "success" });
       setResetPasswordUser(null);
       setNewPasswordVal("");
@@ -1155,74 +1226,6 @@ export default function Dashboard() {
       setToast({ message: "Failed to dispatch password reset request.", type: "error" });
     } finally {
       setIsSavingUser(false);
-    }
-  };
-
-  const handleToggleUserAdmin = async (userId: string, makeAdmin: boolean) => {
-    const userToModify = dbUsers.find((u) => u.id === userId);
-    const OWNER_EMAIL = "veereshhp2004@gmail.com";
-    if (userToModify && !makeAdmin && (userToModify.email || "").toLowerCase().trim() === OWNER_EMAIL) {
-      setToast({
-        message: "Demoting the root platform owner account is prohibited to maintain security clearance.",
-        type: "warning",
-      });
-      return;
-    }
-    
-    const targetRole = makeAdmin ? "admin" : "developer";
-    try {
-      if (!userToModify) return;
-
-      const userEmailClean = (userToModify.email || "").toLowerCase().trim();
-      const promotedRaw = localStorage.getItem("recodex_promoted_admin_emails");
-      let promotedList: string[] = promotedRaw ? JSON.parse(promotedRaw) : [];
-
-      if (makeAdmin) {
-        if (!promotedList.includes(userEmailClean)) {
-          promotedList.push(userEmailClean);
-        }
-      } else {
-        promotedList = promotedList.filter((e) => e !== userEmailClean);
-      }
-      localStorage.setItem("recodex_promoted_admin_emails", JSON.stringify(promotedList));
-
-      // Update cached synced users in localStorage
-      const syncedRaw = localStorage.getItem("recodex_synced_users");
-      if (syncedRaw) {
-        try {
-          const syncedList = JSON.parse(syncedRaw);
-          const updatedSynced = syncedList.map((u: any) =>
-            (u.email || "").toLowerCase().trim() === userEmailClean
-              ? { ...u, role: targetRole }
-              : u
-          );
-          localStorage.setItem("recodex_synced_users", JSON.stringify(updatedSynced));
-        } catch (e) {}
-      }
-
-      window.dispatchEvent(new Event("recodex-auth-update"));
-      await promoteUserAdminApi(userEmailClean, targetRole);
-
-      try {
-        const token = await getAuthToken();
-        await updateUser(userId, { name: userToModify.name, role: targetRole, email: userEmailClean }, token);
-      } catch (apiErr) {
-        console.warn("API update user role failed, saved in local store anyway:", apiErr);
-      }
-
-      setDbUsers((prev) => prev.map((u) => u.id === userId ? { ...u, role: targetRole } : u));
-      logAdminActivityApi({
-        adminName: adminName || user?.fullName || "Admin",
-        adminEmail: adminEmail || user?.primaryEmailAddress?.emailAddress || "",
-        action: makeAdmin ? "PROMOTED USER TO ADMIN" : "DEMOTED USER TO DEVELOPER",
-        target: `${userToModify.name} (${userToModify.email})`,
-        details: `Updated role to ${targetRole.toUpperCase()}`
-      });
-      fetchAuditLogs();
-      await fetchUsers();
-      setToast({ message: `User role changed to ${targetRole.toUpperCase()}.`, type: "success" });
-    } catch (err) {
-      console.error("Failed to modify user admin status:", err);
     }
   };
 
@@ -1242,6 +1245,14 @@ export default function Dashboard() {
     };
     setSoftDeletedUserIds((prev) => [...prev, userId]);
     setRecycleBin((prev) => [recycled, ...prev]);
+    logAdminActivityApi({
+      adminName: adminName || user?.fullName || (adminEmail.includes("uday") ? "Uday Kumar" : "Admin"),
+      adminEmail: adminEmail || user?.primaryEmailAddress?.emailAddress || "",
+      action: "MOVED USER TO RECYCLE BIN",
+      target: `${userToRecycle.name} (${userToRecycle.email})`,
+      details: "User soft deleted and archived in Recycle Bin"
+    });
+    fetchAuditLogs();
     setToast({ message: "User moved to Recycle Bin.", type: "success" });
   };
 
@@ -1250,6 +1261,7 @@ export default function Dashboard() {
       return;
     }
     try {
+      const targetU = dbUsers.find((u) => u.id === userId);
       const token = await getAuthToken();
       try {
         await deleteUser(userId, token);
@@ -1258,6 +1270,14 @@ export default function Dashboard() {
       }
       setDbUsers((prev) => prev.filter((u) => u.id !== userId));
       setSoftDeletedUserIds((prev) => prev.filter((id) => id !== userId));
+      logAdminActivityApi({
+        adminName: adminName || user?.fullName || (adminEmail.includes("uday") ? "Uday Kumar" : "Admin"),
+        adminEmail: adminEmail || user?.primaryEmailAddress?.emailAddress || "",
+        action: "PERMANENTLY DELETED USER",
+        target: targetU ? `${targetU.name} (${targetU.email})` : `User ID: ${userId}`,
+        details: "User record permanently erased from system"
+      });
+      fetchAuditLogs();
       fetchUsers();
       setToast({ message: "User permanently deleted.", type: "success" });
     } catch (error) {
@@ -1273,6 +1293,14 @@ export default function Dashboard() {
 
       await updateProject(projId, { status: nextStatus }, token);
       setDbProjects((prev) => prev.map((p) => p.id === projId ? { ...p, status: nextStatus } : p));
+      logAdminActivityApi({
+        adminName: adminName || user?.fullName || (adminEmail.includes("uday") ? "Uday Kumar" : "Admin"),
+        adminEmail: adminEmail || user?.primaryEmailAddress?.emailAddress || "",
+        action: "MODIFIED PROJECT STATUS",
+        target: `${projectToModify.title} (ID: ${projId})`,
+        details: `Project status updated from "${projectToModify.status || 'Pending'}" to "${nextStatus}"`
+      });
+      fetchAuditLogs();
       fetchProjects();
       setToast({ message: `Project status updated to ${nextStatus}.`, type: "success" });
     } catch (error) {
@@ -1293,6 +1321,14 @@ export default function Dashboard() {
     };
     setSoftDeletedProjectIds((prev) => [...prev, projId]);
     setRecycleBin((prev) => [recycled, ...prev]);
+    logAdminActivityApi({
+      adminName: adminName || user?.fullName || (adminEmail.includes("uday") ? "Uday Kumar" : "Admin"),
+      adminEmail: adminEmail || user?.primaryEmailAddress?.emailAddress || "",
+      action: "MOVED PROJECT TO RECYCLE BIN",
+      target: `${projToRecycle.title} (ID: ${projId})`,
+      details: "Project archived in Recycle Bin"
+    });
+    fetchAuditLogs();
     setToast({ message: "Project moved to Recycle Bin.", type: "success" });
   };
 
@@ -1575,8 +1611,23 @@ export default function Dashboard() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-black/5 dark:divide-white/5">
-                      {dbUsers.filter(u => !softDeletedUserIds.includes(u.id)).slice(0, 5).map((userItem) => {
-                        const isUserAdmin = userItem.role === "admin" || userItem.email === "veereshhp2004@gmail.com";
+                      {dbUsers
+                        .filter((u) => {
+                          if (softDeletedUserIds.includes(u.id)) return false;
+                          const email = (u.email || "").toLowerCase().trim();
+                          const name = (u.name || "").toLowerCase().trim();
+                          const dummyKeywords = ["john.doe", "sarah@skynet", "vance@blackmesa", "demo@", "john doe", "sarah connor", "alice vance"];
+                          if (dummyKeywords.some((k) => email.includes(k) || name.includes(k))) return false;
+                          return true;
+                        })
+                        .sort((a, b) => {
+                          const timeA = new Date(a.createdAt || 0).getTime();
+                          const timeB = new Date(b.createdAt || 0).getTime();
+                          return timeB - timeA;
+                        })
+                        .slice(0, 4)
+                        .map((userItem) => {
+                        const isUserAdmin = userItem.role === "admin" || ROOT_ADMIN_EMAILS.includes((userItem.email || "").toLowerCase().trim());
                         return (
                           <tr key={userItem.id} className="hover:bg-black/5 dark:hover:bg-white/5 transition-colors group">
                             <td className="px-6 py-4">
@@ -1597,12 +1648,12 @@ export default function Dashboard() {
                             <td className="px-6 py-4">
                               <span className={`inline-flex items-center px-2.5 py-0.5 rounded-md text-[10px] font-mono font-bold uppercase tracking-wider border ${
                                 isUserAdmin 
-                                  ? "bg-cyan-500/10 text-cyan-400 border-cyan-500/20"
-                                  : userItem.role === "client"
                                   ? "bg-purple-500/10 text-purple-400 border-purple-500/20"
-                                  : "bg-blue-500/10 text-blue-400 border-blue-500/20"
+                                  : userItem.role === "suspended"
+                                  ? "bg-rose-500/10 text-rose-500 border-rose-500/20"
+                                  : "bg-cyan-500/10 text-[#00d1ff] border-cyan-500/20"
                               }`}>
-                                {isUserAdmin ? "Admin" : userItem.role || "Developer"}
+                                {isUserAdmin ? "Admin" : userItem.role === "suspended" ? "Suspended" : "Client"}
                               </span>
                             </td>
                             <td className="px-6 py-4">
@@ -1686,9 +1737,79 @@ export default function Dashboard() {
           if (softDeletedUserIds.includes(userItem.id)) return false;
           const matchesQuery = userItem.name.toLowerCase().includes(userSearch.toLowerCase()) || 
                                userItem.email.toLowerCase().includes(userSearch.toLowerCase());
-          const matchesRole = userRoleFilter === "All" ? true : userItem.role === userRoleFilter;
+          const matchesRole = userRoleFilter === "All" ? true : (
+            userRoleFilter === "admin"
+              ? (userItem.role === "admin" || ROOT_ADMIN_EMAILS.includes((userItem.email || "").toLowerCase().trim()))
+              : userRoleFilter === "client"
+              ? (userItem.role === "client" || userItem.role === "developer")
+              : userItem.role === userRoleFilter
+          );
           return matchesQuery && matchesRole;
+        }).sort((a, b) => {
+          const emailA = (a.email || "").toLowerCase().trim();
+          const emailB = (b.email || "").toLowerCase().trim();
+          const isFounderA = emailA === "veereshhp2004@gmail.com";
+          const isFounderB = emailB === "veereshhp2004@gmail.com";
+          const isAdminA = a.role === "admin" || ROOT_ADMIN_EMAILS.includes(emailA);
+          const isAdminB = b.role === "admin" || ROOT_ADMIN_EMAILS.includes(emailB);
+
+          // Default sort: Platform founder veereshhp2004 strictly at top (#1), other admins (udaykumaras34) right below (#2), followed by clients sorted by newest joined
+          if (userSortBy === "default") {
+            if (isFounderA) return -1;
+            if (isFounderB) return 1;
+            if (isAdminA && !isAdminB) return -1;
+            if (!isAdminA && isAdminB) return 1;
+            const dateA = new Date(a.createdAt || 0).getTime();
+            const dateB = new Date(b.createdAt || 0).getTime();
+            return dateB - dateA;
+          }
+
+          if (userSortBy === "name_asc") return (a.name || "").localeCompare(b.name || "");
+          if (userSortBy === "name_desc") return (b.name || "").localeCompare(a.name || "");
+          if (userSortBy === "email_asc") return emailA.localeCompare(emailB);
+          if (userSortBy === "email_desc") return emailB.localeCompare(emailA);
+
+          if (userSortBy === "role_asc") {
+            const getPriority = (isAdm: boolean, r: string) => isAdm ? 1 : (r === "client" || r === "developer" ? 2 : (r === "suspended" ? 3 : 4));
+            return getPriority(isAdminA, a.role) - getPriority(isAdminB, b.role);
+          }
+          if (userSortBy === "role_desc") {
+            const getPriority = (isAdm: boolean, r: string) => isAdm ? 3 : (r === "client" || r === "developer" ? 1 : (r === "suspended" ? 2 : 4));
+            return getPriority(isAdminA, a.role) - getPriority(isAdminB, b.role);
+          }
+
+          if (userSortBy === "status_asc") {
+            const statusA = a.role === "suspended" ? "Blocked" : "Active";
+            const statusB = b.role === "suspended" ? "Blocked" : "Active";
+            return statusA.localeCompare(statusB);
+          }
+          if (userSortBy === "status_desc") {
+            const statusA = a.role === "suspended" ? "Blocked" : "Active";
+            const statusB = b.role === "suspended" ? "Blocked" : "Active";
+            return statusB.localeCompare(statusA);
+          }
+
+          if (userSortBy === "date_desc") {
+            const dateA = new Date(a.createdAt || 0).getTime();
+            const dateB = new Date(b.createdAt || 0).getTime();
+            return dateB - dateA;
+          }
+          if (userSortBy === "date_asc") {
+            const dateA = new Date(a.createdAt || 0).getTime();
+            const dateB = new Date(b.createdAt || 0).getTime();
+            return dateA - dateB;
+          }
+
+          return 0;
         });
+
+        const toggleUserSort = (col: "name" | "email" | "role" | "status" | "date") => {
+          if (col === "name") setUserSortBy(userSortBy === "name_asc" ? "name_desc" : "name_asc");
+          else if (col === "email") setUserSortBy(userSortBy === "email_asc" ? "email_desc" : "email_asc");
+          else if (col === "role") setUserSortBy(userSortBy === "role_asc" ? "role_desc" : "role_asc");
+          else if (col === "status") setUserSortBy(userSortBy === "status_asc" ? "status_desc" : "status_asc");
+          else if (col === "date") setUserSortBy(userSortBy === "date_desc" ? "date_asc" : "date_desc");
+        };
 
         return (
           <div className="space-y-6">
@@ -1698,64 +1819,132 @@ export default function Dashboard() {
                 <p className="text-xs text-zinc-400 dark:text-zinc-500">Live records of active engineers, developers, and clients synced in your MongoDB tables.</p>
               </div>
 
-              {/* Filters & Search */}
-              <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+              {/* Filters, Search & Sort Controls */}
+              <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
                 <div className="relative w-full md:w-56 select-none">
-                  <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px]">search</span>
+                  <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 dark:text-zinc-500 text-[18px]">search</span>
                   <input
                     type="text"
                     placeholder="Search users..."
                     value={userSearch}
                     onChange={(e) => setUserSearch(e.target.value)}
-                    className="w-full pl-9 pr-4 py-1.5 bg-surface-container-low border border-outline-variant/40 rounded-full text-xs font-mono text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none"
+                    className="w-full pl-9 pr-4 py-1.5 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-full text-xs font-mono text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-primary dark:focus:border-cyan-500 transition-all"
                   />
                 </div>
                 
                 <select
                   value={userRoleFilter}
                   onChange={(e) => setUserRoleFilter(e.target.value)}
-                  className="bg-surface-container-low border border-outline-variant/40 rounded-full px-4 py-1.5 text-xs text-on-surface-variant font-mono outline-none"
+                  className="bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-full px-3.5 py-1.5 text-xs text-zinc-700 dark:text-zinc-300 font-mono outline-none cursor-pointer focus:border-primary dark:focus:border-cyan-500 transition-all"
                 >
                   <option value="All">All Roles</option>
                   <option value="admin">Admin</option>
-                  <option value="developer">Student/Freelancer</option>
                   <option value="client">Client</option>
                   <option value="suspended">Suspended</option>
+                </select>
+
+                <select
+                  value={userSortBy}
+                  onChange={(e) => setUserSortBy(e.target.value)}
+                  className="bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-full px-3.5 py-1.5 text-xs text-zinc-700 dark:text-zinc-300 font-mono outline-none cursor-pointer focus:border-primary dark:focus:border-cyan-500 transition-all"
+                >
+                  <option value="default">Sort: Admins First (Default)</option>
+                  <option value="date_desc">Sort: Joined Newest</option>
+                  <option value="date_asc">Sort: Joined Oldest</option>
+                  <option value="name_asc">Sort: Name (A → Z)</option>
+                  <option value="name_desc">Sort: Name (Z → A)</option>
+                  <option value="email_asc">Sort: Email (A → Z)</option>
+                  <option value="email_desc">Sort: Email (Z → A)</option>
+                  <option value="role_asc">Sort: Role (Admins → Clients)</option>
+                  <option value="role_desc">Sort: Role (Clients → Admins)</option>
+                  <option value="status_asc">Sort: Status (Active First)</option>
+                  <option value="status_desc">Sort: Status (Blocked First)</option>
                 </select>
 
                 <button 
                   onClick={handleRefreshSystem} 
                   disabled={isRefreshing}
-                  className="px-3.5 py-1.5 bg-primary-container text-on-primary rounded-full text-xs font-mono font-bold hover:bg-primary-container/90 hover-lift cursor-pointer flex items-center gap-1.5"
+                  className="px-4 py-1.5 bg-primary/10 dark:bg-cyan-500/10 hover:bg-primary/20 dark:hover:bg-cyan-500/20 border border-primary/25 dark:border-cyan-500/30 text-primary dark:text-[#00d1ff] rounded-full text-xs font-mono font-bold hover-lift cursor-pointer flex items-center gap-1.5 transition-all"
                 >
                   <RefreshCw size={11} className={isRefreshing ? "animate-spin" : ""} /> Sync
                 </button>
               </div>
             </div>
  
-            <div className="glass-card w-full border border-outline-variant/40 overflow-hidden">
+            <div className="w-full bg-white dark:bg-[#07090e] border border-zinc-200 dark:border-zinc-800/80 rounded-2xl overflow-hidden shadow-xs">
               <div className="overflow-x-auto w-full">
                 <table className="w-full min-w-[650px] border-collapse text-left">
                   <thead>
-                    <tr className="border-b border-outline-variant/40 bg-surface-container-low/50 text-[10px] font-mono font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-widest h-10 select-none">
-                      <th className="px-md py-3">User</th>
-                      <th className="px-md py-3">Email</th>
-                      <th className="px-md py-3">Role</th>
-                      <th className="px-md py-3">Status</th>
-                      <th className="px-md py-3">Joined Date</th>
-                      <th className="px-md py-3 text-right">Actions</th>
+                    <tr className="border-b border-zinc-200 dark:border-zinc-800/80 bg-zinc-50/80 dark:bg-zinc-900/60 text-[10px] font-mono font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-widest h-11 select-none">
+                      <th 
+                        onClick={() => toggleUserSort("name")} 
+                        className="px-6 py-3 cursor-pointer hover:text-primary dark:hover:text-[#00d1ff] transition-colors select-none"
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <span>User</span>
+                          {userSortBy === "name_asc" && <span className="text-[12px] text-primary dark:text-[#00d1ff]">▲</span>}
+                          {userSortBy === "name_desc" && <span className="text-[12px] text-primary dark:text-[#00d1ff]">▼</span>}
+                          {!userSortBy.startsWith("name_") && <span className="text-[10px] opacity-30">⇅</span>}
+                        </div>
+                      </th>
+                      <th 
+                        onClick={() => toggleUserSort("email")} 
+                        className="px-6 py-3 cursor-pointer hover:text-primary dark:hover:text-[#00d1ff] transition-colors select-none"
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <span>Email</span>
+                          {userSortBy === "email_asc" && <span className="text-[12px] text-primary dark:text-[#00d1ff]">▲</span>}
+                          {userSortBy === "email_desc" && <span className="text-[12px] text-primary dark:text-[#00d1ff]">▼</span>}
+                          {!userSortBy.startsWith("email_") && <span className="text-[10px] opacity-30">⇅</span>}
+                        </div>
+                      </th>
+                      <th 
+                        onClick={() => toggleUserSort("role")} 
+                        className="px-6 py-3 cursor-pointer hover:text-primary dark:hover:text-[#00d1ff] transition-colors select-none"
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <span>Role</span>
+                          {userSortBy === "role_asc" && <span className="text-[12px] text-primary dark:text-[#00d1ff]">▲</span>}
+                          {userSortBy === "role_desc" && <span className="text-[12px] text-primary dark:text-[#00d1ff]">▼</span>}
+                          {!userSortBy.startsWith("role_") && <span className="text-[10px] opacity-30">⇅</span>}
+                        </div>
+                      </th>
+                      <th 
+                        onClick={() => toggleUserSort("status")} 
+                        className="px-6 py-3 cursor-pointer hover:text-primary dark:hover:text-[#00d1ff] transition-colors select-none"
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <span>Status</span>
+                          {userSortBy === "status_asc" && <span className="text-[12px] text-primary dark:text-[#00d1ff]">▲</span>}
+                          {userSortBy === "status_desc" && <span className="text-[12px] text-primary dark:text-[#00d1ff]">▼</span>}
+                          {!userSortBy.startsWith("status_") && <span className="text-[10px] opacity-30">⇅</span>}
+                        </div>
+                      </th>
+                      <th 
+                        onClick={() => toggleUserSort("date")} 
+                        className="px-6 py-3 cursor-pointer hover:text-primary dark:hover:text-[#00d1ff] transition-colors select-none"
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <span>Joined Date</span>
+                          {userSortBy === "date_asc" && <span className="text-[12px] text-primary dark:text-[#00d1ff]">▲</span>}
+                          {userSortBy === "date_desc" && <span className="text-[12px] text-primary dark:text-[#00d1ff]">▼</span>}
+                          {userSortBy === "default" && <span className="text-[10px] text-primary dark:text-[#00d1ff]">★</span>}
+                          {!userSortBy.startsWith("date_") && userSortBy !== "default" && <span className="text-[10px] opacity-30">⇅</span>}
+                        </div>
+                      </th>
+                      <th className="px-6 py-3 text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-outline-variant/30">
+                  <tbody className="divide-y divide-zinc-200/80 dark:divide-zinc-800/60">
                     {filteredUsers.map((u) => {
+                      const emailClean = (u.email || "").toLowerCase().trim();
                       const isUserSuspended = u.role === "suspended";
-                      const isUserAdmin = u.role === "admin" || u.email === "veereshhp2004@gmail.com";
-                      const isRootAdmin = u.email === "veereshhp2004@gmail.com";
+                      const isUserAdmin = u.role === "admin" || ROOT_ADMIN_EMAILS.includes(emailClean);
                       return (
-                        <tr key={u.id} className="hover:bg-surface-variant/20 transition-colors group h-14">
-                          <td className="px-md py-3">
+                        <tr key={u.id} className="hover:bg-zinc-50/60 dark:hover:bg-zinc-900/30 transition-colors group h-14">
+                          <td className="px-6 py-3.5">
                             <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-full overflow-hidden bg-surface-variant border border-outline-variant/50 flex-shrink-0 flex items-center justify-center font-bold text-xs text-primary">
+                              <div className="w-8 h-8 rounded-full overflow-hidden bg-primary/10 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex-shrink-0 flex items-center justify-center font-bold text-xs text-primary dark:text-[#00d1ff]">
                                 {u.profileImage ? (
                                   <img alt={u.name} className="w-full h-full object-cover" src={u.profileImage} />
                                 ) : (
@@ -1764,10 +1953,10 @@ export default function Dashboard() {
                               </div>
                               <span 
                                 onClick={() => setSelectedUserDetails({ ...u, role: isUserAdmin ? "admin" : u.role })} 
-                                className="text-foreground dark:text-white font-bold cursor-pointer hover:text-primary transition-colors text-xs inline-flex items-center gap-1.5"
+                                className="text-zinc-900 dark:text-white font-bold cursor-pointer hover:text-primary dark:hover:text-[#00d1ff] transition-colors text-xs inline-flex items-center gap-1.5"
                               >
                                 {u.name}
-                                {isNewUser(u.createdAt) && (
+                                {isNewUser(u.createdAt, u.email) && (
                                   <span className="px-1.5 py-0.5 rounded text-[7px] font-mono font-black uppercase bg-emerald-500/15 border border-emerald-500/30 text-emerald-500 dark:text-emerald-400 tracking-wider shadow-sm animate-pulse">
                                     NEW
                                   </span>
@@ -1775,130 +1964,55 @@ export default function Dashboard() {
                               </span>
                             </div>
                           </td>
-                          <td className="px-md py-3 text-zinc-500 dark:text-zinc-400 font-mono text-xs">{u.email}</td>
-                          <td className="px-md py-3">
+                          <td className="px-6 py-3.5 text-zinc-500 dark:text-zinc-400 font-mono text-xs">{u.email}</td>
+                          <td className="px-6 py-3.5">
                             <span className={`px-2 py-0.5 rounded text-[8px] font-mono font-black uppercase border ${
-                              isUserAdmin ? "bg-purple-500/10 border-purple-500/25 text-purple-650 dark:text-purple-400" :
-                              u.role === "developer" ? "bg-cyan-500/10 border-cyan-500/25 text-[#00d1ff]" :
-                              u.role === "suspended" ? "bg-red-500/10 border-red-500/25 text-red-500" :
-                              "bg-zinc-500/10 border-zinc-500/25 text-zinc-550 dark:text-zinc-450"
+                              isUserAdmin ? "bg-purple-500/10 border-purple-500/25 text-purple-600 dark:text-purple-400" :
+                              isUserSuspended ? "bg-red-500/10 border-red-500/25 text-red-500" :
+                              "bg-cyan-500/10 border-cyan-500/25 text-[#00d1ff]"
                             }`}>
-                              {isUserAdmin ? "ADMIN" : u.role === "developer" ? "STUDENT" : u.role === "suspended" ? `SUSPENDED` : u.role}
+                              {isUserAdmin ? "ADMIN" : isUserSuspended ? "SUSPENDED" : "CLIENT"}
                             </span>
                           </td>
-                          <td className="px-md py-3">
+                          <td className="px-6 py-3.5">
                             <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-mono font-bold border ${
                               isUserSuspended 
-                                ? "bg-red-500/5 text-red-550 border-red-500/20" 
-                                : "bg-green-500/5 text-green-550 border-green-500/20"
+                                ? "bg-red-500/5 text-red-500 border-red-500/20" 
+                                : "bg-green-500/5 text-green-500 border-green-500/20"
                             }`}>
                               {isUserSuspended ? "Blocked" : "Active"}
                             </span>
                           </td>
-                          <td className="px-md py-3 font-mono text-zinc-500 text-xs">
+                          <td className="px-6 py-3.5 font-mono text-zinc-500 text-xs">
                             {new Date(u.createdAt || Date.now()).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                           </td>
-                          <td className="px-md py-3 text-right relative">
+                          <td className="px-6 py-3.5 text-right">
                             <div className="flex justify-end select-none">
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  setActiveUserActionMenuId(activeUserActionMenuId === u.id ? null : u.id);
+                                  if (userMenuAnchor?.id === u.id) {
+                                    setUserMenuAnchor(null);
+                                  } else {
+                                    const rect = e.currentTarget.getBoundingClientRect();
+                                    const spaceBelow = window.innerHeight - rect.bottom;
+                                    const openUp = spaceBelow < 250;
+                                    setUserMenuAnchor({
+                                      id: u.id,
+                                      top: openUp ? rect.top - 6 : rect.bottom + 6,
+                                      right: Math.max(12, window.innerWidth - rect.right),
+                                      openUp
+                                    });
+                                  }
                                 }}
-                                className="p-1.5 hover:bg-surface-variant/50 rounded-full text-zinc-400 hover:text-foreground transition-colors cursor-pointer relative"
+                                className={`p-1.5 rounded-full transition-colors cursor-pointer ${
+                                  userMenuAnchor?.id === u.id 
+                                    ? "bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-white" 
+                                    : "hover:bg-zinc-100 dark:hover:bg-zinc-800/60 text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
+                                }`}
                               >
                                 <span className="material-symbols-outlined text-[20px] block">more_vert</span>
                               </button>
-
-                              {/* Dropdown Action Menu */}
-                              {activeUserActionMenuId === u.id && (
-                                <div className="absolute right-0 top-[90%] z-[100] bg-white dark:bg-[#0b0e14] border border-black/10 dark:border-zinc-800 rounded-xl py-2 w-48 shadow-xl text-left select-none animate-in fade-in duration-100">
-                                  <button
-                                    onClick={() => {
-                                      if (!isRootAdmin) {
-                                        setEditingUser(u);
-                                        setNewEditName(u.name);
-                                        setNewEditRole(u.role);
-                                        setActiveUserActionMenuId(null);
-                                      }
-                                    }}
-                                    disabled={isRootAdmin}
-                                    className={`w-full px-4 py-2 text-xs font-medium flex items-center gap-3 transition-colors ${
-                                      isRootAdmin
-                                        ? "text-zinc-300 dark:text-zinc-700 cursor-not-allowed opacity-40"
-                                        : "text-zinc-700 dark:text-zinc-300 hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer"
-                                    }`}
-                                  >
-                                    <span className="material-symbols-outlined text-[16px]">edit</span>
-                                    Edit User
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      setResetPasswordUser(u);
-                                      setNewPasswordVal("");
-                                      setActiveUserActionMenuId(null);
-                                    }}
-                                    className="w-full px-4 py-2 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 flex items-center gap-3 transition-colors cursor-pointer"
-                                  >
-                                    <span className="material-symbols-outlined text-[16px] text-zinc-400 dark:text-zinc-555">lock_reset</span>
-                                    Reset Password
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      if (!isRootAdmin) {
-                                        handleToggleUserAdmin(u.id, !isUserAdmin);
-                                        setActiveUserActionMenuId(null);
-                                      }
-                                    }}
-                                    disabled={isRootAdmin}
-                                    className={`w-full px-4 py-2 text-xs font-medium flex items-center gap-3 transition-colors ${
-                                      isRootAdmin
-                                        ? "text-zinc-300 dark:text-zinc-700 cursor-not-allowed opacity-40"
-                                        : "text-zinc-700 dark:text-zinc-300 hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer"
-                                    }`}
-                                  >
-                                    <span className="material-symbols-outlined text-[16px]">admin_panel_settings</span>
-                                    {isUserAdmin ? "Remove Admin" : "Make Admin"}
-                                  </button>
-                                  <div className="border-t border-outline-variant/30 my-1"></div>
-                                  <button
-                                    onClick={() => {
-                                      if (!isRootAdmin) {
-                                        handleModifyUserStatus(u.id, isUserSuspended ? "Active" : "Suspended");
-                                        setActiveUserActionMenuId(null);
-                                      }
-                                    }}
-                                    disabled={isRootAdmin}
-                                    className={`w-full px-4 py-2 text-xs font-medium flex items-center gap-3 transition-colors ${
-                                      isRootAdmin
-                                        ? "text-zinc-300 dark:text-zinc-700 cursor-not-allowed opacity-40"
-                                        : "text-zinc-700 dark:text-zinc-300 hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer"
-                                    }`}
-                                  >
-                                    <span className="material-symbols-outlined text-[16px]">
-                                      {isUserSuspended ? "play_circle" : "pause_circle"}
-                                    </span>
-                                    {isUserSuspended ? "Reactivate Access" : "Suspend Access"}
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      if (!isUserAdmin) {
-                                        handleRemoveUser(u.id);
-                                        setActiveUserActionMenuId(null);
-                                      }
-                                    }}
-                                    disabled={isUserAdmin}
-                                    className={`w-full px-4 py-2 text-xs font-bold flex items-center gap-3 transition-colors ${
-                                      isUserAdmin
-                                        ? "text-zinc-300 dark:text-zinc-700 cursor-not-allowed opacity-40"
-                                        : "text-red-500 hover:bg-red-500/10 cursor-pointer"
-                                    }`}
-                                  >
-                                    <span className="material-symbols-outlined text-[16px]">delete</span>
-                                    Delete User
-                                  </button>
-                                </div>
-                              )}
                             </div>
                           </td>
                         </tr>
@@ -1908,6 +2022,126 @@ export default function Dashboard() {
                 </table>
               </div>
             </div>
+
+            {/* Portal Dropdown Menu for User Actions */}
+            {userMenuAnchor && createPortal(
+              <>
+                <div 
+                  className="fixed inset-0 z-[9998]" 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setUserMenuAnchor(null);
+                  }} 
+                />
+                {(() => {
+                  const u = dbUsers.find((x) => x.id === userMenuAnchor.id);
+                  if (!u) return null;
+                  const emailClean = (u.email || "").toLowerCase().trim();
+                  const isUserSuspended = u.role === "suspended";
+                  const isUserAdmin = u.role === "admin" || ROOT_ADMIN_EMAILS.includes(emailClean);
+                  const isRootAdmin = ROOT_ADMIN_EMAILS.includes(emailClean);
+
+                  return (
+                    <div 
+                      style={{
+                        position: "fixed",
+                        right: `${userMenuAnchor.right}px`,
+                        ...(userMenuAnchor.openUp
+                          ? { bottom: `${window.innerHeight - userMenuAnchor.top}px` }
+                          : { top: `${userMenuAnchor.top}px` }),
+                      }}
+                      className="z-[9999] bg-white dark:bg-[#0b0e14] border border-black/10 dark:border-zinc-800 rounded-xl py-2 w-52 text-left select-none shadow-[0_12px_40px_rgba(0,0,0,0.5)] animate-in fade-in zoom-in-95 duration-100"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <button
+                        onClick={() => {
+                          setUploadingCertUser(u);
+                          setEditingCertItem(null);
+                          setCertProjectTitleInput("Software Solution Project");
+                          setCertIssueDateInput(new Date().toISOString().split("T")[0]);
+                          setCertStatusInput("Approved");
+                          setCertFileDataUrl("");
+                          setCertFileNameVal("");
+                          setUserMenuAnchor(null);
+                        }}
+                        className="w-full px-4 py-2 text-xs font-medium text-primary dark:text-[#00d1ff] hover:bg-primary/5 dark:hover:bg-[#00d1ff]/5 flex items-center gap-3 transition-colors cursor-pointer font-bold"
+                      >
+                        <Award size={16} />
+                        Issue Certificate
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (!isRootAdmin) {
+                            setEditingUser(u);
+                            setNewEditName(u.name);
+                            setNewEditRole(u.role || "client");
+                            setUserMenuAnchor(null);
+                          }
+                        }}
+                        disabled={isRootAdmin}
+                        className={`w-full px-4 py-2 text-xs font-medium flex items-center gap-3 transition-colors ${
+                          isRootAdmin
+                            ? "text-zinc-300 dark:text-zinc-700 cursor-not-allowed opacity-40"
+                            : "text-zinc-700 dark:text-zinc-300 hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer"
+                        }`}
+                      >
+                        <span className="material-symbols-outlined text-[16px]">edit</span>
+                        Edit User
+                      </button>
+                      <button
+                        onClick={() => {
+                          setResetPasswordUser(u);
+                          setNewPasswordVal("");
+                          setUserMenuAnchor(null);
+                        }}
+                        className="w-full px-4 py-2 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 flex items-center gap-3 transition-colors cursor-pointer"
+                      >
+                        <span className="material-symbols-outlined text-[16px] text-zinc-400 dark:text-zinc-555">lock_reset</span>
+                        Reset Password
+                      </button>
+                      <div className="border-t border-outline-variant/30 my-1"></div>
+                      <button
+                        onClick={() => {
+                          if (!isRootAdmin) {
+                            handleModifyUserStatus(u.id, isUserSuspended ? "Active" : "Suspended");
+                            setUserMenuAnchor(null);
+                          }
+                        }}
+                        disabled={isRootAdmin}
+                        className={`w-full px-4 py-2 text-xs font-medium flex items-center gap-3 transition-colors ${
+                          isRootAdmin
+                            ? "text-zinc-300 dark:text-zinc-700 cursor-not-allowed opacity-40"
+                            : "text-zinc-700 dark:text-zinc-300 hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer"
+                        }`}
+                      >
+                        <span className="material-symbols-outlined text-[16px]">
+                          {isUserSuspended ? "play_circle" : "pause_circle"}
+                        </span>
+                        {isUserSuspended ? "Reactivate Access" : "Suspend Access"}
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (!isUserAdmin) {
+                            handleRemoveUser(u.id);
+                            setUserMenuAnchor(null);
+                          }
+                        }}
+                        disabled={isUserAdmin}
+                        className={`w-full px-4 py-2 text-xs font-bold flex items-center gap-3 transition-colors ${
+                          isUserAdmin
+                            ? "text-zinc-300 dark:text-zinc-700 cursor-not-allowed opacity-40"
+                            : "text-red-500 hover:bg-red-500/10 cursor-pointer"
+                        }`}
+                      >
+                        <span className="material-symbols-outlined text-[16px]">delete</span>
+                        Delete User
+                      </button>
+                    </div>
+                  );
+                })()}
+              </>,
+              document.body
+            )}
           </div>
         );
 
@@ -1918,20 +2152,34 @@ export default function Dashboard() {
                                (p.category && p.category.toLowerCase().includes(projectSearch.toLowerCase()));
           const matchesStatus = projectStatusFilter === "All" ? true : p.status === projectStatusFilter;
           return matchesQuery && matchesStatus;
+        }).sort((a, b) => {
+          if (projectSortBy === "title_asc") return (a.title || "").localeCompare(b.title || "");
+          if (projectSortBy === "title_desc") return (b.title || "").localeCompare(a.title || "");
+          if (projectSortBy === "category_asc") return (a.category || "").localeCompare(b.category || "");
+          if (projectSortBy === "stars_desc") return ((b.stars || 0) + (b.forks || 0)) - ((a.stars || 0) + (a.forks || 0));
+          if (projectSortBy === "status_asc") return (a.status || "").localeCompare(b.status || "");
+          return 0;
         });
 
+        const toggleProjectSort = (col: "title" | "category" | "stars" | "status") => {
+          if (col === "title") setProjectSortBy(projectSortBy === "title_asc" ? "title_desc" : "title_asc");
+          else if (col === "category") setProjectSortBy(projectSortBy === "category_asc" ? "default" : "category_asc");
+          else if (col === "stars") setProjectSortBy(projectSortBy === "stars_desc" ? "default" : "stars_desc");
+          else if (col === "status") setProjectSortBy(projectSortBy === "status_asc" ? "default" : "status_asc");
+        };
+
         return (
-          <div className="bg-white dark:bg-[#0b0e14] border border-black/10 dark:border-zinc-900 rounded-2xl p-8 space-y-6 shadow-lg transition-colors duration-300">
+          <div className="bg-white dark:bg-[#07090e] border border-zinc-200 dark:border-zinc-800/80 rounded-2xl p-6 sm:p-8 space-y-6 shadow-xs transition-colors duration-300">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
               <div>
                 <h3 className="text-lg font-bold text-foreground dark:text-white font-sans font-extrabold uppercase">Project Management</h3>
                 <p className="text-xs text-zinc-400 dark:text-zinc-500">Review, approve, assign, and mark ecosystem projects completed.</p>
               </div>
 
-              {/* Filters & Search */}
-              <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+              {/* Filters & Search & Sort */}
+              <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
                 <div className="relative w-full md:w-48">
-                  <span className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-zinc-500">
+                  <span className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-zinc-400 dark:text-zinc-500">
                     <Search size={12} />
                   </span>
                   <input
@@ -1939,14 +2187,14 @@ export default function Dashboard() {
                     placeholder="Search title..."
                     value={projectSearch}
                     onChange={(e) => setProjectSearch(e.target.value)}
-                    className="w-full pl-7 pr-3 py-1.5 bg-black/5 dark:bg-zinc-900 border border-black/10 dark:border-zinc-800 rounded-lg text-xs focus:outline-none focus:border-primary transition-all font-mono"
+                    className="w-full pl-7 pr-3 py-1.5 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg text-xs text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:border-cyan-500 transition-all font-mono"
                   />
                 </div>
 
                 <select
                   value={projectStatusFilter}
                   onChange={(e) => setProjectStatusFilter(e.target.value)}
-                  className="bg-black/5 dark:bg-zinc-900 border border-black/10 dark:border-zinc-800 rounded-lg px-2 py-1.5 text-xs text-zinc-500 font-mono outline-none"
+                  className="bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-2.5 py-1.5 text-xs text-zinc-700 dark:text-zinc-300 font-mono outline-none cursor-pointer focus:border-cyan-500 transition-all"
                 >
                   <option value="All">All Statuses</option>
                   <option value="Pending">Pending</option>
@@ -1955,29 +2203,76 @@ export default function Dashboard() {
                   <option value="Completed">Completed</option>
                   <option value="Cancelled">Cancelled</option>
                 </select>
+
+                <select
+                  value={projectSortBy}
+                  onChange={(e) => setProjectSortBy(e.target.value)}
+                  className="bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-2.5 py-1.5 text-xs text-zinc-700 dark:text-zinc-300 font-mono outline-none cursor-pointer focus:border-cyan-500 transition-all"
+                >
+                  <option value="default">Sort: Default</option>
+                  <option value="title_asc">Sort: Title (A → Z)</option>
+                  <option value="title_desc">Sort: Title (Z → A)</option>
+                  <option value="category_asc">Sort: Category</option>
+                  <option value="stars_desc">Sort: Stars/Forks Highest</option>
+                  <option value="status_asc">Sort: Status</option>
+                </select>
               </div>
             </div>
 
-            <div className="overflow-x-auto text-xs font-mono w-full select-text">
-              <table className="w-full min-w-[650px] border-collapse text-left">
-                <thead>
-                  <tr className="border-b border-black/10 dark:border-zinc-900 text-[8px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest h-10 select-none">
-                    <th className="pb-3">Project Title</th>
-                    <th className="pb-3">Category</th>
-                    <th className="pb-3">Stars / Forks</th>
-                    <th className="pb-3">Status</th>
-                    <th className="pb-3 text-right">Actions</th>
+            <div className="border border-zinc-200 dark:border-zinc-800/80 rounded-xl overflow-hidden bg-white dark:bg-[#0b0e14]">
+              <div className="overflow-x-auto text-xs font-mono w-full select-text">
+                <table className="w-full min-w-[650px] border-collapse text-left">
+                  <thead>
+                    <tr className="border-b border-zinc-200 dark:border-zinc-800/80 bg-zinc-50/80 dark:bg-zinc-900/60 text-[9px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-widest h-11 select-none">
+                      <th 
+                        onClick={() => toggleProjectSort("title")}
+                        className="px-5 py-3 cursor-pointer hover:text-primary dark:hover:text-[#00d1ff] transition-colors"
+                      >
+                        <div className="flex items-center gap-1">
+                          <span>Project Title</span>
+                          {projectSortBy === "title_asc" && <span className="text-[10px] text-primary dark:text-[#00d1ff]">▲</span>}
+                          {projectSortBy === "title_desc" && <span className="text-[10px] text-primary dark:text-[#00d1ff]">▼</span>}
+                        </div>
+                      </th>
+                    <th 
+                      onClick={() => toggleProjectSort("category")}
+                      className="px-5 py-3 cursor-pointer hover:text-primary dark:hover:text-[#00d1ff] transition-colors"
+                    >
+                      <div className="flex items-center gap-1">
+                        <span>Category</span>
+                        {projectSortBy === "category_asc" && <span className="text-[10px] text-primary dark:text-[#00d1ff]">▲</span>}
+                      </div>
+                    </th>
+                    <th 
+                      onClick={() => toggleProjectSort("stars")}
+                      className="px-5 py-3 cursor-pointer hover:text-primary dark:hover:text-[#00d1ff] transition-colors"
+                    >
+                      <div className="flex items-center gap-1">
+                        <span>Stars / Forks</span>
+                        {projectSortBy === "stars_desc" && <span className="text-[10px] text-primary dark:text-[#00d1ff]">▼</span>}
+                      </div>
+                    </th>
+                    <th 
+                      onClick={() => toggleProjectSort("status")}
+                      className="px-5 py-3 cursor-pointer hover:text-primary dark:hover:text-[#00d1ff] transition-colors"
+                    >
+                      <div className="flex items-center gap-1">
+                        <span>Status</span>
+                        {projectSortBy === "status_asc" && <span className="text-[10px] text-primary dark:text-[#00d1ff]">▲</span>}
+                      </div>
+                    </th>
+                    <th className="px-5 py-3 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-black/5 dark:divide-zinc-900">
+                <tbody className="divide-y divide-zinc-200/80 dark:divide-zinc-800/60">
                   {filteredProjects.map((p) => {
                     const isPending = p.status === "Pending" || !p.status;
                     return (
-                      <tr key={p.id} className="h-14 hover:bg-black/5 dark:hover:bg-[#07090e]/25 transition-colors">
-                        <td className="text-foreground dark:text-white font-extrabold max-w-[200px] truncate">{p.title}</td>
-                        <td className="text-zinc-500 dark:text-zinc-400">{p.category}</td>
-                        <td className="text-zinc-500 dark:text-zinc-400">{p.stars} ⭐ / {p.forks} 🍴</td>
-                        <td>
+                      <tr key={p.id} className="h-14 hover:bg-zinc-50/60 dark:hover:bg-zinc-900/30 transition-colors">
+                        <td className="px-5 py-3.5 text-zinc-900 dark:text-white font-extrabold max-w-[200px] truncate">{p.title}</td>
+                        <td className="px-5 py-3.5 text-zinc-500 dark:text-zinc-400">{p.category}</td>
+                        <td className="px-5 py-3.5 text-zinc-500 dark:text-zinc-400">{p.stars} ⭐ / {p.forks} 🍴</td>
+                        <td className="px-5 py-3.5">
                           <span className={`px-2 py-0.5 rounded text-[8px] font-mono font-black uppercase border ${
                             p.status === "Completed" ? "bg-green-500/10 border-green-500/25 text-green-500" :
                             p.status === "Cancelled" ? "bg-red-500/10 border-red-500/25 text-red-500" :
@@ -1988,7 +2283,7 @@ export default function Dashboard() {
                             {p.status || "Pending"}
                           </span>
                         </td>
-                        <td className="py-2 text-right">
+                        <td className="px-5 py-3.5 text-right">
                           <div className="flex justify-end gap-1.5">
                             {isPending && (
                               <>
@@ -2037,7 +2332,8 @@ export default function Dashboard() {
               </table>
             </div>
           </div>
-        );
+        </div>
+      );
 
       case "Categories":
         return (
@@ -2356,9 +2652,6 @@ export default function Dashboard() {
         );
 
       case "Certificates":
-        // Combine registered real users (dbUsers) with issued certificates
-        const activeUsersList = dbUsers.filter((u) => !softDeletedUserIds.includes(u.id));
-
         // Create a unified list of certificate rows for all real registered users
         const certRowsMap = new Map<string, any>();
 
@@ -2615,178 +2908,6 @@ export default function Dashboard() {
                 </tbody>
               </table>
             </div>
-
-            {/* Modal 1: Upload / Issue / Replace Certificate Popup */}
-            {(uploadingCertUser || editingCertItem) && createPortal(
-              <div className="fixed top-0 left-0 w-screen h-screen bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-6 select-text animate-in fade-in duration-200">
-                <div className="bg-white dark:bg-[#07090e] border border-black/10 dark:border-zinc-800 p-8 rounded-2xl w-[480px] max-w-full shrink-0 shadow-2xl relative font-sans space-y-6">
-                  <button
-                    onClick={() => {
-                      setUploadingCertUser(null);
-                      setEditingCertItem(null);
-                    }}
-                    className="absolute top-4 right-4 text-zinc-400 hover:text-zinc-700 dark:hover:text-white cursor-pointer"
-                  >
-                    <XCircle size={18} />
-                  </button>
-
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2 text-primary dark:text-[#00d1ff]">
-                      <Upload size={20} />
-                      <h3 className="text-sm font-mono tracking-widest text-foreground dark:text-white font-extrabold uppercase">
-                        {editingCertItem ? "Replace / Edit Certificate" : "Issue Certificate for User"}
-                      </h3>
-                    </div>
-                    <p className="text-xs text-zinc-500 font-sans">
-                      Target User: <strong className="text-foreground dark:text-white font-semibold">{uploadingCertUser?.name || editingCertItem?.studentName}</strong> ({uploadingCertUser?.email || editingCertItem?.userEmail})
-                    </p>
-                  </div>
-
-                  <form onSubmit={handleSaveCertificate} className="space-y-4 text-xs font-sans">
-                    {/* User Selection Dropdown if no specific user pre-selected */}
-                    {!editingCertItem && (
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-mono text-zinc-500 dark:text-zinc-400 uppercase tracking-wider block font-bold">Select Registered User</label>
-                        <select
-                          value={uploadingCertUser?.id || ""}
-                          onChange={(e) => {
-                            const found = activeUsersList.find(u => u.id === e.target.value);
-                            if (found) setUploadingCertUser(found);
-                          }}
-                          className="w-full px-3 py-2 bg-black/5 dark:bg-[#0b0e14] border border-black/10 dark:border-zinc-800 rounded-xl text-xs text-foreground dark:text-white font-mono outline-none"
-                        >
-                          {activeUsersList.map(u => (
-                            <option key={u.id} value={u.id}>{u.name} ({u.email})</option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-mono text-zinc-500 dark:text-zinc-400 uppercase tracking-wider block font-bold">Project Title / Qualification</label>
-                      <input
-                        type="text"
-                        required
-                        value={certProjectTitleInput}
-                        onChange={(e) => setCertProjectTitleInput(e.target.value)}
-                        placeholder="e.g., Quantum-Flux Core Integration"
-                        className="w-full px-3 py-2 bg-black/5 dark:bg-[#0b0e14] border border-black/10 dark:border-zinc-800 rounded-xl text-xs text-foreground dark:text-white focus:outline-none focus:border-primary dark:focus:border-[#00d1ff] transition-all font-sans"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-mono text-zinc-500 dark:text-zinc-400 uppercase tracking-wider block font-bold">Issue Date</label>
-                        <input
-                          type="date"
-                          required
-                          value={certIssueDateInput}
-                          onChange={(e) => setCertIssueDateInput(e.target.value)}
-                          className="w-full px-3 py-2 bg-black/5 dark:bg-[#0b0e14] border border-black/10 dark:border-zinc-800 rounded-xl text-xs text-foreground dark:text-white font-mono focus:outline-none focus:border-primary dark:focus:border-[#00d1ff]"
-                        />
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-mono text-zinc-500 dark:text-zinc-400 uppercase tracking-wider block font-bold">Credential Status</label>
-                        <select
-                          value={certStatusInput}
-                          onChange={(e: any) => setCertStatusInput(e.target.value)}
-                          className="w-full px-3 py-2 bg-black/5 dark:bg-[#0b0e14] border border-black/10 dark:border-zinc-800 rounded-xl text-xs text-foreground dark:text-white font-mono outline-none"
-                        >
-                          <option value="Approved">Approved / Verified</option>
-                          <option value="Pending">Pending Review</option>
-                          <option value="Revoked">Revoked</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    {/* File Upload Box */}
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-mono text-zinc-500 dark:text-zinc-400 uppercase tracking-wider block font-bold">Upload Certificate Document (PDF / Image)</label>
-                      <div className="p-4 border-2 border-dashed border-black/10 dark:border-zinc-800 rounded-xl text-center space-y-2 bg-black/5 dark:bg-white/[0.01]">
-                        <FileUp className="mx-auto text-primary dark:text-[#00d1ff]" size={24} />
-                        <div className="text-[11px] text-zinc-500">
-                          {certFileNameVal ? (
-                            <span className="font-mono text-emerald-500 font-bold block truncate">Selected: {certFileNameVal}</span>
-                          ) : (
-                            <span>Drag and drop certificate PDF / image or click browse</span>
-                          )}
-                        </div>
-                        <input
-                          type="file"
-                          accept=".pdf,image/*"
-                          onChange={handleCertFileSelected}
-                          className="hidden"
-                          id="cert-file-picker"
-                        />
-                        <label
-                          htmlFor="cert-file-picker"
-                          className="inline-block px-3 py-1 bg-black/10 dark:bg-white/10 text-foreground dark:text-white rounded-lg text-[10px] font-mono font-bold uppercase tracking-wider hover:bg-black/20 dark:hover:bg-white/20 transition-all cursor-pointer"
-                        >
-                          {certFileNameVal ? "Change File" : "Browse Computer"}
-                        </label>
-                      </div>
-                    </div>
-
-                    <div className="flex gap-3 pt-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setUploadingCertUser(null);
-                          setEditingCertItem(null);
-                        }}
-                        className="w-1/2 py-2.5 bg-zinc-100 dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 rounded-xl text-[10px] font-mono font-bold uppercase tracking-wider hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-all cursor-pointer"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="submit"
-                        className="w-1/2 py-2.5 bg-primary dark:bg-[#00d1ff] text-white dark:text-black font-extrabold rounded-xl text-[10px] uppercase hover:brightness-110 active:scale-95 transition-all cursor-pointer shadow-md"
-                      >
-                        Save & Issue Certificate
-                      </button>
-                    </div>
-                  </form>
-                </div>
-              </div>,
-              document.body
-            )}
-
-            {/* Modal 2: View Certificate Details Popup */}
-            {selectedCertView && createPortal(
-              <div className="fixed top-0 left-0 w-screen h-screen bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-6 select-text animate-in fade-in duration-200">
-                <div className="bg-white dark:bg-[#07090e] border border-black/10 dark:border-zinc-800 p-8 rounded-2xl w-full max-w-md shadow-2xl relative space-y-6 text-center">
-                  <button onClick={() => setSelectedCertView(null)} className="absolute top-4 right-4 text-zinc-400 hover:text-foreground dark:hover:text-white cursor-pointer"><XCircle size={18} /></button>
-                  <Award size={48} className="text-primary dark:text-[#00d1ff] mx-auto animate-pulse" />
-                  <div className="space-y-1">
-                    <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest block">RecodeX Verified Credential</span>
-                    <h2 className="text-xl font-extrabold text-foreground dark:text-white font-sans">{selectedCertView.studentName}</h2>
-                    <p className="text-xs text-zinc-500 font-sans">{selectedCertView.projectName}</p>
-                  </div>
-
-                  <div className="p-4 border border-dashed border-black/10 dark:border-zinc-800 rounded-xl space-y-1.5 font-mono text-[10px] text-zinc-500 uppercase text-left">
-                    <div className="flex justify-between"><span>Certificate ID:</span> <strong className="text-primary dark:text-[#00d1ff]">{selectedCertView.id}</strong></div>
-                    <div className="flex justify-between"><span>Issue Date:</span> <strong className="text-foreground dark:text-white">{selectedCertView.issueDate}</strong></div>
-                    <div className="flex justify-between"><span>Verification Status:</span> <strong className="text-emerald-500">{selectedCertView.status}</strong></div>
-                    {selectedCertView.fileName && (
-                      <div className="flex justify-between"><span>Attached Document:</span> <strong className="text-zinc-700 dark:text-zinc-300 truncate max-w-[160px]">{selectedCertView.fileName}</strong></div>
-                    )}
-                  </div>
-
-                  <div className="flex gap-3">
-                    <button
-                      onClick={() => handleDownloadCertFile(selectedCertView)}
-                      className="w-full py-2.5 bg-primary dark:bg-[#00d1ff] text-white dark:text-black font-extrabold rounded-xl text-xs uppercase flex items-center justify-center gap-2 hover:brightness-110 active:scale-95 transition-all cursor-pointer shadow-md"
-                    >
-                      <Download size={14} />
-                      Download Certificate Document
-                    </button>
-                  </div>
-                </div>
-              </div>,
-              document.body
-            )}
-
           </div>
         );
 
@@ -3320,7 +3441,6 @@ export default function Dashboard() {
                   >
                     <option value="developer">Student/Freelancer</option>
                     <option value="client">Client</option>
-                    <option value="admin">Admin</option>
                   </select>
                 </div>
                 <div className="flex gap-3 pt-2">
@@ -3513,6 +3633,177 @@ export default function Dashboard() {
                 className="px-5 py-2 bg-[#00d1ff] text-black font-extrabold rounded-lg text-xs font-mono uppercase tracking-wider hover:brightness-110 cursor-pointer"
               >
                 Got It, Close Guide
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Global Certificate Issue / Upload / Edit Modal */}
+      {(uploadingCertUser || editingCertItem) && createPortal(
+        <div className="fixed top-0 left-0 w-screen h-screen bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-6 select-text animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#07090e] border border-black/10 dark:border-zinc-800 p-8 rounded-2xl w-[480px] max-w-full shrink-0 shadow-2xl relative font-sans space-y-6">
+            <button
+              onClick={() => {
+                setUploadingCertUser(null);
+                setEditingCertItem(null);
+              }}
+              className="absolute top-4 right-4 text-zinc-400 hover:text-zinc-700 dark:hover:text-white cursor-pointer"
+            >
+              <XCircle size={18} />
+            </button>
+
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 text-primary dark:text-[#00d1ff]">
+                <Award size={22} />
+                <h3 className="text-sm font-mono tracking-widest text-foreground dark:text-white font-extrabold uppercase">
+                  {editingCertItem ? "Replace / Edit Certificate" : "Issue Certificate for User"}
+                </h3>
+              </div>
+              <p className="text-xs text-zinc-500 font-sans">
+                Target User: <strong className="text-foreground dark:text-white font-semibold">{uploadingCertUser?.name || editingCertItem?.studentName}</strong> ({uploadingCertUser?.email || editingCertItem?.userEmail})
+              </p>
+            </div>
+
+            <form onSubmit={handleSaveCertificate} className="space-y-4 text-xs font-sans">
+              {/* User Selection Dropdown if no specific user pre-selected */}
+              {!editingCertItem && !uploadingCertUser && (
+                <div className="space-y-1">
+                  <label className="text-[10px] font-mono text-zinc-500 dark:text-zinc-400 uppercase tracking-wider block font-bold">Select Registered User</label>
+                  <select
+                    value={uploadingCertUser?.id || ""}
+                    onChange={(e) => {
+                      const found = activeUsersList.find(u => u.id === e.target.value);
+                      if (found) setUploadingCertUser(found);
+                    }}
+                    className="w-full px-3 py-2 bg-black/5 dark:bg-[#0b0e14] border border-black/10 dark:border-zinc-800 rounded-xl text-xs text-foreground dark:text-white font-mono outline-none"
+                  >
+                    {activeUsersList.map(u => (
+                      <option key={u.id} value={u.id}>{u.name} ({u.email})</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-mono text-zinc-500 dark:text-zinc-400 uppercase tracking-wider block font-bold">Project Title / Qualification</label>
+                <input
+                  type="text"
+                  required
+                  value={certProjectTitleInput}
+                  onChange={(e) => setCertProjectTitleInput(e.target.value)}
+                  placeholder="e.g., Quantum-Flux Core Integration"
+                  className="w-full px-3 py-2 bg-black/5 dark:bg-[#0b0e14] border border-black/10 dark:border-zinc-800 rounded-xl text-xs text-foreground dark:text-white focus:outline-none focus:border-primary dark:focus:border-[#00d1ff] transition-all font-sans"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-mono text-zinc-500 dark:text-zinc-400 uppercase tracking-wider block font-bold">Issue Date</label>
+                  <input
+                    type="date"
+                    required
+                    value={certIssueDateInput}
+                    onChange={(e) => setCertIssueDateInput(e.target.value)}
+                    className="w-full px-3 py-2 bg-black/5 dark:bg-[#0b0e14] border border-black/10 dark:border-zinc-800 rounded-xl text-xs text-foreground dark:text-white font-mono focus:outline-none focus:border-primary dark:focus:border-[#00d1ff]"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-mono text-zinc-500 dark:text-zinc-400 uppercase tracking-wider block font-bold">Credential Status</label>
+                  <select
+                    value={certStatusInput}
+                    onChange={(e: any) => setCertStatusInput(e.target.value)}
+                    className="w-full px-3 py-2 bg-black/5 dark:bg-[#0b0e14] border border-black/10 dark:border-zinc-800 rounded-xl text-xs text-foreground dark:text-white font-mono outline-none"
+                  >
+                    <option value="Approved">Approved / Verified</option>
+                    <option value="Pending">Pending Review</option>
+                    <option value="Revoked">Revoked</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* File Upload Box */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-mono text-zinc-500 dark:text-zinc-400 uppercase tracking-wider block font-bold">Upload Certificate Document (PDF / Image)</label>
+                <div className="p-4 border-2 border-dashed border-black/10 dark:border-zinc-800 rounded-xl text-center space-y-2 bg-black/5 dark:bg-white/[0.01]">
+                  <FileUp className="mx-auto text-primary dark:text-[#00d1ff]" size={24} />
+                  <div className="text-[11px] text-zinc-500">
+                    {certFileNameVal ? (
+                      <span className="font-mono text-emerald-500 font-bold block truncate">Selected: {certFileNameVal}</span>
+                    ) : (
+                      <span>Drag and drop certificate PDF / image or click browse</span>
+                    )}
+                  </div>
+                  <input
+                    type="file"
+                    accept=".pdf,image/*"
+                    onChange={handleCertFileSelected}
+                    className="hidden"
+                    id="cert-file-picker"
+                  />
+                  <label
+                    htmlFor="cert-file-picker"
+                    className="inline-block px-3 py-1 bg-black/10 dark:bg-white/10 text-foreground dark:text-white rounded-lg text-[10px] font-mono font-bold uppercase tracking-wider hover:bg-black/20 dark:hover:bg-white/20 transition-all cursor-pointer"
+                  >
+                    {certFileNameVal ? "Change File" : "Browse Computer"}
+                  </label>
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUploadingCertUser(null);
+                    setEditingCertItem(null);
+                  }}
+                  className="w-1/2 py-2.5 bg-zinc-100 dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 rounded-xl text-[10px] font-mono font-bold uppercase tracking-wider hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-all cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="w-1/2 py-2.5 bg-primary dark:bg-[#00d1ff] text-white dark:text-black font-extrabold rounded-xl text-[10px] uppercase hover:brightness-110 active:scale-95 transition-all cursor-pointer shadow-md"
+                >
+                  Save & Issue Certificate
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Global View Certificate Details Modal */}
+      {selectedCertView && createPortal(
+        <div className="fixed top-0 left-0 w-screen h-screen bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-6 select-text animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#07090e] border border-black/10 dark:border-zinc-800 p-8 rounded-2xl w-full max-w-md shadow-2xl relative space-y-6 text-center">
+            <button onClick={() => setSelectedCertView(null)} className="absolute top-4 right-4 text-zinc-400 hover:text-foreground dark:hover:text-white cursor-pointer"><XCircle size={18} /></button>
+            <Award size={48} className="text-primary dark:text-[#00d1ff] mx-auto animate-pulse" />
+            <div className="space-y-1">
+              <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest block">RecodeX Verified Credential</span>
+              <h2 className="text-xl font-extrabold text-foreground dark:text-white font-sans">{selectedCertView.studentName}</h2>
+              <p className="text-xs text-zinc-500 font-sans">{selectedCertView.projectName}</p>
+            </div>
+
+            <div className="p-4 border border-dashed border-black/10 dark:border-zinc-800 rounded-xl space-y-1.5 font-mono text-[10px] text-zinc-500 uppercase text-left">
+              <div className="flex justify-between"><span>Certificate ID:</span> <strong className="text-primary dark:text-[#00d1ff]">{selectedCertView.id}</strong></div>
+              <div className="flex justify-between"><span>Issue Date:</span> <strong className="text-foreground dark:text-white">{selectedCertView.issueDate}</strong></div>
+              <div className="flex justify-between"><span>Verification Status:</span> <strong className="text-emerald-500">{selectedCertView.status}</strong></div>
+              {selectedCertView.fileName && (
+                <div className="flex justify-between"><span>Attached Document:</span> <strong className="text-zinc-700 dark:text-zinc-300 truncate max-w-[160px]">{selectedCertView.fileName}</strong></div>
+              )}
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => handleDownloadCertFile(selectedCertView)}
+                className="w-full py-2.5 bg-primary dark:bg-[#00d1ff] text-white dark:text-black font-extrabold rounded-xl text-xs uppercase flex items-center justify-center gap-2 hover:brightness-110 active:scale-95 transition-all cursor-pointer shadow-md"
+              >
+                <Download size={14} />
+                Download Certificate Document
               </button>
             </div>
           </div>

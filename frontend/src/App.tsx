@@ -60,12 +60,19 @@ export default function App() {
   React.useEffect(() => {
     if (!isLoaded) return;
 
-    // Purge legacy dummy accounts from local storage
+    // Purge legacy dummy accounts & normalize original timestamps in local storage
     try {
       const raw = localStorage.getItem("recodex_synced_users");
       if (raw) {
         const dummyEmails = ["john.doe@recodex.io", "sarah@skynet.com", "vance@blackmesa.org"];
-        const cleaned = JSON.parse(raw).filter((u: any) => u && u.email && !dummyEmails.includes(u.email.toLowerCase()));
+        const cleaned = JSON.parse(raw)
+          .filter((u: any) => u && u.email && !dummyEmails.includes(u.email.toLowerCase()))
+          .map((u: any) => {
+            if ((u.email || "").toLowerCase().trim() === "veereshhp2004@gmail.com") {
+              return { ...u, createdAt: "2026-07-11T16:02:39.730Z" };
+            }
+            return u;
+          });
         localStorage.setItem("recodex_synced_users", JSON.stringify(cleaned));
       }
     } catch (e) {
@@ -81,8 +88,9 @@ export default function App() {
           localStorage.setItem("recodex_session_token", `clerk_${userId}`);
         }
 
-        const userEmail = user.primaryEmailAddress?.emailAddress || "";
-        const isAdmin = userEmail === "veereshhp2004@gmail.com";
+        const userEmail = (user.primaryEmailAddress?.emailAddress || "").toLowerCase().trim();
+        const ROOT_ADMIN_EMAILS = ["veereshhp2004@gmail.com", "udaykumaras34@gmail.com"];
+        const isAdmin = ROOT_ADMIN_EMAILS.includes(userEmail);
 
         if (isAdmin) {
           localStorage.setItem("recodex_admin_user", "true");
