@@ -18,6 +18,9 @@ const Docs = lazy(() => import("./pages/Docs"));
 const Terms = lazy(() => import("./pages/Terms"));
 const Privacy = lazy(() => import("./pages/Privacy"));
 const Profile = lazy(() => import("./pages/Profile"));
+const Certificates = lazy(() => import("./pages/Certificates"));
+const MyProjects = lazy(() => import("./pages/MyProjects"));
+const Queries = lazy(() => import("./pages/Queries"));
 const Announcements = lazy(() => import("./pages/Announcements"));
 const About = lazy(() => import("./pages/About"));
 import { ThemeProvider } from "./context/ThemeContext";
@@ -166,6 +169,11 @@ export default function App() {
                 <Route path="/terms" element={<Terms />} />
                 <Route path="/privacy" element={<Privacy />} />
                 <Route path="/profile" element={<Profile />} />
+                <Route path="/certificates" element={<Certificates />} />
+                <Route path="/my-certificates" element={<Certificates />} />
+                <Route path="/my-projects" element={<MyProjects />} />
+                <Route path="/queries" element={<Queries />} />
+                <Route path="/my-queries" element={<Queries />} />
                 <Route path="/announcements" element={<Announcements />} />
                 <Route path="/about" element={<About />} />
               </Route>

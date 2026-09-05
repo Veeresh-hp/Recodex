@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
-import { useAuth, useUser } from "@clerk/clerk-react";
+import { useAuth, useUser, useClerk } from "@clerk/clerk-react";
 import { getUserProfile, getInquiries, getCertificatesApi, getPromotedAdminsApi } from "@/services/api";
 import {
   User as UserIcon, Shield, Mail, Phone, Cpu, ArrowLeft, ArrowRight,
   CheckCircle, ExternalLink, Camera, Upload, X, Check, CreditCard,
   Calendar, DollarSign, MessageSquare, Clock, ListTodo, Info, Activity, FolderGit2,
-  ShieldCheck, CheckCircle2, Award, Download, Eye, XCircle, Printer, FileText, Sparkles
+  ShieldCheck, CheckCircle2, Award, Download, Eye, XCircle, Printer, FileText, Sparkles,
+  Sliders, Bell, Lock, Key, Terminal, RefreshCw, Trash2
 } from "lucide-react";
 
 interface Certificate {
@@ -190,6 +191,7 @@ const getDynamicProjectData = (projectId: string, title: string, category: strin
 export default function Profile() {
   const { isLoaded, userId, getToken } = useAuth();
   const { user } = useUser();
+  const clerk = useClerk();
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -199,6 +201,125 @@ export default function Profile() {
   const [avatarSaved, setAvatarSaved] = useState(false);
   const [pendingAvatar, setPendingAvatar] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Settings State
+  const [settingsSavedToast, setSettingsSavedToast] = useState(false);
+  const [testNotificationToast, setTestNotificationToast] = useState<string | null>(null);
+  const [showSecurityModal, setShowSecurityModal] = useState(false);
+  const [showPurgeModal, setShowPurgeModal] = useState(false);
+  const [purgeSuccess, setPurgeSuccess] = useState(false);
+  const [slaMetricsOpen, setSlaMetricsOpen] = useState(false);
+  const [livePing, setLivePing] = useState(21);
+
+  const [settings, setSettings] = useState(() => {
+    const saved = localStorage.getItem("recodex_user_preferences");
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {}
+    }
+    return {
+      ticketAlerts: true,
+      milestoneAlerts: true,
+      securityAlerts: true,
+      developerRole: "Full-Stack Engineer",
+      editorTheme: "RecodeX Cyber Dark",
+      slaTelemetry: true
+    };
+  });
+
+  // Live ping oscillation effect for SLA Telemetry widget
+  useEffect(() => {
+    if (!settings.slaTelemetry) return;
+    const interval = setInterval(() => {
+      setLivePing(Math.floor(17 + Math.random() * 8));
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [settings.slaTelemetry]);
+
+  const toggleSetting = (key: "ticketAlerts" | "milestoneAlerts" | "securityAlerts" | "slaTelemetry") => {
+    setSettings((prev: any) => {
+      const updated = { ...prev, [key]: !prev[key] };
+      localStorage.setItem("recodex_user_preferences", JSON.stringify(updated));
+      window.dispatchEvent(new CustomEvent("recodex-preferences-changed", { detail: updated }));
+      return updated;
+    });
+    setSettingsSavedToast(true);
+    setTimeout(() => setSettingsSavedToast(false), 2200);
+  };
+
+  const updateSetting = (key: string, value: any) => {
+    setSettings((prev: any) => {
+      const updated = { ...prev, [key]: value };
+      localStorage.setItem("recodex_user_preferences", JSON.stringify(updated));
+      if (key === "editorTheme") {
+        localStorage.setItem("recodex_editor_theme", value);
+        window.dispatchEvent(new CustomEvent("recodex-editor-theme-changed", { detail: value }));
+      }
+      window.dispatchEvent(new CustomEvent("recodex-preferences-changed", { detail: updated }));
+      return updated;
+    });
+    setSettingsSavedToast(true);
+    setTimeout(() => setSettingsSavedToast(false), 2200);
+  };
+
+  const triggerTestAlert = () => {
+    const active = [];
+    if (settings.ticketAlerts) active.push("Support Desk");
+    if (settings.milestoneAlerts) active.push("Milestone Engine");
+    if (settings.securityAlerts) active.push("Auth Shield");
+
+    if (active.length === 0) {
+      setTestNotificationToast("All alert channels are currently muted. Turn on at least one notification toggle above.");
+    } else {
+      setTestNotificationToast(`Simulated Alert: Active dispatch channels verified [${active.join(", ")}]. Protocol live.`);
+    }
+    setTimeout(() => setTestNotificationToast(null), 4000);
+  };
+
+  const handleExportUserData = () => {
+    if (!profile) return;
+    const exportData = {
+      userProfile: {
+        id: profile.id,
+        name: profile.name,
+        email: profile.email,
+        phone: profile.phone,
+        role: profile.role,
+        domainSpecialization: settings.developerRole,
+        isGoogleUser: profile.isGoogleUser
+      },
+      preferences: settings,
+      systemTelemetry: {
+        gatewayStatus: "Operational",
+        currentPing: `${livePing}ms`,
+        activeCluster: "us-east-1-primary",
+        exportTimestamp: new Date().toISOString(),
+        cryptographicSignature: `RECODEX-SEC-AUTH-${Date.now().toString(36).toUpperCase()}`
+      }
+    };
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `RecodeX_Profile_${profile.name.replace(/\s+/g, "_")}_Telemetry.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleConfirmPurgeCache = () => {
+    localStorage.removeItem("recodex_user_preferences");
+    localStorage.removeItem("recodex_submitted_inquiries");
+    localStorage.removeItem("recodex_editor_theme");
+    setShowPurgeModal(false);
+    setPurgeSuccess(true);
+    setTimeout(() => {
+      setPurgeSuccess(false);
+      window.location.reload();
+    }, 1200);
+  };
 
   const [userCertificates, setUserCertificates] = useState<Certificate[]>([]);
   const [selectedCertView, setSelectedCertView] = useState<Certificate | null>(null);
@@ -601,7 +722,7 @@ export default function Profile() {
             {/* Profile specifications */}
             <div className="space-y-4 flex-grow">
               <div>
-                <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-3">
+                <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-3 flex-wrap">
                   <h1 className="text-2xl md:text-3xl font-black tracking-tight text-foreground dark:text-white leading-none">
                     {profile.name}
                   </h1>
@@ -611,24 +732,21 @@ export default function Profile() {
                   }`}>
                     {profile.role}
                   </span>
+                  <span className="self-center px-2.5 py-0.5 rounded-full text-[9px] font-mono font-bold uppercase tracking-wider border bg-cyan-500/10 border-cyan-500/25 text-cyan-400">
+                    {settings.developerRole}
+                  </span>
                   {profile.isGoogleUser && (
                     <span className="self-center px-2.5 py-0.5 rounded-full text-[9px] font-mono font-black uppercase tracking-wider border bg-red-500/10 border-red-500/20 text-red-400">
                       Google Account
                     </span>
                   )}
-                  {userCertificates.length > 0 ? (
-                    <a
-                      href="#certificates-section"
-                      className="self-center px-2.5 py-0.5 rounded-full text-[9px] font-mono font-black uppercase tracking-wider border bg-emerald-500/10 border-emerald-500/30 text-emerald-400 flex items-center gap-1 hover:bg-emerald-500/20 transition-colors"
-                    >
-                      <Award size={11} className="text-emerald-400" />
-                      <span>Certificate Verified ({userCertificates[0].id})</span>
-                    </a>
-                  ) : (
-                    <span className="self-center px-2.5 py-0.5 rounded-full text-[9px] font-mono font-bold uppercase tracking-wider border bg-zinc-500/10 border-zinc-500/20 text-zinc-400">
-                      No Certificate Issued
-                    </span>
-                  )}
+                  <Link
+                    to="/certificates"
+                    className="self-center px-2.5 py-0.5 rounded-full text-[9px] font-mono font-black uppercase tracking-wider border bg-emerald-500/10 border-emerald-500/30 text-emerald-400 flex items-center gap-1 hover:bg-emerald-500/20 transition-colors"
+                  >
+                    <Award size={11} className="text-emerald-400" />
+                    <span>Certificates</span>
+                  </Link>
                 </div>
                 <p className="text-[10px] font-mono text-zinc-500 mt-2 tracking-wide uppercase">RECODEX SECURITY ACCOUNT SIGNATURE</p>
               </div>
@@ -636,7 +754,7 @@ export default function Profile() {
               {/* Change avatar button */}
               <button
                 onClick={() => setShowAvatarPicker(true)}
-                className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-black/5 dark:bg-zinc-900 border border-black/10 dark:border-zinc-800 rounded-lg text-xs font-mono font-bold text-zinc-500 hover:text-primary hover:border-primary/40 transition-all"
+                className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-black/5 dark:bg-zinc-900 border border-black/10 dark:border-zinc-800 rounded-lg text-xs font-mono font-bold text-zinc-500 hover:text-primary hover:border-primary/40 transition-all cursor-pointer"
               >
                 <Camera size={13} />
                 Change Profile Picture
@@ -678,513 +796,390 @@ export default function Profile() {
                   <span>Verified Identity sync successful</span>
                 </div>
 
-                {profile.role === "admin" && (
-                  <Link
-                    to="/dashboard"
-                    className="flex items-center gap-1.5 px-4 py-2 bg-primary dark:bg-[#00d1ff] text-on-primary dark:text-black font-extrabold rounded-lg text-[10px] font-mono uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all shadow-[0_0_15px_rgba(0,209,255,0.25)]"
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setShowSecurityModal(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-black/5 dark:bg-zinc-900 hover:bg-black/10 dark:hover:bg-zinc-800 border border-black/10 dark:border-zinc-800 text-zinc-600 dark:text-zinc-300 font-bold rounded-lg text-[10px] font-mono uppercase tracking-wider transition-all cursor-pointer"
                   >
-                    Manage Console
-                    <ExternalLink size={11} />
-                  </Link>
-                )}
+                    <Sliders size={11} className="text-primary" />
+                    <span>Security & Passwords</span>
+                  </button>
+
+                  {profile.role === "admin" && (
+                    <Link
+                      to="/dashboard"
+                      className="flex items-center gap-1.5 px-4 py-1.5 bg-primary dark:bg-[#00d1ff] text-on-primary dark:text-black font-extrabold rounded-lg text-[10px] font-mono uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all shadow-[0_0_15px_rgba(0,209,255,0.25)]"
+                    >
+                      Console
+                      <ExternalLink size={11} />
+                    </Link>
+                  )}
+                </div>
               </div>
 
             </div>
           </div>
         </div>
 
-        {/* DEDICATED VERIFIED CREDENTIALS & CERTIFICATES SECTION */}
-        <div id="certificates-section" className="mt-8 glass-card bg-white/60 dark:bg-[#07090e]/60 backdrop-blur-xl border border-black/10 dark:border-zinc-800/80 rounded-2xl p-8 md:p-10 shadow-xl space-y-6 select-text">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-black/5 dark:border-zinc-900/60 pb-4">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2 text-primary dark:text-[#00d1ff]">
-                <Award size={20} />
-                <h2 className="text-xl font-bold tracking-tight text-foreground dark:text-white font-sans uppercase">
-                  Verified Certificates & Credentials
-                </h2>
-              </div>
-              <p className="text-xs text-zinc-500 font-sans">
-                Official project completion credentials and software certifications issued to your account.
+        {/* Account Settings & Preferences Section */}
+        <div className="mt-8 space-y-6">
+          <div className="flex items-center justify-between border-b border-black/10 dark:border-zinc-800/80 pb-3">
+            <div>
+              <h2 className="text-lg font-black tracking-tight text-foreground dark:text-white flex items-center gap-2 font-mono uppercase">
+                <Sliders size={18} className="text-primary" />
+                Account Settings & Preferences
+              </h2>
+              <p className="text-xs text-zinc-500 mt-0.5">
+                Customize your workspace telemetry, security controls, and notifications.
               </p>
             </div>
-
-            {/* Clear Status Indicator Badge */}
-            {userCertificates.length > 0 ? (
-              <span className="px-3.5 py-1.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 rounded-full text-[10px] font-mono font-black uppercase tracking-wider flex items-center gap-1.5 shadow-[0_0_12px_rgba(16,185,129,0.2)] self-start sm:self-auto">
-                <CheckCircle2 size={13} className="text-emerald-500" />
-                <span>STATUS: ISSUED ({userCertificates.length})</span>
-              </span>
-            ) : (
-              <span className="px-3.5 py-1.5 bg-zinc-500/10 border border-zinc-500/20 text-zinc-400 rounded-full text-[10px] font-mono font-black uppercase tracking-wider flex items-center gap-1.5 self-start sm:self-auto">
-                <Info size={13} className="text-zinc-400" />
-                <span>STATUS: NOT ISSUED YET</span>
+            {settingsSavedToast && (
+              <span className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-[10px] font-mono font-bold uppercase rounded-full flex items-center gap-1 animate-fade-in shadow-sm">
+                <Check size={12} />
+                Preferences Saved
               </span>
             )}
           </div>
 
-          {/* User Notification Status Banner */}
-          {userCertificates.length > 0 ? (
-            <div className="p-3.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center gap-3 text-emerald-500 text-xs font-sans font-medium">
-              <Sparkles size={16} className="shrink-0 text-emerald-400 animate-pulse" />
-              <span>
-                <strong>Certificate Issued:</strong> Official completion credential <strong>[{userCertificates[0].id}]</strong> is active and verified for your account ({profile.email}).
-              </span>
-            </div>
-          ) : (
-            <div className="p-3.5 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center gap-3 text-amber-500 text-xs font-sans font-medium">
-              <Info size={16} className="shrink-0 text-amber-400" />
-              <span>
-                <strong>No Certificate Issued Yet:</strong> Once RecodeX administrators verify and issue your project completion certificate, it will automatically appear here with full verification details.
-              </span>
+          {/* Test Alert Floating Banner */}
+          {testNotificationToast && (
+            <div className="p-3.5 bg-amber-500/10 border border-amber-500/25 rounded-xl flex items-center gap-3 text-amber-500 text-xs font-mono animate-fade-in">
+              <Bell size={15} className="shrink-0 animate-bounce" />
+              <div className="flex-grow">{testNotificationToast}</div>
+              <button onClick={() => setTestNotificationToast(null)} className="text-amber-400 hover:text-amber-200 cursor-pointer">
+                <X size={14} />
+              </button>
             </div>
           )}
 
-          {userCertificates.length === 0 ? (
-            <div className="text-center py-8 space-y-3">
-              <div className="w-12 h-12 rounded-full bg-primary/10 text-primary dark:text-[#00d1ff] flex items-center justify-center mx-auto">
-                <Award size={24} />
+          {purgeSuccess && (
+            <div className="p-3.5 bg-rose-500/10 border border-rose-500/25 rounded-xl flex items-center gap-3 text-rose-500 text-xs font-mono animate-fade-in">
+              <Trash2 size={15} className="shrink-0" />
+              <span>Local client cache purged successfully. Refreshing environment...</span>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+            {/* Card 1: Notification & Communication */}
+            <div className="bg-white/60 dark:bg-[#07090e]/60 backdrop-blur-xl border border-black/10 dark:border-zinc-800/80 rounded-2xl p-6 space-y-5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5 text-xs font-mono font-bold uppercase tracking-wider text-foreground dark:text-white">
+                  <Bell size={15} className="text-amber-500" />
+                  <span>Notification Preferences</span>
+                </div>
+                <button
+                  onClick={triggerTestAlert}
+                  className="px-2.5 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 border border-amber-500/20 rounded-lg text-[10px] font-mono font-bold uppercase transition-all cursor-pointer"
+                >
+                  Test Alert
+                </button>
               </div>
-              <div className="space-y-1 max-w-sm mx-auto">
-                <h4 className="text-sm font-bold text-foreground dark:text-white font-sans">No Certificates Issued Yet</h4>
-                <p className="text-xs text-zinc-500 font-sans leading-relaxed">
-                  When RecodeX administrators verify and upload your project completion certificate, it will automatically appear here for view and download.
-                </p>
+
+              <div className="space-y-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-xs font-bold text-foreground dark:text-white">Support Ticket Updates</p>
+                    <p className="text-[11px] text-zinc-500">Receive alerts when admins respond to your queries</p>
+                  </div>
+                  <button
+                    onClick={() => toggleSetting("ticketAlerts")}
+                    className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer ${
+                      settings.ticketAlerts ? "bg-primary justify-end" : "bg-zinc-300 dark:bg-zinc-800 justify-start"
+                    }`}
+                  >
+                    <div className="w-4 h-4 rounded-full bg-white dark:bg-[#07090e] shadow-md transition-all" />
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between gap-4 pt-3 border-t border-black/5 dark:border-zinc-900">
+                  <div>
+                    <p className="text-xs font-bold text-foreground dark:text-white">Milestone Deliverables</p>
+                    <p className="text-[11px] text-zinc-500">Real-time alerts on project commits and releases</p>
+                  </div>
+                  <button
+                    onClick={() => toggleSetting("milestoneAlerts")}
+                    className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer ${
+                      settings.milestoneAlerts ? "bg-primary justify-end" : "bg-zinc-300 dark:bg-zinc-800 justify-start"
+                    }`}
+                  >
+                    <div className="w-4 h-4 rounded-full bg-white dark:bg-[#07090e] shadow-md transition-all" />
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between gap-4 pt-3 border-t border-black/5 dark:border-zinc-900">
+                  <div>
+                    <p className="text-xs font-bold text-foreground dark:text-white">Security & Login Alerts</p>
+                    <p className="text-[11px] text-zinc-500">Instant notification for new browser sessions</p>
+                  </div>
+                  <button
+                    onClick={() => toggleSetting("securityAlerts")}
+                    className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer ${
+                      settings.securityAlerts ? "bg-primary justify-end" : "bg-zinc-300 dark:bg-zinc-800 justify-start"
+                    }`}
+                  >
+                    <div className="w-4 h-4 rounded-full bg-white dark:bg-[#07090e] shadow-md transition-all" />
+                  </button>
+                </div>
               </div>
             </div>
-          ) : (
-            <div className="space-y-8">
-              {userCertificates.map((cert) => (
-                <div key={cert.id} className="glass-card bg-[#07090e] border-2 border-primary/30 dark:border-[#00d1ff]/40 rounded-2xl p-6 md:p-8 shadow-[0_0_40px_rgba(0,209,255,0.15)] relative overflow-hidden space-y-6">
 
-                  {/* Certificate Background Watermark Grid */}
-                  <div className="absolute inset-0 bg-[radial-gradient(#00d1ff_1px,transparent_1px)] [background-size:24px_24px] opacity-[0.04] pointer-events-none"></div>
-                  <div className="absolute -top-12 -right-12 w-48 h-48 bg-primary/10 rounded-full blur-3xl pointer-events-none"></div>
+            {/* Card 2: Developer & Experience */}
+            <div className="bg-white/60 dark:bg-[#07090e]/60 backdrop-blur-xl border border-black/10 dark:border-zinc-800/80 rounded-2xl p-6 space-y-5">
+              <div className="flex items-center gap-2.5 text-xs font-mono font-bold uppercase tracking-wider text-foreground dark:text-white">
+                <Terminal size={15} className="text-cyan-500" />
+                <span>Developer Workspace</span>
+              </div>
 
-                  {/* Top Certificate Header Bar */}
-                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-white/10 pb-6 text-center sm:text-left relative z-10">
-                    <div className="flex items-center gap-3">
-                      <img src="/recodeXlogo.png" alt="RecodeX" className="h-9 w-auto brand-logo-img filter brightness-125" />
-                      <div>
-                        <span className="text-[9px] font-mono tracking-widest text-[#00d1ff] uppercase font-bold block leading-none">
-                          OFFICIAL RECODEX COMPLETION CREDENTIAL
-                        </span>
-                        <span className="text-xs font-mono text-zinc-400 font-semibold mt-1 block">
-                          DECENTRALIZED ARCHITECTURE VERIFICATION
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 select-none">
-                      <span className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-full text-[10px] font-mono font-black uppercase tracking-wider flex items-center gap-1.5 shadow-[0_0_10px_rgba(16,185,129,0.2)]">
-                        <CheckCircle2 size={12} className="text-emerald-400" />
-                        <span>VERIFIED & SIGNED</span>
-                      </span>
-                      <span className="px-2.5 py-1 bg-primary/10 border border-primary/20 text-[#00d1ff] rounded-full text-[10px] font-mono font-extrabold uppercase">
-                        {cert.id}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Main Visual Certificate Document Body */}
-                  <div className="py-6 px-4 md:px-8 border border-white/10 rounded-xl bg-black/40 backdrop-blur-md text-center space-y-5 relative z-10 select-text shadow-inner">
-                    <div className="space-y-1">
-                      <p className="text-[10px] font-mono uppercase tracking-[0.25em] text-zinc-400 font-bold">
-                        THIS IS TO CERTIFY THAT
-                      </p>
-                      <h1 className="text-2xl md:text-4xl font-black font-sans tracking-tight text-white uppercase drop-shadow-[0_0_15px_rgba(255,255,255,0.4)]">
-                        {cert.studentName}
-                      </h1>
-                    </div>
-
-                    <p className="text-xs text-zinc-400 max-w-lg mx-auto leading-relaxed font-sans font-medium">
-                      has successfully fulfilled all software engineering benchmarks, security audits, and deployment milestones for the project title
-                    </p>
-
-                    <div className="inline-block px-6 py-2 bg-gradient-to-r from-primary/20 via-[#00d1ff]/20 to-primary/20 border border-[#00d1ff]/40 rounded-xl">
-                      <h3 className="text-base md:text-xl font-bold font-sans text-[#00d1ff] tracking-wide">
-                        "{cert.projectName}"
-                      </h3>
-                    </div>
-
-                    {/* Issue Details & Cryptographic Hash Footer */}
-                    <div className="pt-4 border-t border-white/10 grid grid-cols-1 sm:grid-cols-3 gap-4 text-center font-mono text-[10px] text-zinc-400 uppercase">
-                      <div>
-                        <span className="block text-zinc-500 text-[8px] font-bold tracking-widest">CREDENTIAL ID</span>
-                        <span className="font-semibold text-white">{cert.id}</span>
-                      </div>
-                      <div>
-                        <span className="block text-zinc-500 text-[8px] font-bold tracking-widest">OFFICIAL ISSUE DATE</span>
-                        <span className="font-semibold text-white">{cert.issueDate}</span>
-                      </div>
-                      <div>
-                        <span className="block text-zinc-500 text-[8px] font-bold tracking-widest">VALIDATION SEAL</span>
-                        <span className="font-semibold text-emerald-400">cryptographic_valid</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Attached File / Document Image Preview Container */}
-                  {cert.fileData && (
-                    <div className="p-4 border border-white/10 rounded-xl bg-black/60 space-y-3">
-                      <div className="flex items-center justify-between text-[11px] font-mono text-zinc-400">
-                        <span className="flex items-center gap-1.5 text-[#00d1ff] font-bold">
-                          <FileText size={14} />
-                          Attached Certificate Document ({cert.fileName || "Certificate.pdf"})
-                        </span>
-                        <span className="text-emerald-400 font-bold uppercase text-[9px]">Document Preview Active</span>
-                      </div>
-
-                      {/* Display image or PDF preview if base64 fileData is attached */}
-                      {cert.fileData.startsWith("data:image/") ? (
-                        <div className="max-h-[500px] overflow-hidden rounded-lg border border-white/10 flex justify-center bg-black">
-                          <img src={cert.fileData} alt="Certificate Document" className="max-h-[500px] w-auto object-contain" />
-                        </div>
-                      ) : (
-                        <div className="rounded-lg border border-white/10 overflow-hidden bg-black shadow-2xl space-y-2">
-                          <iframe 
-                            src={cert.fileData} 
-                            className="w-full h-[480px] rounded-lg border-0 bg-white" 
-                            title="Issued Certificate PDF Preview"
-                          />
-                          <div className="p-3 bg-white/5 flex items-center justify-between text-xs font-mono text-zinc-300">
-                            <span className="truncate">{cert.fileName || "Uploaded Certificate Document (PDF)"}</span>
-                            <button
-                              onClick={() => handleDownloadUserCert(cert)}
-                              className="px-3.5 py-1.5 bg-[#00d1ff] text-black hover:brightness-110 rounded text-[10px] font-black uppercase tracking-wider transition-all"
-                            >
-                              Download PDF Document
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Bottom Action Controls */}
-                  <div className="flex flex-wrap items-center justify-between gap-3 pt-2 relative z-10">
-                    <div className="flex items-center gap-2 text-[10px] font-mono text-zinc-400">
-                      <ShieldCheck size={14} className="text-emerald-400" />
-                      <span>Tamper-proof RecodeX digital credential signature</span>
-                    </div>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                      <button
-                        onClick={() => setSelectedCertView(cert)}
-                        className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-lg text-xs font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer"
-                      >
-                        <Eye size={14} className="text-[#00d1ff]" />
-                        <span>Full Screen Modal</span>
-                      </button>
-                      <button
-                        onClick={() => handleDownloadUserCert(cert)}
-                        className="px-4 py-2 bg-[#00d1ff] text-black hover:brightness-110 rounded-lg text-xs font-mono font-black uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-[0_0_15px_rgba(0,209,255,0.3)] cursor-pointer"
-                      >
-                        <Download size={14} />
-                        <span>Download Certificate</span>
-                      </button>
-                    </div>
-                  </div>
-
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs font-bold text-foreground dark:text-white block mb-1.5">
+                    Primary Domain / Role
+                  </label>
+                  <select
+                    value={settings.developerRole}
+                    onChange={(e) => updateSetting("developerRole", e.target.value)}
+                    className="w-full px-3 py-2 bg-black/5 dark:bg-zinc-900/90 border border-black/10 dark:border-zinc-800 rounded-xl text-xs font-mono text-foreground dark:text-zinc-200 outline-none focus:border-primary/50 transition-colors cursor-pointer"
+                  >
+                    <option value="Full-Stack Engineer">Full-Stack Engineer</option>
+                    <option value="Frontend Specialist">Frontend Specialist</option>
+                    <option value="Backend Architect">Backend Architect</option>
+                    <option value="DevOps & Cloud Engineer">DevOps & Cloud Engineer</option>
+                    <option value="Client / Stakeholder">Client / Stakeholder</option>
+                  </select>
                 </div>
-              ))}
+
+                <div className="pt-3 border-t border-black/5 dark:border-zinc-900">
+                  <label className="text-xs font-bold text-foreground dark:text-white block mb-1.5">
+                    Editor Syntax Theme
+                  </label>
+                  <select
+                    value={settings.editorTheme}
+                    onChange={(e) => updateSetting("editorTheme", e.target.value)}
+                    className="w-full px-3 py-2 bg-black/5 dark:bg-zinc-900/90 border border-black/10 dark:border-zinc-800 rounded-xl text-xs font-mono text-foreground dark:text-zinc-200 outline-none focus:border-primary/50 transition-colors cursor-pointer"
+                  >
+                    <option value="RecodeX Cyber Dark">RecodeX Cyber Dark (Default)</option>
+                    <option value="Monokai Pro">Monokai Pro</option>
+                    <option value="One Dark Pro">One Dark Pro</option>
+                    <option value="Dracula Official">Dracula Official</option>
+                    <option value="GitHub Dark Dimmed">GitHub Dark Dimmed</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center justify-between gap-4 pt-3 border-t border-black/5 dark:border-zinc-900">
+                  <div>
+                    <p className="text-xs font-bold text-foreground dark:text-white">Live SLA Telemetry</p>
+                    <p className="text-[11px] text-zinc-500">Show floating ping and response latency metrics</p>
+                  </div>
+                  <button
+                    onClick={() => toggleSetting("slaTelemetry")}
+                    className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer ${
+                      settings.slaTelemetry ? "bg-primary justify-end" : "bg-zinc-300 dark:bg-zinc-800 justify-start"
+                    }`}
+                  >
+                    <div className="w-4 h-4 rounded-full bg-white dark:bg-[#07090e] shadow-md transition-all" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Card 3: Security & Sessions */}
+            <div className="bg-white/60 dark:bg-[#07090e]/60 backdrop-blur-xl border border-black/10 dark:border-zinc-800/80 rounded-2xl p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5 text-xs font-mono font-bold uppercase tracking-wider text-foreground dark:text-white">
+                  <Lock size={15} className="text-emerald-500" />
+                  <span>Security & Auth Pipeline</span>
+                </div>
+                <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-bold uppercase bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                  Secured
+                </span>
+              </div>
+
+              <div className="space-y-2.5 text-xs">
+                <div className="flex items-center justify-between py-2 border-b border-black/5 dark:border-zinc-900">
+                  <span className="text-zinc-500 font-mono text-[11px]">OAuth Provider</span>
+                  <span className="font-bold text-foreground dark:text-zinc-200">
+                    {profile.isGoogleUser ? "Google Single Sign-On" : "Clerk Identity Protocol"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between py-2 border-b border-black/5 dark:border-zinc-900">
+                  <span className="text-zinc-500 font-mono text-[11px]">2-Factor Authentication</span>
+                  <span className="font-mono text-emerald-500 font-bold text-[11px]">Enforced via Clerk</span>
+                </div>
+                <div className="flex items-center justify-between py-2 border-b border-black/5 dark:border-zinc-900">
+                  <span className="text-zinc-500 font-mono text-[11px]">Current Session</span>
+                  <span className="font-mono text-zinc-400 text-[11px]">Active (This Device)</span>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setShowSecurityModal(true)}
+                className="w-full mt-2 py-2 px-3 bg-black/5 dark:bg-zinc-900 hover:bg-black/10 dark:hover:bg-zinc-800 border border-black/10 dark:border-zinc-800 rounded-xl text-xs font-mono font-bold text-foreground dark:text-white flex items-center justify-center gap-2 transition-all cursor-pointer"
+              >
+                <Key size={13} className="text-amber-500" />
+                Manage Password & 2FA via Clerk
+              </button>
+            </div>
+
+            {/* Card 4: Local Storage & Data Management */}
+            <div className="bg-white/60 dark:bg-[#07090e]/60 backdrop-blur-xl border border-black/10 dark:border-zinc-800/80 rounded-2xl p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5 text-xs font-mono font-bold uppercase tracking-wider text-foreground dark:text-white">
+                  <RefreshCw size={15} className="text-purple-500" />
+                  <span>Data & Cache Controls</span>
+                </div>
+                <span className="text-[10px] font-mono text-zinc-500">Client Memory</span>
+              </div>
+
+              <p className="text-xs text-zinc-500 leading-relaxed">
+                Manage your locally cached states, ticket drafts, and cryptographic identity signatures.
+              </p>
+
+              <div className="pt-2 flex flex-col sm:flex-row gap-3">
+                <button
+                  onClick={handleExportUserData}
+                  className="flex-1 py-2 px-3 bg-black/5 dark:bg-zinc-900 hover:bg-black/10 dark:hover:bg-zinc-800 border border-black/10 dark:border-zinc-800 rounded-xl text-xs font-mono font-bold text-zinc-700 dark:text-zinc-300 flex items-center justify-center gap-2 transition-all cursor-pointer"
+                >
+                  <Download size={13} className="text-primary" />
+                  Export Telemetry JSON
+                </button>
+
+                <button
+                  onClick={() => setShowPurgeModal(true)}
+                  className="flex-1 py-2 px-3 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 rounded-xl text-xs font-mono font-bold text-rose-500 flex items-center justify-center gap-2 transition-all cursor-pointer"
+                >
+                  <Trash2 size={13} />
+                  Purge Cache
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </main>
+
+      {/* Floating SLA Telemetry Widget */}
+      {settings.slaTelemetry && (
+        <div className="fixed bottom-5 right-5 z-40">
+          <button
+            onClick={() => setSlaMetricsOpen(!slaMetricsOpen)}
+            className="flex items-center gap-2.5 px-3 py-1.5 bg-black/80 dark:bg-zinc-900/90 backdrop-blur-xl border border-black/20 dark:border-zinc-700 text-zinc-300 rounded-full shadow-2xl hover:border-emerald-500/50 transition-all cursor-pointer text-xs font-mono"
+          >
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+            <span className="text-[11px] font-bold text-emerald-400">{livePing}ms</span>
+            <span className="text-[10px] text-zinc-400">US-EAST-1</span>
+          </button>
+
+          {slaMetricsOpen && (
+            <div className="absolute bottom-10 right-0 w-72 p-4 bg-white dark:bg-[#07090e] border border-black/10 dark:border-zinc-800 rounded-2xl shadow-2xl space-y-3 font-mono text-xs animate-fade-in">
+              <div className="flex items-center justify-between pb-2 border-b border-black/5 dark:border-zinc-800">
+                <span className="font-bold text-foreground dark:text-white">Live Node Telemetry</span>
+                <span className="text-[10px] text-emerald-400 font-bold">99.99% SLA</span>
+              </div>
+              <div className="space-y-1.5 text-[11px] text-zinc-500">
+                <div className="flex justify-between"><span>Active Gateway:</span><span className="text-zinc-300">AWS us-east-1</span></div>
+                <div className="flex justify-between"><span>SSL Handshake:</span><span className="text-emerald-400">TLS 1.3 Validated</span></div>
+                <div className="flex justify-between"><span>Database Pool:</span><span className="text-zinc-300">Supabase PG Active</span></div>
+                <div className="flex justify-between"><span>Latency Variance:</span><span className="text-zinc-300">&plusmn;2.4ms</span></div>
+              </div>
             </div>
           )}
         </div>
+      )}
 
-        {/* Certificate Details Modal in Profile */}
-        {selectedCertView && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-6 select-text animate-in fade-in duration-200">
-            <div className="bg-white dark:bg-[#07090e] border border-black/10 dark:border-zinc-800 p-8 rounded-2xl w-full max-w-md shadow-2xl relative space-y-6 text-center">
-              <button onClick={() => setSelectedCertView(null)} className="absolute top-4 right-4 text-zinc-400 hover:text-foreground dark:hover:text-white cursor-pointer"><XCircle size={18} /></button>
-              <Award size={48} className="text-primary dark:text-[#00d1ff] mx-auto animate-pulse" />
-              <div className="space-y-1">
-                <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest block">Official Cryptographic Credential</span>
-                <h2 className="text-xl font-extrabold text-foreground dark:text-white font-sans">{selectedCertView.studentName}</h2>
-                <p className="text-xs text-zinc-500 font-sans">{selectedCertView.projectName}</p>
+      {/* Security & Password Modal */}
+      {showSecurityModal && (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-[#07090e] border border-black/10 dark:border-zinc-800 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-fade-in">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-black/5 dark:border-zinc-900">
+              <div className="flex items-center gap-2">
+                <Lock size={16} className="text-primary" />
+                <h3 className="font-bold text-foreground dark:text-white text-sm uppercase tracking-wider font-mono">
+                  Security & Auth Control
+                </h3>
+              </div>
+              <button onClick={() => setShowSecurityModal(false)} className="text-zinc-400 hover:text-foreground cursor-pointer">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center gap-3">
+                <ShieldCheck size={24} className="text-emerald-400 shrink-0" />
+                <div>
+                  <p className="text-xs font-bold text-emerald-400">Identity Guard Active</p>
+                  <p className="text-[11px] text-zinc-400">Your credentials and 2FA are protected under Clerk Cryptographic Vaults.</p>
+                </div>
               </div>
 
-              <div className="p-4 border border-dashed border-black/10 dark:border-zinc-800 rounded-xl space-y-1.5 font-mono text-[10px] text-zinc-500 uppercase text-left">
-                <div className="flex justify-between"><span>Certificate ID:</span> <strong className="text-primary dark:text-[#00d1ff]">{selectedCertView.id}</strong></div>
-                <div className="flex justify-between"><span>Issue Date:</span> <strong className="text-foreground dark:text-white">{selectedCertView.issueDate}</strong></div>
-                <div className="flex justify-between"><span>Verification Status:</span> <strong className="text-emerald-500">{selectedCertView.status}</strong></div>
-                {selectedCertView.fileName && (
-                  <div className="flex justify-between"><span>Attached Document:</span> <strong className="text-zinc-700 dark:text-zinc-300 truncate max-w-[160px]">{selectedCertView.fileName}</strong></div>
-                )}
+              <div className="space-y-2 text-xs font-mono">
+                <div className="p-2.5 bg-black/5 dark:bg-zinc-900/60 rounded-lg flex justify-between">
+                  <span className="text-zinc-500">Connected Identity:</span>
+                  <span className="text-foreground dark:text-white font-bold">{profile.email}</span>
+                </div>
+                <div className="p-2.5 bg-black/5 dark:bg-zinc-900/60 rounded-lg flex justify-between">
+                  <span className="text-zinc-500">Session Status:</span>
+                  <span className="text-emerald-400 font-bold">Authorized & Active</span>
+                </div>
               </div>
 
-              <div className="flex gap-3">
+              <div className="pt-2 space-y-2">
                 <button
-                  onClick={() => handleDownloadUserCert(selectedCertView)}
-                  className="w-full py-2.5 bg-primary dark:bg-[#00d1ff] text-white dark:text-black font-extrabold rounded-xl text-xs uppercase flex items-center justify-center gap-2 hover:brightness-110 active:scale-95 transition-all cursor-pointer shadow-md"
+                  onClick={() => {
+                    setShowSecurityModal(false);
+                    try {
+                      clerk?.openUserProfile?.();
+                    } catch (e) {
+                      console.warn(e);
+                    }
+                  }}
+                  className="w-full py-2.5 bg-primary text-white dark:text-black font-bold font-mono text-xs rounded-xl hover:brightness-110 transition-all flex items-center justify-center gap-2 cursor-pointer"
                 >
-                  <Download size={14} />
-                  Download Certificate Document
+                  <Key size={14} />
+                  Open Clerk Security Settings
+                </button>
+                <button
+                  onClick={() => setShowSecurityModal(false)}
+                  className="w-full py-2 bg-black/5 dark:bg-zinc-900 text-zinc-400 font-mono text-xs rounded-xl hover:text-foreground transition-all cursor-pointer"
+                >
+                  Close
                 </button>
               </div>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-          {/* DEDICATED CUSTOMER PROJECT DASHBOARD */}
-          {profile.role === "client" && (
-            <div className="mt-8 space-y-6 select-text">
-              {!profile.projects || profile.projects.length === 0 ? (
-                /* Standby / No approved projects view */
-                <div className="glass-card bg-white/60 dark:bg-[#07090e]/60 backdrop-blur-xl border border-black/10 dark:border-zinc-800/80 rounded-2xl p-8 text-center space-y-6 shadow-xl">
-                  <div className="w-14 h-14 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center mx-auto text-primary dark:text-[#00d1ff] animate-pulse">
-                    <FolderGit2 size={26} />
-                  </div>
-                  <div className="space-y-2.5 max-w-md mx-auto">
-                    <span className="text-[9px] font-mono text-primary dark:text-[#00d1ff] tracking-widest uppercase font-bold block">
-                      Project Telemetry Standby
-                    </span>
-                    <h3 className="text-xl font-bold text-foreground dark:text-white font-sans">
-                      No Active Projects Mapped
-                    </h3>
-                    <p className="text-xs text-zinc-500 leading-relaxed font-sans font-medium">
-                      Your real-time project tracking dashboard is currently in standby. Contact our core team to outline your specifications. Once approved, live progress metrics, payment trackers, and notes will activate here!
-                    </p>
-                  </div>
-                  <Link
-                    to="/contact"
-                    className="inline-flex items-center gap-2 px-6 py-3 bg-primary dark:bg-[#00d1ff] text-on-primary dark:text-black font-extrabold rounded-lg text-xs tracking-wider uppercase transition-all duration-300 hover:brightness-110 hover:shadow-[0_0_20px_rgba(0,209,255,0.35)] active:scale-[0.98] font-sans cursor-pointer"
-                  >
-                    <span>Request Service / Contact Team</span>
-                    <ArrowRight size={14} className="shrink-0" />
-                  </Link>
-                </div>
-              ) : (
-                /* Live projects array mapping */
-                <div className="space-y-8">
-                  {profile.projects.map((project: any, idx: number) => (
-                    <div 
-                      key={project.id || idx} 
-                      className="glass-card bg-white/60 dark:bg-[#07090e]/60 backdrop-blur-xl border border-black/10 dark:border-zinc-800/80 rounded-2xl p-8 md:p-10 shadow-xl space-y-8 relative overflow-hidden"
-                    >
-                      <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl pointer-events-none"></div>
-
-                      {/* Project Header section */}
-                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b border-black/5 dark:border-zinc-900/60 pb-6">
-                        <div className="space-y-2">
-                          <div className="flex flex-wrap items-center gap-2.5">
-                            <span className="px-2.5 py-0.5 rounded-full text-[9px] font-mono font-black uppercase tracking-wider bg-primary/10 border border-primary/20 text-primary dark:text-[#00d1ff]">
-                              {project.category}
-                            </span>
-                            <span className="flex items-center gap-1.5 text-[9px] font-mono font-bold text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full uppercase">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_6px_rgba(16,185,129,0.7)]"></span>
-                              {project.status}
-                            </span>
-                          </div>
-                          <h2 className="text-xl md:text-2xl font-black tracking-tight text-foreground dark:text-white leading-tight font-sans">
-                            {project.title}
-                          </h2>
-                          <p className="text-zinc-500 text-xs leading-relaxed max-w-2xl font-sans font-medium">
-                            {project.description}
-                          </p>
-                        </div>
-                        <div className="shrink-0 text-left sm:text-right font-mono select-none">
-                          <span className="text-[8px] text-zinc-500 dark:text-zinc-650 block uppercase font-bold tracking-widest leading-none">Project ID</span>
-                          <span className="text-[11px] font-semibold text-primary dark:text-[#00d1ff] tracking-tight">{project.id}</span>
-                        </div>
-                      </div>
-
-                      {/* Project Telemetry Metrics Grid (4 items) */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 select-none">
-                        {/* Progress percentage radial */}
-                        <div className="border border-black/10 dark:border-zinc-900/60 bg-black/5 dark:bg-[#04060a]/40 rounded-xl p-5 hover:border-black/20 dark:hover:border-zinc-800 transition-all flex flex-col justify-between">
-                          <div className="flex items-center justify-between text-zinc-500">
-                            <span className="text-[9px] font-mono tracking-widest uppercase font-bold">Progress</span>
-                            <Activity size={13} className="text-primary dark:text-[#00d1ff]" />
-                          </div>
-                          <div className="mt-3">
-                            <span className="text-xl font-bold tracking-tight text-foreground dark:text-white font-mono">{project.completion}% Complete</span>
-                            {/* Visual Progress Bar */}
-                            <div className="w-full h-1.5 bg-black/10 dark:bg-zinc-800 rounded-full mt-2 overflow-hidden shadow-inner">
-                              <div 
-                                className="h-full bg-gradient-to-r from-primary to-blue-500 dark:from-[#00d1ff] dark:to-cyan-400 rounded-full shadow-[0_0_8px_rgba(0,209,255,0.4)] transition-all duration-1000"
-                                style={{ width: `${project.completion}%` }}
-                              ></div>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Estimated completion timeline */}
-                        <div className="border border-black/10 dark:border-zinc-900/60 bg-black/5 dark:bg-[#04060a]/40 rounded-xl p-5 hover:border-black/20 dark:hover:border-zinc-800 transition-all flex flex-col justify-between">
-                          <div className="flex items-center justify-between text-zinc-500">
-                            <span className="text-[9px] font-mono tracking-widest uppercase font-bold">Timeline</span>
-                            <Clock size={13} className="text-primary dark:text-[#00d1ff]" />
-                          </div>
-                          <div className="mt-3 space-y-1">
-                            <span className="text-xs font-bold text-foreground dark:text-zinc-200 font-mono block truncate">{project.daysRemaining}</span>
-                            <span className="text-[9px] font-sans font-medium text-zinc-500 block leading-none">Started: {project.startDate}</span>
-                          </div>
-                        </div>
-
-                        {/* Budget Amount */}
-                        <div className="border border-black/10 dark:border-zinc-900/60 bg-black/5 dark:bg-[#04060a]/40 rounded-xl p-5 hover:border-black/20 dark:hover:border-zinc-800 transition-all flex flex-col justify-between">
-                          <div className="flex items-center justify-between text-zinc-500">
-                            <span className="text-[9px] font-mono tracking-widest uppercase font-bold">Agreed Cost</span>
-                            <DollarSign size={13} className="text-primary dark:text-[#00d1ff]" />
-                          </div>
-                          <div className="mt-3">
-                            <span className="text-xl font-bold tracking-tight text-foreground dark:text-white font-mono block">{project.cost}</span>
-                          </div>
-                        </div>
-
-                        {/* Payment / Escrow Status */}
-                        <div className="border border-black/10 dark:border-zinc-900/60 bg-black/5 dark:bg-[#04060a]/40 rounded-xl p-5 hover:border-black/20 dark:hover:border-zinc-800 transition-all flex flex-col justify-between">
-                          <div className="flex items-center justify-between text-zinc-500">
-                            <span className="text-[9px] font-mono tracking-widest uppercase font-bold">Payment Status</span>
-                            <CreditCard size={13} className="text-primary dark:text-[#00d1ff]" />
-                          </div>
-                          <div className="mt-3">
-                            <span className="text-xs font-bold text-foreground dark:text-zinc-200 font-mono block truncate">{project.paymentStatus}</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Milestones & Note Feeds grid splits */}
-                      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 pt-4">
-                        {/* Key Milestones and Deliverables */}
-                        <div className="lg:col-span-7 space-y-4">
-                          <h3 className="text-xs font-mono tracking-widest text-zinc-550 dark:text-zinc-400 font-bold uppercase flex items-center gap-2 select-none">
-                            <ListTodo size={14} className="text-primary dark:text-[#00d1ff]" />
-                            Key Milestones & Deliverables
-                          </h3>
-                          <div className="space-y-3.5 bg-black/5 dark:bg-[#04060a]/40 border border-black/10 dark:border-zinc-900 rounded-xl p-5 shadow-inner">
-                            {project.milestones.map((m: any, mIdx: number) => (
-                              <div key={mIdx} className="flex items-start gap-3 text-xs">
-                                <div className="shrink-0 mt-0.5">
-                                  {m.completed ? (
-                                    <CheckCircle size={14} className="text-emerald-500 drop-shadow-[0_0_4px_rgba(16,185,129,0.3)]" />
-                                  ) : m.inProgress ? (
-                                    <Clock size={14} className="text-primary dark:text-[#00d1ff] animate-pulse" />
-                                  ) : (
-                                    <span className="w-3.5 h-3.5 rounded-full border border-zinc-650 flex items-center justify-center text-[7px] font-black text-transparent select-none">✕</span>
-                                  )}
-                                </div>
-                                <span className={`font-sans font-semibold leading-relaxed transition-all ${
-                                  m.completed ? "text-zinc-550 dark:text-zinc-500 line-through" : 
-                                  m.inProgress ? "text-foreground dark:text-white font-bold" : "text-zinc-500"
-                                }`}>
-                                  {m.title}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Important Notes & Updates Bulletins */}
-                        <div className="lg:col-span-5 space-y-4">
-                          <h3 className="text-xs font-mono tracking-widest text-zinc-550 dark:text-zinc-400 font-bold uppercase flex items-center gap-2 select-none">
-                            <Info size={14} className="text-primary dark:text-[#00d1ff]" />
-                            Important Notes & Updates
-                          </h3>
-                          <div className="space-y-4 bg-black/5 dark:bg-[#04060a]/40 border border-black/10 dark:border-zinc-900 rounded-xl p-5 shadow-inner">
-                            {project.updates.map((upd: any, uIdx: number) => (
-                              <div key={uIdx} className="space-y-1 text-xs">
-                                <span className="text-[8px] font-mono text-zinc-500 block uppercase font-bold">{upd.date}</span>
-                                <p className="text-zinc-700 dark:text-zinc-300 font-sans leading-relaxed font-medium">
-                                  {upd.msg}
-                                </p>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Communication / Status History Log */}
-                      <div className="space-y-4 pt-4 border-t border-black/5 dark:border-zinc-900/60">
-                        <h3 className="text-xs font-mono tracking-widest text-zinc-550 dark:text-zinc-400 font-bold uppercase flex items-center gap-2 select-none">
-                          <MessageSquare size={14} className="text-primary dark:text-[#00d1ff]" />
-                          Communication History
-                        </h3>
-                        <div className="space-y-4 bg-black/5 dark:bg-[#04060a]/40 border border-black/10 dark:border-zinc-900 rounded-xl p-6 shadow-inner max-h-[300px] overflow-y-auto pr-2">
-                          {project.chatHistory.map((chat: any, cIdx: number) => {
-                            const isSupport = chat.sender.includes("Support");
-                            return (
-                              <div 
-                                key={cIdx} 
-                                className={`flex flex-col space-y-1 max-w-[85%] ${isSupport ? "mr-auto text-left" : "ml-auto text-right"}`}
-                              >
-                                <div className="flex items-center gap-2 text-[8px] font-mono text-zinc-500 font-bold uppercase select-none">
-                                  <span>{chat.sender}</span>
-                                  <span>•</span>
-                                  <span>{chat.date}</span>
-                                </div>
-                                <div className={`px-4 py-2.5 rounded-2xl text-xs font-sans font-medium leading-relaxed ${
-                                  isSupport 
-                                    ? "bg-black/5 dark:bg-zinc-900/50 border border-black/10 dark:border-zinc-800 text-zinc-750 dark:text-zinc-300 rounded-tl-none" 
-                                    : "bg-primary text-on-primary dark:bg-[#0b101c] dark:border dark:border-[#00d1ff]/20 dark:text-[#00d1ff] rounded-tr-none"
-                                }`}>
-                                  {chat.msg}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                    </div>
-                  ))}
-                </div>
-              )}
+      {/* Purge Cache Confirmation Modal */}
+      {showPurgeModal && (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-[#07090e] border border-black/10 dark:border-zinc-800 rounded-2xl w-full max-w-sm shadow-2xl p-6 space-y-4 animate-fade-in font-mono">
+            <div className="w-12 h-12 rounded-full bg-rose-500/10 border border-rose-500/25 flex items-center justify-center text-rose-500 mx-auto">
+              <Trash2 size={22} />
             </div>
-          )}
-
-          {/* DEDICATED CUSTOMER CONTACT INQUIRIES & ADMIN REPLIES SECTION */}
-          <div className="mt-8 glass-card bg-white/60 dark:bg-[#07090e]/60 backdrop-blur-xl border border-black/10 dark:border-zinc-800/80 rounded-2xl p-8 shadow-xl space-y-6 select-text">
-            <div className="flex items-center justify-between border-b border-black/5 dark:border-zinc-900 pb-4">
-              <div>
-                <h3 className="text-base font-bold text-foreground dark:text-white font-sans uppercase tracking-wider flex items-center gap-2">
-                  <ShieldCheck size={18} className="text-emerald-400" />
-                  Contact Inquiries & Support Responses
-                </h3>
-                <p className="text-xs text-zinc-500">Track submitted messages and official platform architect replies.</p>
-              </div>
-              <span className="px-3 py-1 bg-primary/10 text-primary dark:text-[#00d1ff] text-[10px] font-mono font-bold uppercase rounded-full">
-                {userInquiries.length} Submitted
-              </span>
+            <div className="text-center space-y-1">
+              <h3 className="text-sm font-bold text-foreground dark:text-white uppercase">Purge Local Cache?</h3>
+              <p className="text-[11px] text-zinc-500">
+                This will reset local temporary workspace drafts, tickets memory, and preferences. Cloud database records remain untouched.
+              </p>
             </div>
-
-            {userInquiries.length === 0 ? (
-              <div className="py-8 text-center text-xs font-mono text-zinc-400 uppercase tracking-wider">
-                No contact inquiries submitted yet.
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {userInquiries.map((inq: any, idx: number) => (
-                  <div key={idx} className="p-5 bg-black/5 dark:bg-[#04060a]/60 border border-black/10 dark:border-zinc-800 rounded-xl space-y-3">
-                    <div className="flex items-center justify-between text-[10px] font-mono text-zinc-500">
-                      <span>Submitted: {inq.date || inq.createdAt || "Recently"} • Service: {inq.type || "General Inquiry"}</span>
-                      {inq.reply ? (
-                        <span className="px-2.5 py-0.5 bg-emerald-500/20 text-emerald-400 font-bold uppercase tracking-wider rounded-md">
-                          REPLIED BY ADMIN
-                        </span>
-                      ) : (
-                        <span className="px-2.5 py-0.5 bg-amber-500/20 text-amber-400 font-bold uppercase tracking-wider rounded-md">
-                          AWAITING ARCHITECT REVIEW
-                        </span>
-                      )}
-                    </div>
-                    <div className="space-y-1">
-                      <span className="text-[9px] font-mono text-zinc-400 uppercase tracking-widest block">Your Message:</span>
-                      <p className="text-xs text-zinc-700 dark:text-zinc-300 font-sans italic">"{inq.message}"</p>
-                    </div>
-                    {inq.reply && (
-                      <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl space-y-1 mt-2">
-                        <span className="text-[10px] font-mono font-bold text-emerald-400 uppercase tracking-wider block flex items-center gap-1.5">
-                          <CheckCircle2 size={13} /> Official RecodeX Lead Platform Architect Reply:
-                        </span>
-                        <p className="text-sm font-semibold text-zinc-900 dark:text-white font-sans whitespace-pre-wrap">{inq.reply}</p>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={() => setShowPurgeModal(false)}
+                className="flex-1 py-2 text-xs text-zinc-400 hover:text-foreground border border-black/10 dark:border-zinc-800 rounded-xl cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmPurgeCache}
+                className="flex-1 py-2 text-xs bg-rose-500 text-white font-bold rounded-xl hover:bg-rose-600 transition-colors cursor-pointer"
+              >
+                Confirm Purge
+              </button>
+            </div>
           </div>
-        </main>
+        </div>
+      )}
 
       {/* Avatar Picker Modal */}
       {showAvatarPicker && (

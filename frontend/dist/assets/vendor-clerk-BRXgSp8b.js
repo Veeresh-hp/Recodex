@@ -1,4 +1,4 @@
-import{ab as l,aL as y,aI as Et,ah as Ut,aK as jt}from"./vendor-L1cQ5uaP.js";var Ot=class Ye extends Error{static kind="ClerkError";clerkError=!0;code;longMessage;docsUrl;cause;get name(){return this.constructor.name}constructor(n){super(new.target.formatMessage(new.target.kind,n.message,n.code,n.docsUrl),{cause:n.cause}),Object.setPrototypeOf(this,Ye.prototype),this.code=n.code,this.docsUrl=n.docsUrl,this.longMessage=n.longMessage,this.cause=n.cause}toString(){return`[${this.name}]
+import{ad as l,aM as y,aJ as Et,aj as Ut,aL as jt}from"./vendor-DTod5T8-.js";var Ot=class Ye extends Error{static kind="ClerkError";clerkError=!0;code;longMessage;docsUrl;cause;get name(){return this.constructor.name}constructor(n){super(new.target.formatMessage(new.target.kind,n.message,n.code,n.docsUrl),{cause:n.cause}),Object.setPrototypeOf(this,Ye.prototype),this.code=n.code,this.docsUrl=n.docsUrl,this.longMessage=n.longMessage,this.cause=n.cause}toString(){return`[${this.name}]
 Message:${this.message}`}static formatMessage(n,s,i,t){const r="Clerk:",o=new RegExp(r.replace(" ","\\s*"),"i");return s=s.replace(o,""),s=`${r} ${s.trim()}
 
 (code="${i}")
