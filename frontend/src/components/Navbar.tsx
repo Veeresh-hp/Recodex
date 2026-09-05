@@ -273,7 +273,7 @@ export default function Navbar() {
               >
                 <div className="w-full h-full rounded-full bg-white dark:bg-[#07090e] overflow-hidden flex items-center justify-center">
                   {navAvatar ? (
-                    <img src={navAvatar} alt="Profile" className="w-full h-full object-cover" />
+                    <img src={navAvatar} alt="" referrerPolicy="no-referrer" className="w-full h-full object-cover" />
                   ) : navInitials ? (
                     <span className="text-[10px] font-black text-foreground dark:text-white font-sans">{navInitials}</span>
                   ) : (
@@ -298,7 +298,7 @@ export default function Navbar() {
                     <div className="w-11 h-11 rounded-full bg-gradient-to-tr from-primary to-blue-500 p-[2px] shadow-sm shrink-0">
                       <div className="w-full h-full rounded-full bg-white dark:bg-[#07090e] overflow-hidden flex items-center justify-center">
                         {navAvatar ? (
-                          <img src={navAvatar} alt="Profile" className="w-full h-full object-cover" />
+                          <img src={navAvatar} alt="" referrerPolicy="no-referrer" className="w-full h-full object-cover" />
                         ) : (
                           <span className="text-xs font-black text-foreground dark:text-white">{navInitials || "U"}</span>
                         )}

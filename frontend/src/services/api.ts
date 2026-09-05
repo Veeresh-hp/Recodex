@@ -282,7 +282,7 @@ const REAL_ECOSYSTEM_USERS = [
     role: "admin",
     status: "Active",
     createdAt: "2026-07-11T16:02:39.730Z",
-    profileImage: "https://img.clerk.com/eyJ0eXBlIjoicHJveHkiLCJzcmMiOiJodHRwczovL2ltYWdlcy5jbGVyay5kZXYvb2F1dGhfZ29vZ2xlL2ltZ18zR01VZ1RUc2tqTTExY1FDa0ZaeHQ1SDVhTXoifQ"
+    profileImage: "https://api.dicebear.com/7.x/bottts/svg?seed=veereshhp2004&backgroundColor=0f172a"
   },
   {
     id: "user_3G8UdayKumarAs34Admin001",
@@ -291,7 +291,7 @@ const REAL_ECOSYSTEM_USERS = [
     role: "admin",
     status: "Active",
     createdAt: new Date().toISOString(),
-    profileImage: "https://img.clerk.com/eyJ0eXBlIjoiZGVmYXVsdCIsImluaXRpYWxzIjoiVUsifQ"
+    profileImage: "https://api.dicebear.com/7.x/bottts/svg?seed=udaykumaras34&backgroundColor=0f172a"
   },
   {
     id: "user_3G82d9FackVcHk09TD8V9uHKJEt",
@@ -300,7 +300,7 @@ const REAL_ECOSYSTEM_USERS = [
     role: "client",
     status: "Active",
     createdAt: "2026-07-11T15:58:52.253Z",
-    profileImage: "https://img.clerk.com/eyJ0eXBlIjoicHJveHkiLCJzcmMiOiJodHRwczovL2ltYWdlcy5jbGVyay5kZXYvb2F1dGhfZ29vZ2xlL2ltZ18zRzgyZDN3UllpRWpTc3dlV1FnQ2o2eEN4c2kifQ"
+    profileImage: "https://api.dicebear.com/7.x/bottts/svg?seed=veereshhp04&backgroundColor=0f172a"
   },
   {
     id: "user_3IKkzxTelZizaJk8JgKn4iGZXHi",
@@ -309,7 +309,7 @@ const REAL_ECOSYSTEM_USERS = [
     role: "client",
     status: "Active",
     createdAt: "2026-08-24T10:39:11.708Z",
-    profileImage: "https://img.clerk.com/eyJ0eXBlIjoicHJveHkiLCJzcmMiOiJodHRwczovL2ltYWdlcy5jbGVyay5kZXYvb2F1dGhfZ29vZ2xlL2ltZ18zSUtrenlqbEdmcUhzUWdrWklCa1hibHZnWlcifQ"
+    profileImage: "https://api.dicebear.com/7.x/bottts/svg?seed=veerthinks&backgroundColor=0f172a"
   },
   {
     id: "user_3IKE3zF8zNPvnmxWhNQqnscyFB3",
@@ -318,7 +318,7 @@ const REAL_ECOSYSTEM_USERS = [
     role: "client",
     status: "Active",
     createdAt: "2026-08-24T10:39:13.475Z",
-    profileImage: "https://img.clerk.com/eyJ0eXBlIjoiZGVmYXVsdCIsImlpZCI6Imluc18zRzd4VVE2ZmV1aE5RWTRFMlowQ1lma2hDMHMiLCJyaWQiOiJ1c2VyXzNJS0UzekY4ek5Qdm5teFdoTlFxbnNjeUZCMyIsImluaXRpYWxzIjoiVkoifQ"
+    profileImage: "https://api.dicebear.com/7.x/bottts/svg?seed=vaibhavjoshi&backgroundColor=0f172a"
   },
   {
     id: "user_3IKF89Diganth0719Gowda001",
@@ -327,7 +327,7 @@ const REAL_ECOSYSTEM_USERS = [
     role: "client",
     status: "Active",
     createdAt: "2026-08-27T11:20:00.000Z",
-    profileImage: "https://img.clerk.com/eyJ0eXBlIjoiZGVmYXVsdCIsImluaXRpYWxzIjoiREcifQ"
+    profileImage: "https://api.dicebear.com/7.x/bottts/svg?seed=diganthgowda&backgroundColor=0f172a"
   },
   {
     id: "user_3IKF90SyedRehan002",
@@ -336,7 +336,7 @@ const REAL_ECOSYSTEM_USERS = [
     role: "client",
     status: "Active",
     createdAt: "2026-08-27T12:15:00.000Z",
-    profileImage: "https://img.clerk.com/eyJ0eXBlIjoiZGVmYXVsdCIsImluaXRpYWxzIjoiU1IifQ"
+    profileImage: "https://api.dicebear.com/7.x/bottts/svg?seed=syedrehan&backgroundColor=0f172a"
   },
   {
     id: "user_3IKF91DavanKS003",
@@ -345,7 +345,7 @@ const REAL_ECOSYSTEM_USERS = [
     role: "client",
     status: "Active",
     createdAt: "2026-08-27T13:40:00.000Z",
-    profileImage: "https://img.clerk.com/eyJ0eXBlIjoiZGVmYXVsdCIsImluaXRpYWxzIjoiREsifQ"
+    profileImage: "https://api.dicebear.com/7.x/bottts/svg?seed=davanks&backgroundColor=0f172a"
   }
 ];
 

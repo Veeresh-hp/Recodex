@@ -129,6 +129,66 @@ const isNewUser = (createdAtStr?: string, email?: string): boolean => {
   return diffMs >= 0 && diffMs <= 24 * 60 * 60 * 1000;
 };
 
+const UserAvatar = ({
+  src,
+  name,
+  className = "w-10 h-10 rounded-xl",
+  textClassName = "text-sm font-extrabold",
+  email = ""
+}: {
+  src?: string | null;
+  name?: string;
+  className?: string;
+  textClassName?: string;
+  email?: string;
+}) => {
+  const [hasError, setHasError] = useState(false);
+
+  // Derive initials (e.g. "Mr._.Ratha._" -> "MR", "Davan KS" -> "DK", "Syed Rehan" -> "SR", "Diganth Gowda" -> "DG")
+  const cleanName = (name || email || "User").replace(/[^a-zA-Z0-9\s]/g, " ").trim();
+  const parts = cleanName.split(/\s+/).filter(Boolean);
+  const initials = (
+    parts.length >= 2
+      ? (parts[0][0] + parts[1][0])
+      : (cleanName.slice(0, 2) || "U")
+  ).toUpperCase();
+
+  // Deterministic vibrant gradient palette based on string char codes
+  const palettes = [
+    "from-cyan-500 to-blue-600",
+    "from-purple-500 to-indigo-600",
+    "from-emerald-500 to-teal-600",
+    "from-amber-500 to-orange-600",
+    "from-rose-500 to-pink-600",
+    "from-blue-600 to-violet-600",
+  ];
+  const charSum = (name || email || "U").split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
+  const gradient = palettes[charSum % palettes.length];
+
+  const isValidSrc = src && typeof src === "string" && src.trim().length > 5 && !src.includes("undefined") && !src.includes("null");
+
+  if (isValidSrc && !hasError) {
+    return (
+      <div className={`overflow-hidden border border-black/10 dark:border-white/10 flex-shrink-0 flex items-center justify-center bg-zinc-900 ${className}`}>
+        <img
+          src={src}
+          alt=""
+          referrerPolicy="no-referrer"
+          crossOrigin="anonymous"
+          onError={() => setHasError(true)}
+          className="w-full h-full object-cover"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className={`overflow-hidden border border-black/10 dark:border-white/10 flex-shrink-0 flex items-center justify-center bg-gradient-to-tr ${gradient} text-white shadow-inner ${className}`}>
+      <span className={`font-mono font-black select-none ${textClassName}`}>{initials}</span>
+    </div>
+  );
+};
+
 export default function Dashboard() {
   const { isLoaded, userId, getToken } = useAuth();
   const { user } = useUser();
@@ -1632,13 +1692,13 @@ export default function Dashboard() {
                           <tr key={userItem.id} className="hover:bg-black/5 dark:hover:bg-white/5 transition-colors group">
                             <td className="px-6 py-4">
                               <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl overflow-hidden bg-primary/10 border border-primary/20 flex-shrink-0 flex items-center justify-center">
-                                  {userItem.profileImage ? (
-                                    <img alt={userItem.name} className="w-full h-full object-cover" src={userItem.profileImage} />
-                                  ) : (
-                                    <span className="font-extrabold text-sm text-primary">{userItem.name[0]}</span>
-                                  )}
-                                </div>
+                                <UserAvatar
+                                  src={userItem.profileImage}
+                                  name={userItem.name}
+                                  email={userItem.email}
+                                  className="w-10 h-10 rounded-xl"
+                                  textClassName="text-sm"
+                                />
                                 <div>
                                   <p className="text-xs font-bold text-zinc-900 dark:text-white">{userItem.name}</p>
                                   <p className="text-xs font-mono text-zinc-500 dark:text-zinc-400">{userItem.email}</p>
@@ -1944,13 +2004,13 @@ export default function Dashboard() {
                         <tr key={u.id} className="hover:bg-zinc-50/60 dark:hover:bg-zinc-900/30 transition-colors group h-14">
                           <td className="px-6 py-3.5">
                             <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-full overflow-hidden bg-primary/10 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex-shrink-0 flex items-center justify-center font-bold text-xs text-primary dark:text-[#00d1ff]">
-                                {u.profileImage ? (
-                                  <img alt={u.name} className="w-full h-full object-cover" src={u.profileImage} />
-                                ) : (
-                                  <span>{u.name[0]}</span>
-                                )}
-                              </div>
+                              <UserAvatar
+                                src={u.profileImage}
+                                name={u.name}
+                                email={u.email}
+                                className="w-8 h-8 rounded-full"
+                                textClassName="text-xs"
+                              />
                               <span 
                                 onClick={() => setSelectedUserDetails({ ...u, role: isUserAdmin ? "admin" : u.role })} 
                                 className="text-zinc-900 dark:text-white font-bold cursor-pointer hover:text-primary dark:hover:text-[#00d1ff] transition-colors text-xs inline-flex items-center gap-1.5"
@@ -3361,13 +3421,13 @@ export default function Dashboard() {
               </button>
             </div>
 
-            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-primary/10 border border-primary/20 overflow-hidden ml-0.5 flex items-center justify-center cursor-pointer hover:border-primary/50 transition-colors shrink-0">
-              {user?.imageUrl ? (
-                <img alt="Admin User" className="w-full h-full object-cover" src={user.imageUrl} />
-              ) : (
-                <span className="font-extrabold text-xs text-primary">VH</span>
-              )}
-            </div>
+            <UserAvatar
+              src={user?.imageUrl}
+              name={adminName || user?.fullName || "Veeresh H P"}
+              email={adminEmail || user?.primaryEmailAddress?.emailAddress || ""}
+              className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl ml-0.5 cursor-pointer hover:border-primary/50 transition-colors shrink-0"
+              textClassName="text-xs"
+            />
           </div>
         </header>
 
