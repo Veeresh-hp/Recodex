@@ -1086,12 +1086,14 @@ export default function Dashboard() {
     setToast({ message: `Certificate [${officialId}] approved for ${approvedCert.studentName} successfully.`, type: "success" });
   };
 
-  const handleUpdateCertField = (
+  const handleUpdateCertField = async (
     certId: string,
     userItem: any,
     field: "projectName" | "issueDate" | "status",
     value: string
   ) => {
+    let targetCertToSave: Certificate | null = null;
+
     setCertificates((prev) => {
       const targetEmail = userItem?.email;
       const targetId = userItem?.id;
@@ -1099,20 +1101,22 @@ export default function Dashboard() {
       const existingIndex = prev.findIndex(
         (c) =>
           (certId !== "--" && c.id === certId) ||
-          (targetEmail && c.userEmail && c.userEmail.toLowerCase() === targetEmail.toLowerCase()) ||
+          (targetEmail && c.userEmail && c.userEmail.toLowerCase().trim() === targetEmail.toLowerCase().trim()) ||
           (targetId && c.userId === targetId)
       );
 
       if (existingIndex >= 0) {
         const updated = [...prev];
-        updated[existingIndex] = {
+        const updatedCert = {
           ...updated[existingIndex],
           [field]: value,
         };
+        updated[existingIndex] = updatedCert;
+        targetCertToSave = updatedCert;
         return updated;
       } else {
         const newCert: Certificate = {
-          id: `CERT-${Math.floor(1000 + Math.random() * 9000)}`,
+          id: certId !== "--" ? certId : `CERT-${Math.floor(1000 + Math.random() * 9000)}`,
           userId: userItem?.id,
           userEmail: userItem?.email,
           studentName: userItem?.name || "Student Developer",
@@ -1120,9 +1124,18 @@ export default function Dashboard() {
           issueDate: field === "issueDate" ? value : new Date().toISOString().split("T")[0],
           status: field === "status" ? (value as any) : "Approved",
         };
+        targetCertToSave = newCert;
         return [newCert, ...prev];
       }
     });
+
+    if (targetCertToSave) {
+      try {
+        await saveCertificateApi(targetCertToSave);
+      } catch (e) {
+        console.warn("Auto-save certificate error:", e);
+      }
+    }
   };
 
   const handleCertFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -2796,14 +2809,14 @@ export default function Dashboard() {
 
         // 1. Add all certificates in certificates state
         certificates.forEach((c) => {
-          const key = (c.userEmail || c.studentName || c.id).toLowerCase();
-          certRowsMap.set(key, c);
+          if (c.userEmail) certRowsMap.set(c.userEmail.toLowerCase().trim(), c);
+          if (c.userId) certRowsMap.set(c.userId, c);
         });
 
         // 2. Map all real users so every registered user appears automatically
         const combinedCertRows = activeUsersList.map((userItem) => {
-          const key = (userItem.email || userItem.name).toLowerCase();
-          const existingCert = certRowsMap.get(key) || certificates.find(c => c.userId === userItem.id);
+          const userEmailClean = (userItem.email || "").toLowerCase().trim();
+          const existingCert = (userEmailClean ? certRowsMap.get(userEmailClean) : null) || certRowsMap.get(userItem.id) || certificates.find(c => c.userId === userItem.id || (userEmailClean && (c.userEmail || "").toLowerCase().trim() === userEmailClean));
 
           if (existingCert) {
             return {
