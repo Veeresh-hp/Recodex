@@ -330,9 +330,6 @@ export default function Profile() {
         const allCerts: Certificate[] = await getCertificatesApi();
         if (allCerts && profile) {
           const userEmailClean = (profile.email || "").toLowerCase().trim();
-          const userNameClean = (profile.name || "").toLowerCase().trim();
-          const userFirstName = userNameClean.split(" ")[0].replace(/[^a-z]/g, "");
-          const userHandle = userEmailClean.split("@")[0].replace(/[^a-z]/g, "");
 
           const cleanedCerts = allCerts.filter(
             (c) =>
@@ -340,33 +337,12 @@ export default function Profile() {
               !["cert-9402", "cert-1842", "cert-0691"].includes((c.id || "").toLowerCase().trim())
           );
 
+          // STRICT USER MATCH: Certificates must belong strictly to this user's email or ID
           const filtered = cleanedCerts.filter((c) => {
             const certEmail = (c.userEmail || "").toLowerCase().trim();
-            const certName = (c.studentName || "").toLowerCase().trim();
-            const certHandle = certEmail.split("@")[0].replace(/[^a-z]/g, "");
-
-            // 1. Handle match ignoring domain typos (e.g. gmil.com vs gmail.com) and numeric suffixes (04 vs 2004)
-            const isHandleMatch = Boolean(certHandle && userHandle && (
-              certHandle === userHandle || 
-              certHandle.includes(userHandle) || 
-              userHandle.includes(certHandle)
-            ));
-
-            // 2. Email match
-            const isEmailMatch = Boolean(certEmail && userEmailClean && (
-              certEmail === userEmailClean || isHandleMatch
-            ));
-
-            // 3. Name match (full name or first name)
-            const isNameMatch = Boolean(certName && (
-              (userNameClean && (certName === userNameClean || userNameClean.includes(certName) || certName.includes(userNameClean))) ||
-              (userFirstName && userFirstName.length >= 3 && certName.includes(userFirstName))
-            ));
-
-            // 4. User ID match
+            const isEmailMatch = Boolean(certEmail && userEmailClean && certEmail === userEmailClean);
             const isIdMatch = Boolean(c.userId && profile.id && c.userId === profile.id);
-
-            return isEmailMatch || isNameMatch || isIdMatch;
+            return isEmailMatch || isIdMatch;
           });
 
           setUserCertificates(filtered);

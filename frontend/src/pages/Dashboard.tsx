@@ -15,7 +15,7 @@ import {
   getProjects, getUsers, updateUser, deleteUser, 
   updateProject, deleteProject, getInquiries, 
   deleteInquiry, replyToInquiry, getUserProfile,
-  getCertificatesApi, saveCertificateApi, deleteCertificateApi,
+  getCertificatesApi, saveCertificateApi, deleteCertificateApi, approveCertificateApi,
   getPromotedAdminsApi, getAuditLogsApi, logAdminActivityApi,
   AuditLogEntry
 } from "../services/api";
@@ -1008,9 +1008,82 @@ export default function Dashboard() {
     setToast({ message: `Report marked as ${nextStatus}.`, type: "success" });
   };
 
-  const handleModifyCertStatus = (id: string, nextStatus: "Approved" | "Pending" | "Revoked" | "Not Issued") => {
-    setCertificates(certificates.map((cert) => cert.id === id ? { ...cert, status: nextStatus } : cert));
+  const handleModifyCertStatus = async (id: string, nextStatus: "Approved" | "Pending" | "Revoked" | "Not Issued") => {
+    const certTarget = certificates.find((c) => c.id === id);
+    if (!certTarget) return;
+
+    const updatedCert: Certificate = { ...certTarget, status: nextStatus };
+    setCertificates(certificates.map((cert) => cert.id === id ? updatedCert : cert));
+
+    try {
+      if (nextStatus === "Approved") {
+        await approveCertificateApi(id, updatedCert);
+      } else {
+        await saveCertificateApi(updatedCert);
+      }
+    } catch (e) {
+      console.warn("Status update API error:", e);
+    }
+
+    logAdminActivityApi({
+      adminName: adminName || user?.fullName || (adminEmail.includes("uday") ? "Uday Kumar" : "Admin"),
+      adminEmail: adminEmail || user?.primaryEmailAddress?.emailAddress || "",
+      action: nextStatus === "Approved" ? "APPROVED CERTIFICATE CREDENTIAL" : "REVOKED CERTIFICATE CREDENTIAL",
+      target: `${certTarget.studentName} (${certTarget.userEmail})`,
+      details: `Certificate [${id}] status changed to "${nextStatus}"`
+    });
+    fetchAuditLogs();
     setToast({ message: `Certificate status updated to ${nextStatus}.`, type: "success" });
+  };
+
+  const handleApproveCertificateRequest = async (certItem: Certificate) => {
+    const certYear = new Date().getFullYear();
+    const officialId = certItem.id.startsWith("RCX-")
+      ? certItem.id
+      : `RCX-${certYear}-${Math.floor(100000 + Math.random() * 900000)}`;
+
+    const approvedCert: Certificate = {
+      ...certItem,
+      id: officialId,
+      status: "Approved",
+      issueDate: new Date().toISOString().split("T")[0],
+    };
+
+    try {
+      await approveCertificateApi(certItem.id, approvedCert);
+    } catch (e) {
+      console.warn("Approve API fallback:", e);
+    }
+
+    setCertificates((prev) =>
+      prev.map((c) => (c.id === certItem.id ? approvedCert : c))
+    );
+
+    // Create & dispatch notification for target user
+    try {
+      const annListRaw = localStorage.getItem("recodex_global_announcements");
+      const annList: any[] = annListRaw ? JSON.parse(annListRaw) : [];
+      const newAnn = {
+        id: `ann-cert-${officialId}-${Date.now()}`,
+        title: `🏆 Certificate Approved: ${approvedCert.projectName}`,
+        message: `Official project completion certificate [${officialId}] has been verified and issued for ${approvedCert.studentName} (${approvedCert.userEmail}).`,
+        type: "New Feature",
+        date: new Date().toISOString(),
+      };
+      annList.unshift(newAnn);
+      localStorage.setItem("recodex_global_announcements", JSON.stringify(annList));
+      window.dispatchEvent(new Event("recodex-announcements-update"));
+    } catch (e) {}
+
+    logAdminActivityApi({
+      adminName: adminName || user?.fullName || (adminEmail.includes("uday") ? "Uday Kumar" : "Admin"),
+      adminEmail: adminEmail || user?.primaryEmailAddress?.emailAddress || "",
+      action: "APPROVED CERTIFICATE REQUEST",
+      target: `${approvedCert.studentName} (${approvedCert.userEmail})`,
+      details: `Approved certificate request [${officialId}] for "${approvedCert.projectName}"`
+    });
+    fetchAuditLogs();
+    setToast({ message: `Certificate [${officialId}] approved for ${approvedCert.studentName} successfully.`, type: "success" });
   };
 
   const handleUpdateCertField = (
@@ -2902,6 +2975,17 @@ export default function Dashboard() {
                           <td className="px-3 py-2 text-right">
                             <div className="flex justify-end items-center gap-1 select-none">
 
+                              {/* Action 0: One-click Approve for Pending Certificate Requests */}
+                              {cert && cert.status === "Pending" && (
+                                <button
+                                  title="Approve & Issue Official Certificate"
+                                  onClick={() => handleApproveCertificateRequest(cert)}
+                                  className="p-1.5 text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 rounded-lg transition-all cursor-pointer shadow-sm"
+                                >
+                                  <CheckCircle2 size={15} />
+                                </button>
+                              )}
+
                               {/* Action 1: Upload / Edit Certificate File */}
                               <button
                                 title={cert ? "Upload / Replace Certificate File" : "Issue / Upload Certificate for User"}
@@ -2942,7 +3026,7 @@ export default function Dashboard() {
                               )}
 
                               {/* Action 4: Revoke / Toggle Certificate */}
-                              {cert && (
+                              {cert && cert.status !== "Pending" && (
                                 <button
                                   title={cert.status === "Revoked" ? "Approve Certificate" : "Revoke Certificate"}
                                   onClick={() => handleModifyCertStatus(cert.id, cert.status === "Revoked" ? "Approved" : "Revoked")}

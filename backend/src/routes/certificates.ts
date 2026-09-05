@@ -688,19 +688,135 @@ router.post("/admin/manual-upload", async (req: Request, res: Response) => {
   }
 });
 
-// --- LEGACY ENDPOINTS PRESERVED FOR BACKWARD COMPATIBILITY ---
-
-// GET /api/certificates (Legacy)
-router.get("/", (_req: Request, res: Response) => {
+// POST /api/certificates/request (User requests a certificate)
+router.post("/request", async (req: Request, res: Response) => {
   try {
-    const certs = readCertificatesFile();
+    const { studentName, userEmail, userId, projectName, description, notes } = req.body;
+    if (!projectName || (!userEmail && !userId)) {
+      return res.status(400).json({ error: "Project name and user email/ID are required." });
+    }
+
+    const emailClean = (userEmail || "").toLowerCase().trim();
+    const reqId = req.body.id || `CERT-REQ-${Math.floor(100000 + Math.random() * 900000)}`;
+    const randomHex = Math.random().toString(36).substring(2, 8).toUpperCase();
+
+    const requestRecord = {
+      id: reqId,
+      certificateId: reqId,
+      userId: userId || undefined,
+      userEmail: emailClean,
+      studentName: studentName || "RecodeX Developer",
+      recipientName: studentName || "RecodeX Developer",
+      projectName: projectName.trim(),
+      projectTitle: projectName.trim(),
+      category: req.body.category || "Software Engineering",
+      issueDate: new Date().toISOString().split("T")[0],
+      completionDate: new Date().toISOString().split("T")[0],
+      status: "Pending",
+      description: description || notes || "Submitted for peer audit and official certification issue.",
+      credentialId: `RCX-PEND-${randomHex}`,
+      verificationHash: "0xPENDING_AUDIT_VERIFICATION_HASH",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    let certs = readCertificatesFile();
+    // Replace if existing pending request for same user & project, otherwise unshift
+    const existingIdx = certs.findIndex(
+      (c: any) => c.id === reqId || (c.userEmail === emailClean && c.projectName === projectName.trim() && c.status === "Pending")
+    );
+    if (existingIdx >= 0) {
+      certs[existingIdx] = { ...certs[existingIdx], ...requestRecord };
+    } else {
+      certs.unshift(requestRecord);
+    }
+    writeCertificatesFile(certs);
+
+    return res.status(201).json({
+      message: "Certificate request submitted successfully.",
+      certificate: requestRecord,
+    });
+  } catch (err: any) {
+    console.error("Error submitting certificate request:", err);
+    return res.status(500).json({ error: err.message || "Failed to submit certificate request" });
+  }
+});
+
+// PUT /api/certificates/:id/approve (Admin approves/issues a certificate)
+router.put("/:id/approve", async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { projectName, issueDate, grade, score, fileData, fileName, fileType, description } = req.body;
+    const idClean = id.trim();
+
+    let certs = readCertificatesFile();
+    const existingIdx = certs.findIndex(
+      (c: any) => c.id === idClean || c.certificateId === idClean
+    );
+
+    if (existingIdx === -1) {
+      return res.status(404).json({ error: "Certificate request not found." });
+    }
+
+    const cert = certs[existingIdx];
+    const certYear = new Date().getFullYear();
+    const officialCertId = cert.id.startsWith("RCX-")
+      ? cert.id
+      : `RCX-${certYear}-${Math.floor(100000 + Math.random() * 900000)}`;
+
+    const approvedRecord = {
+      ...cert,
+      id: officialCertId,
+      certificateId: officialCertId,
+      status: "Approved",
+      projectName: projectName || cert.projectName,
+      projectTitle: projectName || cert.projectTitle || cert.projectName,
+      issueDate: issueDate || new Date().toISOString().split("T")[0],
+      completionDate: issueDate || cert.completionDate || new Date().toISOString().split("T")[0],
+      grade: grade || cert.grade || "A+",
+      finalScore: score ? Number(score) : (cert.finalScore || 100),
+      fileData: fileData || cert.fileData,
+      fileName: fileName || cert.fileName,
+      fileType: fileType || cert.fileType,
+      description: description || cert.description || "Official verification of project completion and cryptographic identity signature validation.",
+      credentialId: officialCertId,
+      verificationHash: `0x${Array.from({ length: 40 }, () => Math.floor(Math.random() * 16).toString(16)).join("")}`,
+      updatedAt: new Date().toISOString(),
+    };
+
+    certs[existingIdx] = approvedRecord;
+    writeCertificatesFile(certs);
+
+    return res.json({
+      message: "Certificate approved and issued successfully.",
+      certificate: approvedRecord,
+    });
+  } catch (err: any) {
+    console.error("Error approving certificate:", err);
+    return res.status(500).json({ error: err.message || "Failed to approve certificate" });
+  }
+});
+
+// GET /api/certificates (Legacy & Multi-user querying)
+router.get("/", (req: Request, res: Response) => {
+  try {
+    const { email, userId } = req.query;
+    let certs = readCertificatesFile();
+
+    if (email) {
+      const emailClean = String(email).toLowerCase().trim();
+      certs = certs.filter((c: any) => (c.userEmail || "").toLowerCase().trim() === emailClean);
+    } else if (userId) {
+      certs = certs.filter((c: any) => c.userId === String(userId));
+    }
+
     res.json(certs);
   } catch (err: any) {
     res.status(500).json({ error: err.message || "Failed to fetch certificates" });
   }
 });
 
-// POST /api/certificates (Legacy)
+// POST /api/certificates (Legacy & Direct Save)
 router.post("/", (req: Request, res: Response) => {
   try {
     const cert = req.body;
@@ -723,7 +839,7 @@ router.post("/", (req: Request, res: Response) => {
 
     let certs = readCertificatesFile();
     const existingIndex = certs.findIndex(
-      (c: any) => c.id === certId || (cert.userEmail && c.userEmail === cert.userEmail)
+      (c: any) => c.id === certId || (cert.userEmail && c.userEmail === cert.userEmail && c.projectName === updatedCert.projectName)
     );
 
     if (existingIndex >= 0) {

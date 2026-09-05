@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { useAuth, useUser } from "@clerk/clerk-react";
-import { getCertificatesApi } from "../services/api";
+import { getCertificatesApi, requestCertificateApi } from "../services/api";
 import {
   Award, Shield, CheckCircle2, Download, Eye, XCircle, Printer,
   FileText, Sparkles, ArrowLeft, Search, Filter, ShieldCheck,
@@ -34,6 +34,7 @@ export default function Certificates() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<"ALL" | "Approved" | "Pending">("ALL");
   const [requestModalOpen, setRequestModalOpen] = useState(false);
+  const [submittingRequest, setSubmittingRequest] = useState(false);
   const [requestSuccess, setRequestSuccess] = useState(false);
   const [requestProject, setRequestProject] = useState("");
   const [requestNotes, setRequestNotes] = useState("");
@@ -43,48 +44,60 @@ export default function Certificates() {
   const userEmail = (user?.primaryEmailAddress?.emailAddress || "").toLowerCase().trim();
   const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(" ") || user?.fullName || user?.username || "RecodeX Engineer";
 
+  const fetchCerts = async () => {
+    setLoading(true);
+    try {
+      const serverCerts: any[] = await getCertificatesApi(userEmail, userId || undefined);
+      const localRaw = localStorage.getItem("recodex_global_certificates");
+      const localCerts: any[] = localRaw ? JSON.parse(localRaw) : [];
+
+      // Combine and de-duplicate by ID
+      const combinedMap = new Map<string, any>();
+      [...serverCerts, ...localCerts].forEach((c) => {
+        if (c && c.id) combinedMap.set(c.id, c);
+      });
+
+      const allList = Array.from(combinedMap.values());
+
+      // STRICT USER PRIVACY FILTER:
+      // Only display certificates assigned or requested by THIS authenticated user.
+      const userCerts = allList.filter((c: any) => {
+        if (!c) return false;
+        // Filter out any dummy sample certificates
+        if (["john doe", "alice vance", "sarah connor"].includes((c.studentName || "").toLowerCase().trim())) return false;
+        if (["cert-9402", "cert-1842", "cert-0691"].includes((c.id || "").toLowerCase().trim())) return false;
+
+        const certEmail = (c.userEmail || "").toLowerCase().trim();
+        const certUserId = c.userId || "";
+        const certName = (c.studentName || "").toLowerCase().trim();
+
+        const matchEmail = Boolean(userEmail && certEmail && certEmail === userEmail);
+        const matchUserId = Boolean(userId && certUserId && certUserId === userId);
+        const matchName = Boolean(fullName && certName && certName === fullName.toLowerCase().trim() && certEmail === userEmail);
+
+        return matchEmail || matchUserId || matchName;
+      });
+
+      setCertificates(userCerts);
+    } catch (err) {
+      console.error("Failed to load certificates:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchCerts = async () => {
-      setLoading(true);
-      try {
-        const serverCerts: any[] = await getCertificatesApi();
-        const localRaw = localStorage.getItem("recodex_synced_certificates");
-        const localCerts: any[] = localRaw ? JSON.parse(localRaw) : [];
-
-        // Combine and de-duplicate by ID
-        const combinedMap = new Map<string, any>();
-        [...serverCerts, ...localCerts].forEach((c) => {
-          if (c && c.id) combinedMap.set(c.id, c);
-        });
-
-        const allList = Array.from(combinedMap.values());
-
-        // Filter certificates matching current user
-        const userCerts = allList.filter((c: any) => {
-          if (!c) return false;
-          // Filter out any previous dummy test certificate IDs
-          if (c.id && c.id.includes("7729")) return false;
-          const certEmail = (c.userEmail || "").toLowerCase().trim();
-          const certId = c.userId || "";
-          const certName = (c.studentName || "").toLowerCase().trim();
-          return (
-            (userEmail && certEmail === userEmail) ||
-            (userId && certId === userId) ||
-            (fullName && certName === fullName.toLowerCase())
-          );
-        });
-
-        setCertificates(userCerts);
-      } catch (err) {
-        console.error("Failed to load certificates:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     if (isLoaded) {
       fetchCerts();
     }
+
+    window.addEventListener("recodex-certificates-update", fetchCerts);
+    window.addEventListener("storage", fetchCerts);
+
+    return () => {
+      window.removeEventListener("recodex-certificates-update", fetchCerts);
+      window.removeEventListener("storage", fetchCerts);
+    };
   }, [isLoaded, userId, userEmail, fullName]);
 
   const handleCopyLink = (cert: Certificate) => {
@@ -98,33 +111,39 @@ export default function Certificates() {
     window.print();
   };
 
-  const handleRequestSubmit = (e: React.FormEvent) => {
+  const handleRequestSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!requestProject.trim()) return;
+    if (!requestProject.trim() || submittingRequest) return;
 
-    const newRequest: Certificate = {
-      id: `CERT-REQ-${Date.now().toString().slice(-6)}`,
-      userEmail: userEmail,
-      studentName: fullName,
-      projectName: requestProject,
-      issueDate: new Date().toISOString().split("T")[0],
-      status: "Pending",
-      description: requestNotes || "Submitted for peer audit and official certification issue.",
-      credentialId: `RCX-PEND-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
-      verificationHash: "0xPENDING_AUDIT_VERIFICATION_HASH"
-    };
+    setSubmittingRequest(true);
+    try {
+      const created = await requestCertificateApi({
+        studentName: fullName,
+        userEmail: userEmail,
+        userId: userId || undefined,
+        projectName: requestProject.trim(),
+        description: requestNotes.trim() || "Submitted for peer audit and official certification issue.",
+        notes: requestNotes.trim(),
+      });
 
-    const updated = [newRequest, ...certificates];
-    setCertificates(updated);
-    localStorage.setItem("recodex_synced_certificates", JSON.stringify(updated));
+      setCertificates((prev) => {
+        const filtered = prev.filter((c) => c.id !== created.id);
+        return [created, ...filtered];
+      });
 
-    setRequestSuccess(true);
-    setTimeout(() => {
-      setRequestSuccess(false);
-      setRequestModalOpen(false);
-      setRequestProject("");
-      setRequestNotes("");
-    }, 2000);
+      setRequestSuccess(true);
+      setTimeout(() => {
+        setRequestSuccess(false);
+        setRequestModalOpen(false);
+        setRequestProject("");
+        setRequestNotes("");
+      }, 2000);
+    } catch (err) {
+      console.error("Failed to submit certificate request:", err);
+      alert("Failed to submit certificate request. Please try again.");
+    } finally {
+      setSubmittingRequest(false);
+    }
   };
 
   const filteredCerts = certificates.filter((c) => {

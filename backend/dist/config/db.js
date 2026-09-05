@@ -21,7 +21,7 @@ const MOCK_PROJECTS = [
         category: "Web Systems",
         tags: ["VITE", "REACT", "TYPESCRIPT", "TAILWIND", "EXPRESS", "PRISMA"],
         devsCount: 1,
-        stars: 87,
+        stars: 38,
         forks: 14,
         files: JSON.stringify({
             "src/server.ts": "import express from 'express';\nconst app = express();\napp.listen(5000, () => console.log('Mock Server Ready'));",
