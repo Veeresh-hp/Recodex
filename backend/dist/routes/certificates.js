@@ -614,6 +614,30 @@ router.post("/admin/manual-upload", async (req, res) => {
         return res.status(500).json({ error: err.message || "Failed to upload certificate" });
     }
 });
+const formatPrismaCertificate = (c) => ({
+    id: c.certificateId || c.id,
+    certificateId: c.certificateId || c.id,
+    userId: c.userId,
+    userEmail: (c.recipientEmail || "").toLowerCase().trim(),
+    studentName: c.recipientName || "Developer",
+    recipientName: c.recipientName || "Developer",
+    projectName: c.projectTitle || "Software Solution Project",
+    projectTitle: c.projectTitle || "Software Solution Project",
+    category: c.category || "Software Engineering",
+    issueDate: c.issueDate ? new Date(c.issueDate).toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
+    completionDate: c.completionDate ? new Date(c.completionDate).toISOString().split("T")[0] : undefined,
+    status: c.status === "ISSUED" ? "Approved" : (c.status === "PENDING" ? "Pending" : (c.status === "REVOKED" ? "Revoked" : c.status)),
+    finalScore: c.finalScore || 100,
+    grade: c.grade || "A+",
+    fileData: c.pdfUrl || c.metadata?.fileData,
+    fileName: c.metadata?.fileName,
+    fileType: c.metadata?.fileType,
+    description: c.metadata?.description || "Official verification of project completion and cryptographic identity signature validation.",
+    credentialId: c.certificateId || c.id,
+    verificationHash: c.metadata?.verificationHash || `0x${Array.from({ length: 40 }, () => Math.floor(Math.random() * 16).toString(16)).join("")}`,
+    createdAt: c.createdAt ? new Date(c.createdAt).toISOString() : new Date().toISOString(),
+    updatedAt: c.updatedAt ? new Date(c.updatedAt).toISOString() : new Date().toISOString(),
+});
 // POST /api/certificates/request (User requests a certificate)
 router.post("/request", async (req, res) => {
     try {
@@ -624,15 +648,17 @@ router.post("/request", async (req, res) => {
         const emailClean = (userEmail || "").toLowerCase().trim();
         const reqId = req.body.id || `CERT-REQ-${Math.floor(100000 + Math.random() * 900000)}`;
         const randomHex = Math.random().toString(36).substring(2, 8).toUpperCase();
+        const finalProjectName = projectName.trim();
+        const finalStudentName = studentName || "RecodeX Developer";
         const requestRecord = {
             id: reqId,
             certificateId: reqId,
             userId: userId || undefined,
             userEmail: emailClean,
-            studentName: studentName || "RecodeX Developer",
-            recipientName: studentName || "RecodeX Developer",
-            projectName: projectName.trim(),
-            projectTitle: projectName.trim(),
+            studentName: finalStudentName,
+            recipientName: finalStudentName,
+            projectName: finalProjectName,
+            projectTitle: finalProjectName,
             category: req.body.category || "Software Engineering",
             issueDate: new Date().toISOString().split("T")[0],
             completionDate: new Date().toISOString().split("T")[0],
@@ -644,8 +670,7 @@ router.post("/request", async (req, res) => {
             updatedAt: new Date().toISOString(),
         };
         let certs = readCertificatesFile();
-        // Replace if existing pending request for same user & project, otherwise unshift
-        const existingIdx = certs.findIndex((c) => c.id === reqId || (c.userEmail === emailClean && c.projectName === projectName.trim() && c.status === "Pending"));
+        const existingIdx = certs.findIndex((c) => c.id === reqId || (c.userEmail === emailClean && c.projectName === finalProjectName && c.status === "Pending"));
         if (existingIdx >= 0) {
             certs[existingIdx] = { ...certs[existingIdx], ...requestRecord };
         }
@@ -653,6 +678,75 @@ router.post("/request", async (req, res) => {
             certs.unshift(requestRecord);
         }
         writeCertificatesFile(certs);
+        // Save to Prisma MongoDB
+        try {
+            let targetUser = null;
+            if (userId)
+                targetUser = await db_1.default.user.findUnique({ where: { id: userId } }).catch(() => null);
+            if (!targetUser && emailClean)
+                targetUser = await db_1.default.user.findUnique({ where: { email: emailClean } }).catch(() => null);
+            if (!targetUser && emailClean) {
+                targetUser = await db_1.default.user.create({
+                    data: {
+                        id: userId || `usr_${Date.now()}_${Math.random().toString(36).slice(-5)}`,
+                        email: emailClean,
+                        name: finalStudentName,
+                        role: "client",
+                    },
+                }).catch(() => null);
+            }
+            const targetProjId = `proj_${finalProjectName.toLowerCase().replace(/[^a-z0-9]/g, "-").slice(0, 30)}`;
+            let targetProject = await db_1.default.project.findUnique({ where: { id: targetProjId } }).catch(() => null);
+            if (!targetProject) {
+                targetProject = await db_1.default.project.create({
+                    data: {
+                        id: targetProjId,
+                        title: finalProjectName,
+                        description: `Certified project: ${finalProjectName}`,
+                        longDescription: `Certified project: ${finalProjectName}`,
+                        category: req.body.category || "Software Engineering",
+                        imageUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&q=80",
+                        files: {},
+                    },
+                }).catch(() => null);
+            }
+            if (targetUser && targetProject) {
+                await db_1.default.certificate.upsert({
+                    where: { certificateId: reqId },
+                    update: {
+                        recipientName: finalStudentName,
+                        recipientEmail: emailClean,
+                        projectTitle: finalProjectName,
+                        status: "PENDING",
+                        metadata: {
+                            description: requestRecord.description,
+                            verificationHash: requestRecord.verificationHash,
+                        },
+                    },
+                    create: {
+                        certificateId: reqId,
+                        userId: targetUser.id,
+                        projectId: targetProject.id,
+                        recipientName: finalStudentName,
+                        recipientEmail: emailClean,
+                        projectTitle: finalProjectName,
+                        category: requestRecord.category,
+                        issueDate: new Date(),
+                        completionDate: new Date(),
+                        status: "PENDING",
+                        issuanceMethod: "ADMIN_MANUAL",
+                        verificationUrl: `/verify/${reqId}`,
+                        metadata: {
+                            description: requestRecord.description,
+                            verificationHash: requestRecord.verificationHash,
+                        },
+                    },
+                }).catch(() => { });
+            }
+        }
+        catch (dbErr) {
+            console.warn("Prisma request save warning:", dbErr);
+        }
         return res.status(201).json({
             message: "Certificate request submitted successfully.",
             certificate: requestRecord,
@@ -671,35 +765,79 @@ router.put("/:id/approve", async (req, res) => {
         const idClean = id.trim();
         let certs = readCertificatesFile();
         const existingIdx = certs.findIndex((c) => c.id === idClean || c.certificateId === idClean);
-        if (existingIdx === -1) {
+        let baseCert = existingIdx >= 0 ? certs[existingIdx] : null;
+        if (!baseCert) {
+            try {
+                const dbCert = await db_1.default.certificate.findFirst({
+                    where: {
+                        OR: [{ certificateId: idClean }, { id: idClean }],
+                    },
+                });
+                if (dbCert)
+                    baseCert = formatPrismaCertificate(dbCert);
+            }
+            catch (e) { }
+        }
+        if (!baseCert) {
             return res.status(404).json({ error: "Certificate request not found." });
         }
-        const cert = certs[existingIdx];
         const certYear = new Date().getFullYear();
-        const officialCertId = cert.id.startsWith("RCX-")
-            ? cert.id
+        const officialCertId = baseCert.id.startsWith("RCX-")
+            ? baseCert.id
             : `RCX-${certYear}-${Math.floor(100000 + Math.random() * 900000)}`;
         const approvedRecord = {
-            ...cert,
+            ...baseCert,
             id: officialCertId,
             certificateId: officialCertId,
             status: "Approved",
-            projectName: projectName || cert.projectName,
-            projectTitle: projectName || cert.projectTitle || cert.projectName,
+            projectName: projectName || baseCert.projectName,
+            projectTitle: projectName || baseCert.projectTitle || baseCert.projectName,
             issueDate: issueDate || new Date().toISOString().split("T")[0],
-            completionDate: issueDate || cert.completionDate || new Date().toISOString().split("T")[0],
-            grade: grade || cert.grade || "A+",
-            finalScore: score ? Number(score) : (cert.finalScore || 100),
-            fileData: fileData || cert.fileData,
-            fileName: fileName || cert.fileName,
-            fileType: fileType || cert.fileType,
-            description: description || cert.description || "Official verification of project completion and cryptographic identity signature validation.",
+            completionDate: issueDate || baseCert.completionDate || new Date().toISOString().split("T")[0],
+            grade: grade || baseCert.grade || "A+",
+            finalScore: score ? Number(score) : (baseCert.finalScore || 100),
+            fileData: fileData || baseCert.fileData,
+            fileName: fileName || baseCert.fileName,
+            fileType: fileType || baseCert.fileType,
+            description: description || baseCert.description || "Official verification of project completion and cryptographic identity signature validation.",
             credentialId: officialCertId,
             verificationHash: `0x${Array.from({ length: 40 }, () => Math.floor(Math.random() * 16).toString(16)).join("")}`,
             updatedAt: new Date().toISOString(),
         };
-        certs[existingIdx] = approvedRecord;
+        if (existingIdx >= 0) {
+            certs[existingIdx] = approvedRecord;
+        }
+        else {
+            certs.unshift(approvedRecord);
+        }
         writeCertificatesFile(certs);
+        // Persist to MongoDB Prisma
+        try {
+            await db_1.default.certificate.updateMany({
+                where: {
+                    OR: [{ certificateId: idClean }, { certificateId: officialCertId }, { id: idClean }],
+                },
+                data: {
+                    certificateId: officialCertId,
+                    status: "ISSUED",
+                    issueDate: new Date(approvedRecord.issueDate),
+                    completionDate: new Date(approvedRecord.completionDate),
+                    finalScore: approvedRecord.finalScore,
+                    grade: approvedRecord.grade,
+                    pdfUrl: approvedRecord.fileData || undefined,
+                    metadata: {
+                        fileName: approvedRecord.fileName || null,
+                        fileType: approvedRecord.fileType || null,
+                        fileData: approvedRecord.fileData || null,
+                        description: approvedRecord.description || null,
+                        verificationHash: approvedRecord.verificationHash,
+                    },
+                },
+            }).catch(() => { });
+        }
+        catch (dbErr) {
+            console.warn("Prisma approve update warning:", dbErr);
+        }
         return res.json({
             message: "Certificate approved and issued successfully.",
             certificate: approvedRecord,
@@ -710,45 +848,82 @@ router.put("/:id/approve", async (req, res) => {
         return res.status(500).json({ error: err.message || "Failed to approve certificate" });
     }
 });
-// GET /api/certificates (Legacy & Multi-user querying)
-router.get("/", (req, res) => {
+// GET /api/certificates (Persistent Multi-user Querying from MongoDB & Local Cache)
+router.get("/", async (req, res) => {
     try {
         const { email, userId } = req.query;
-        let certs = readCertificatesFile();
+        const fileCerts = readCertificatesFile();
+        let dbCerts = [];
+        try {
+            const where = {};
+            if (email) {
+                where.recipientEmail = { equals: String(email).trim().toLowerCase(), mode: "insensitive" };
+            }
+            else if (userId) {
+                where.userId = String(userId);
+            }
+            const prismaResults = await db_1.default.certificate.findMany({
+                where,
+                orderBy: { createdAt: "desc" },
+            });
+            dbCerts = prismaResults.map(formatPrismaCertificate);
+        }
+        catch (dbErr) {
+            console.warn("Prisma certificates fetch error:", dbErr);
+        }
+        // Merge database certificates with file certificates, de-duplicating by ID/email+project
+        const mergedMap = new Map();
+        [...dbCerts, ...fileCerts].forEach((c) => {
+            if (!c)
+                return;
+            const key = (c.certificateId || c.id || `${c.userEmail}_${c.projectName}`).toLowerCase();
+            mergedMap.set(key, c);
+        });
+        let allCerts = Array.from(mergedMap.values());
         if (email) {
             const emailClean = String(email).toLowerCase().trim();
-            certs = certs.filter((c) => (c.userEmail || "").toLowerCase().trim() === emailClean);
+            allCerts = allCerts.filter((c) => (c.userEmail || "").toLowerCase().trim() === emailClean);
         }
         else if (userId) {
-            certs = certs.filter((c) => c.userId === String(userId));
+            allCerts = allCerts.filter((c) => c.userId === String(userId));
         }
-        res.json(certs);
+        return res.json(allCerts);
     }
     catch (err) {
-        res.status(500).json({ error: err.message || "Failed to fetch certificates" });
+        return res.status(500).json({ error: err.message || "Failed to fetch certificates" });
     }
 });
-// POST /api/certificates (Legacy & Direct Save)
-router.post("/", (req, res) => {
+// POST /api/certificates (Persistent Save to MongoDB & File Cache)
+router.post("/", async (req, res) => {
     try {
         const cert = req.body;
         if (!cert.id && !cert.certificateId && !cert.studentName && !cert.recipientName) {
             res.status(400).json({ error: "Certificate details are required" });
             return;
         }
+        const emailClean = (cert.userEmail || "").toLowerCase().trim();
         const certId = cert.id || cert.certificateId || `CERT-${Math.floor(1000 + Math.random() * 9000)}`;
+        const studentName = cert.studentName || cert.recipientName || "Developer";
+        const projectName = cert.projectName || cert.projectTitle || "Software Solution Project";
+        const issueDateStr = cert.issueDate || new Date().toISOString().split("T")[0];
+        const issueDateObj = new Date(issueDateStr);
+        const certStatus = cert.status || "Approved";
         const updatedCert = {
             ...cert,
             id: certId,
             certificateId: certId,
-            studentName: cert.studentName || cert.recipientName || "Developer",
-            recipientName: cert.recipientName || cert.studentName || "Developer",
-            projectName: cert.projectName || cert.projectTitle || "Engineering Project",
-            projectTitle: cert.projectTitle || cert.projectName || "Engineering Project",
+            userEmail: emailClean,
+            studentName,
+            recipientName: studentName,
+            projectName,
+            projectTitle: projectName,
+            issueDate: issueDateStr,
+            status: certStatus,
             updatedAt: new Date().toISOString(),
         };
+        // 1. Write to local file
         let certs = readCertificatesFile();
-        const existingIndex = certs.findIndex((c) => c.id === certId || (cert.userEmail && c.userEmail === cert.userEmail && c.projectName === updatedCert.projectName));
+        const existingIndex = certs.findIndex((c) => c.id === certId || (emailClean && c.userEmail === emailClean && c.projectName === projectName));
         if (existingIndex >= 0) {
             certs[existingIndex] = { ...certs[existingIndex], ...updatedCert };
         }
@@ -756,13 +931,97 @@ router.post("/", (req, res) => {
             certs.unshift({ ...updatedCert, createdAt: new Date().toISOString() });
         }
         writeCertificatesFile(certs);
-        res.json({ message: "Certificate saved successfully", certificate: updatedCert });
+        // 2. Persist to MongoDB Atlas via Prisma
+        try {
+            let targetUser = null;
+            if (cert.userId) {
+                targetUser = await db_1.default.user.findUnique({ where: { id: cert.userId } }).catch(() => null);
+            }
+            if (!targetUser && emailClean) {
+                targetUser = await db_1.default.user.findUnique({ where: { email: emailClean } }).catch(() => null);
+            }
+            if (!targetUser && emailClean) {
+                targetUser = await db_1.default.user.create({
+                    data: {
+                        id: cert.userId || `usr_${Date.now()}_${Math.random().toString(36).slice(-5)}`,
+                        email: emailClean,
+                        name: studentName,
+                        role: "client",
+                    },
+                }).catch(() => null);
+            }
+            let targetProject = null;
+            const targetProjId = cert.projectId || `proj_${projectName.toLowerCase().replace(/[^a-z0-9]/g, "-").slice(0, 30)}`;
+            targetProject = await db_1.default.project.findUnique({ where: { id: targetProjId } }).catch(() => null);
+            if (!targetProject) {
+                targetProject = await db_1.default.project.create({
+                    data: {
+                        id: targetProjId,
+                        title: projectName,
+                        description: `Certified project: ${projectName}`,
+                        longDescription: `Certified project: ${projectName}`,
+                        category: cert.category || "Software Engineering",
+                        imageUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&q=80",
+                        files: {},
+                    },
+                }).catch(() => null);
+            }
+            if (targetUser && targetProject) {
+                const prismaStatus = certStatus === "Approved" ? "ISSUED" : (certStatus === "Pending" ? "PENDING" : (certStatus === "Revoked" ? "REVOKED" : "ISSUED"));
+                await db_1.default.certificate.upsert({
+                    where: {
+                        certificateId: certId,
+                    },
+                    update: {
+                        recipientName: studentName,
+                        recipientEmail: emailClean,
+                        projectTitle: projectName,
+                        category: cert.category || "Software Engineering",
+                        issueDate: issueDateObj,
+                        completionDate: issueDateObj,
+                        status: prismaStatus,
+                        pdfUrl: cert.fileData || undefined,
+                        metadata: {
+                            fileName: cert.fileName || null,
+                            fileType: cert.fileType || null,
+                            fileData: cert.fileData || null,
+                            description: cert.description || null,
+                        },
+                    },
+                    create: {
+                        certificateId: certId,
+                        userId: targetUser.id,
+                        projectId: targetProject.id,
+                        recipientName: studentName,
+                        recipientEmail: emailClean,
+                        projectTitle: projectName,
+                        category: cert.category || "Software Engineering",
+                        issueDate: issueDateObj,
+                        completionDate: issueDateObj,
+                        status: prismaStatus,
+                        issuanceMethod: "ADMIN_MANUAL",
+                        pdfUrl: cert.fileData || undefined,
+                        verificationUrl: `/verify/${certId}`,
+                        metadata: {
+                            fileName: cert.fileName || null,
+                            fileType: cert.fileType || null,
+                            fileData: cert.fileData || null,
+                            description: cert.description || null,
+                        },
+                    },
+                }).catch((err) => console.warn("Prisma certificate save note:", err));
+            }
+        }
+        catch (prismaErr) {
+            console.warn("Prisma save skipped/error:", prismaErr);
+        }
+        return res.json({ message: "Certificate saved successfully", certificate: updatedCert });
     }
     catch (err) {
-        res.status(500).json({ error: err.message || "Failed to save certificate" });
+        return res.status(500).json({ error: err.message || "Failed to save certificate" });
     }
 });
-// DELETE /api/certificates/:id (Legacy & Direct)
+// DELETE /api/certificates/:id (Persistent Delete)
 router.delete("/:id", async (req, res) => {
     try {
         const { id } = req.params;
@@ -780,10 +1039,10 @@ router.delete("/:id", async (req, res) => {
         let certs = readCertificatesFile();
         certs = certs.filter((c) => c.id !== idClean && c.certificateId !== idClean && c.certificateId !== idClean.toUpperCase());
         writeCertificatesFile(certs);
-        res.json({ message: "Certificate deleted successfully" });
+        return res.json({ message: "Certificate deleted successfully" });
     }
     catch (err) {
-        res.status(500).json({ error: err.message || "Failed to delete certificate" });
+        return res.status(500).json({ error: err.message || "Failed to delete certificate" });
     }
 });
 exports.default = router;
