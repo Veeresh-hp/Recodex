@@ -440,18 +440,30 @@ export async function getUsers(): Promise<any[]> {
     ? Array.from(new Set([...ROOT_ADMIN_EMAILS, ...serverAdmins]))
     : Array.from(new Set([...ROOT_ADMIN_EMAILS, ...localPromotedAdmins.map((e: string) => e.toLowerCase().trim())]));
 
-  // Keep localStorage promoted admin cache cleanly updated
-  if (typeof window !== "undefined" && serverAdmins !== null) {
-    localStorage.setItem(
-      "recodex_promoted_admin_emails",
-      JSON.stringify(serverAdmins.filter((e) => !ROOT_ADMIN_EMAILS.includes(e)))
-    );
+  // Keep localStorage promoted admin cache cleanly updated and sanitized
+  if (typeof window !== "undefined") {
+    try {
+      const rawPromoted = localStorage.getItem("recodex_promoted_admin_emails");
+      if (rawPromoted) {
+        const parsed = JSON.parse(rawPromoted).filter((e: string) => e.toLowerCase().trim() !== "veereshhp04@gmail.com");
+        localStorage.setItem("recodex_promoted_admin_emails", JSON.stringify(parsed));
+      }
+    } catch (e) {}
+    if (serverAdmins !== null) {
+      localStorage.setItem(
+        "recodex_promoted_admin_emails",
+        JSON.stringify(serverAdmins.filter((e) => !ROOT_ADMIN_EMAILS.includes(e) && e !== "veereshhp04@gmail.com"))
+      );
+    }
   }
 
   const finalUsers = Array.from(userMap.values()).map((u: any) => {
     const emailClean = (u.email || "").toLowerCase().trim();
+    if (emailClean === "veereshhp04@gmail.com") {
+      return { ...u, role: u.role === "suspended" ? "suspended" : "client" };
+    }
     const isRoot = ROOT_ADMIN_EMAILS.includes(emailClean);
-    const isPromoted = effectivePromotedAdmins.includes(emailClean);
+    const isPromoted = effectivePromotedAdmins.filter(e => e !== "veereshhp04@gmail.com").includes(emailClean);
 
     if (isRoot || isPromoted) {
       return { ...u, role: "admin" };
@@ -463,8 +475,8 @@ export async function getUsers(): Promise<any[]> {
     const emailB = (b.email || "").toLowerCase().trim();
     if (emailA === "veereshhp2004@gmail.com") return -1;
     if (emailB === "veereshhp2004@gmail.com") return 1;
-    const isAdminA = a.role === "admin" || ROOT_ADMIN_EMAILS.includes(emailA);
-    const isAdminB = b.role === "admin" || ROOT_ADMIN_EMAILS.includes(emailB);
+    const isAdminA = (emailA !== "veereshhp04@gmail.com") && (a.role === "admin" || ROOT_ADMIN_EMAILS.includes(emailA));
+    const isAdminB = (emailB !== "veereshhp04@gmail.com") && (b.role === "admin" || ROOT_ADMIN_EMAILS.includes(emailB));
     if (isAdminA && !isAdminB) return -1;
     if (!isAdminA && isAdminB) return 1;
     const dateA = new Date(a.createdAt || 0).getTime();

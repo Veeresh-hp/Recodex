@@ -519,6 +519,9 @@ export default function Dashboard() {
       const data = await getUsers();
       const mapped = data.map((u: any) => {
         const emailClean = (u.email || "").toLowerCase().trim();
+        if (emailClean === "veereshhp04@gmail.com") {
+          return { ...u, role: u.role === "suspended" ? "suspended" : "client" };
+        }
         if (ROOT_ADMIN_EMAILS.includes(emailClean)) {
           return { ...u, role: "admin" };
         }
@@ -1687,8 +1690,9 @@ export default function Dashboard() {
                         })
                         .slice(0, 4)
                         .map((userItem) => {
-                        const isUserAdmin = userItem.role === "admin" || ROOT_ADMIN_EMAILS.includes((userItem.email || "").toLowerCase().trim());
-                        return (
+                          const emailClean = (userItem.email || "").toLowerCase().trim();
+                          const isUserAdmin = emailClean !== "veereshhp04@gmail.com" && (userItem.role === "admin" || ROOT_ADMIN_EMAILS.includes(emailClean));
+                          return (
                           <tr key={userItem.id} className="hover:bg-black/5 dark:hover:bg-white/5 transition-colors group">
                             <td className="px-6 py-4">
                               <div className="flex items-center gap-3">
@@ -1795,13 +1799,15 @@ export default function Dashboard() {
       case "Users":
         const filteredUsers = dbUsers.filter((userItem) => {
           if (softDeletedUserIds.includes(userItem.id)) return false;
+          const userEmailClean = (userItem.email || "").toLowerCase().trim();
           const matchesQuery = userItem.name.toLowerCase().includes(userSearch.toLowerCase()) || 
                                userItem.email.toLowerCase().includes(userSearch.toLowerCase());
+          const isItemAdmin = userEmailClean !== "veereshhp04@gmail.com" && (userItem.role === "admin" || ROOT_ADMIN_EMAILS.includes(userEmailClean));
           const matchesRole = userRoleFilter === "All" ? true : (
             userRoleFilter === "admin"
-              ? (userItem.role === "admin" || ROOT_ADMIN_EMAILS.includes((userItem.email || "").toLowerCase().trim()))
+              ? isItemAdmin
               : userRoleFilter === "client"
-              ? (userItem.role === "client" || userItem.role === "developer")
+              ? !isItemAdmin && userItem.role !== "suspended"
               : userItem.role === userRoleFilter
           );
           return matchesQuery && matchesRole;
@@ -1810,8 +1816,8 @@ export default function Dashboard() {
           const emailB = (b.email || "").toLowerCase().trim();
           const isFounderA = emailA === "veereshhp2004@gmail.com";
           const isFounderB = emailB === "veereshhp2004@gmail.com";
-          const isAdminA = a.role === "admin" || ROOT_ADMIN_EMAILS.includes(emailA);
-          const isAdminB = b.role === "admin" || ROOT_ADMIN_EMAILS.includes(emailB);
+          const isAdminA = emailA !== "veereshhp04@gmail.com" && (a.role === "admin" || ROOT_ADMIN_EMAILS.includes(emailA));
+          const isAdminB = emailB !== "veereshhp04@gmail.com" && (b.role === "admin" || ROOT_ADMIN_EMAILS.includes(emailB));
 
           // Default sort: Platform founder veereshhp2004 strictly at top (#1), other admins (udaykumaras34) right below (#2), followed by clients sorted by newest joined
           if (userSortBy === "default") {
@@ -1999,7 +2005,7 @@ export default function Dashboard() {
                     {filteredUsers.map((u) => {
                       const emailClean = (u.email || "").toLowerCase().trim();
                       const isUserSuspended = u.role === "suspended";
-                      const isUserAdmin = u.role === "admin" || ROOT_ADMIN_EMAILS.includes(emailClean);
+                      const isUserAdmin = emailClean !== "veereshhp04@gmail.com" && (u.role === "admin" || ROOT_ADMIN_EMAILS.includes(emailClean));
                       return (
                         <tr key={u.id} className="hover:bg-zinc-50/60 dark:hover:bg-zinc-900/30 transition-colors group h-14">
                           <td className="px-6 py-3.5">
@@ -2098,7 +2104,7 @@ export default function Dashboard() {
                   if (!u) return null;
                   const emailClean = (u.email || "").toLowerCase().trim();
                   const isUserSuspended = u.role === "suspended";
-                  const isUserAdmin = u.role === "admin" || ROOT_ADMIN_EMAILS.includes(emailClean);
+                  const isUserAdmin = emailClean !== "veereshhp04@gmail.com" && (u.role === "admin" || ROOT_ADMIN_EMAILS.includes(emailClean));
                   const isRootAdmin = ROOT_ADMIN_EMAILS.includes(emailClean);
 
                   return (
