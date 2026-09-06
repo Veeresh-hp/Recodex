@@ -1003,7 +1003,8 @@ export async function getCertificatesApi(userEmail?: string, userId?: string): P
 }
 
 /**
- * User: Submits a certificate request application for administrative review.
+ * User: Submits a certificate request application as a message / inquiry directly to the Admin.
+ * Does NOT create fake / dummy certificate cards.
  */
 export async function requestCertificateApi(reqData: {
   studentName: string;
@@ -1014,50 +1015,28 @@ export async function requestCertificateApi(reqData: {
   notes?: string;
   category?: string;
 }): Promise<any> {
-  const reqId = `CERT-REQ-${Math.floor(100000 + Math.random() * 900000)}`;
-  const randomHex = Math.random().toString(36).substring(2, 8).toUpperCase();
-  const localRecord = {
-    id: reqId,
-    certificateId: reqId,
-    studentName: reqData.studentName,
-    recipientName: reqData.studentName,
-    userEmail: reqData.userEmail.toLowerCase().trim(),
-    userId: reqData.userId,
-    projectName: reqData.projectName,
-    projectTitle: reqData.projectName,
-    category: reqData.category || "Software Engineering",
-    issueDate: new Date().toISOString().split("T")[0],
-    completionDate: new Date().toISOString().split("T")[0],
-    status: "Pending",
-    description: reqData.description || reqData.notes || "Submitted for peer audit and official certification issue.",
-    credentialId: `RCX-PEND-${randomHex}`,
-    verificationHash: "0xPENDING_AUDIT_VERIFICATION_HASH",
-    createdAt: new Date().toISOString(),
+  const inquiryPayload = {
+    name: reqData.studentName,
+    email: reqData.userEmail,
+    phone: "",
+    type: "Certificate Request",
+    message: `[CERTIFICATE REQUEST] Project: "${reqData.projectName}". Deliverables / Message to Admin: ${reqData.notes || reqData.description || "N/A"}. User: ${reqData.studentName} (${reqData.userEmail}).`
   };
 
+  // Clean out any legacy pending dummy certificates from localStorage
   try {
-    const stored = localStorage.getItem("recodex_global_certificates");
-    const certs: any[] = stored ? JSON.parse(stored) : [];
-    certs.unshift(localRecord);
-    localStorage.setItem("recodex_global_certificates", JSON.stringify(certs));
-    window.dispatchEvent(new Event("recodex-certificates-update"));
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("recodex_global_certificates");
+      if (stored) {
+        const certs = JSON.parse(stored).filter((c: any) => !c.id?.startsWith("CERT-REQ-") && !c.credentialId?.startsWith("RCX-PEND-"));
+        localStorage.setItem("recodex_global_certificates", JSON.stringify(certs));
+      }
+    }
   } catch (e) {}
 
-  try {
-    const response = await fetch(`${API_BASE_URL}/certificates/request`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Accept": "application/json" },
-      body: JSON.stringify({ ...reqData, id: reqId }),
-    });
-    if (response.ok) {
-      const data = await response.json();
-      return data.certificate || data;
-    }
-  } catch (err) {
-    console.warn("[CERTIFICATES API] Request backend warning (saved locally):", err);
-  }
-
-  return localRecord;
+  // Dispatch inquiry to Admin Dashboard Inquiries & Google Sheet
+  const result = await submitInquiry(inquiryPayload);
+  return { success: true, message: "Certificate request message sent to admin.", ...result };
 }
 
 /**

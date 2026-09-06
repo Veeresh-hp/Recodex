@@ -5,7 +5,7 @@ import { getCertificatesApi, requestCertificateApi } from "../services/api";
 import {
   Award, Shield, CheckCircle2, Download, Eye, XCircle, Printer,
   FileText, Sparkles, ArrowLeft, Search, Filter, ShieldCheck,
-  Share2, Check, ExternalLink, Calendar, User, Code2, Lock
+  Share2, Check, ExternalLink, Calendar, Send
 } from "lucide-react";
 
 interface Certificate {
@@ -33,7 +33,6 @@ export default function Certificates() {
   const [selectedCert, setSelectedCert] = useState<Certificate | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<"ALL" | "Approved" | "Pending">("ALL");
-  const [certModalMode, setCertModalMode] = useState<"document" | "credential">("document");
   const [requestModalOpen, setRequestModalOpen] = useState(false);
   const [submittingRequest, setSubmittingRequest] = useState(false);
   const [requestSuccess, setRequestSuccess] = useState(false);
@@ -78,10 +77,11 @@ export default function Certificates() {
       const allList = Array.from(combinedMap.values());
 
       // STRICT USER PRIVACY FILTER:
-      // Only display certificates assigned or requested by THIS authenticated user.
+      // Only display certificates assigned/uploaded by Admin for THIS authenticated user.
       const userCerts = allList.filter((c: any) => {
         if (!c) return false;
-        // Filter out any dummy sample certificates
+        // Filter out dummy/pending request placeholders
+        if (c.id?.startsWith("CERT-REQ-") || c.credentialId?.startsWith("RCX-PEND-")) return false;
         if (["john doe", "alice vance", "sarah connor"].includes((c.studentName || c.recipientName || "").toLowerCase().trim())) return false;
         if (["cert-9402", "cert-1842", "cert-0691"].includes((c.id || "").toLowerCase().trim())) return false;
 
@@ -133,18 +133,13 @@ export default function Certificates() {
 
     setSubmittingRequest(true);
     try {
-      const created = await requestCertificateApi({
+      await requestCertificateApi({
         studentName: fullName,
         userEmail: userEmail,
         userId: userId || undefined,
         projectName: requestProject.trim(),
-        description: requestNotes.trim() || "Submitted for peer audit and official certification issue.",
+        description: requestNotes.trim() || "Certificate request submitted for review.",
         notes: requestNotes.trim(),
-      });
-
-      setCertificates((prev) => {
-        const filtered = prev.filter((c) => c.id !== created.id);
-        return [created, ...filtered];
       });
 
       setRequestSuccess(true);
@@ -153,7 +148,7 @@ export default function Certificates() {
         setRequestModalOpen(false);
         setRequestProject("");
         setRequestNotes("");
-      }, 2000);
+      }, 2500);
     } catch (err) {
       console.error("Failed to submit certificate request:", err);
       alert("Failed to submit certificate request. Please try again.");
@@ -192,7 +187,7 @@ export default function Certificates() {
           <div className="flex items-center gap-2">
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/25">
               <ShieldCheck size={14} />
-              Cryptographic Ledger Synced
+              Official Credentials
             </span>
           </div>
         </div>
@@ -202,13 +197,13 @@ export default function Certificates() {
           <div>
             <div className="flex items-center gap-2 text-primary font-mono text-xs uppercase tracking-widest font-bold mb-2">
               <Award size={16} />
-              <span>Official Proof of Competence</span>
+              <span>Official Certificates</span>
             </div>
             <h1 className="text-3xl sm:text-4xl font-black text-foreground dark:text-white tracking-tight">
-              Verified Certificates & Credentials
+              Assigned Certificates & Documents
             </h1>
             <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-2 max-w-2xl">
-              Authentic, cryptographically validated credentials, certificates of completion, and professional project audits issued by the RecodeX Engineering Platform.
+              Authentic certificate files and official credentials uploaded and issued by the administration for your completed projects.
             </p>
           </div>
 
@@ -217,8 +212,8 @@ export default function Certificates() {
               onClick={() => setRequestModalOpen(true)}
               className="px-4 py-2.5 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary dark:text-[#00d1ff] border border-primary/30 hover:border-primary/60 font-semibold text-xs tracking-wide transition-all shadow-[0_0_15px_rgba(0,209,255,0.12)] hover:scale-[1.02] active:scale-95 flex items-center gap-2 cursor-pointer font-sans"
             >
-              <Sparkles size={15} />
-              Request Certificate
+              <Send size={15} />
+              Request Certificate from Admin
             </button>
           </div>
         </div>
@@ -260,20 +255,21 @@ export default function Certificates() {
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20">
             <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
-            <p className="text-xs font-mono text-zinc-500 uppercase tracking-widest">Validating Cryptographic Signatures...</p>
+            <p className="text-xs font-mono text-zinc-500 uppercase tracking-widest">Loading Certificates...</p>
           </div>
         ) : filteredCerts.length === 0 ? (
           <div className="text-center py-20 bg-white/40 dark:bg-zinc-900/40 rounded-2xl border border-dashed border-black/10 dark:border-zinc-800 p-8">
             <Award size={40} className="mx-auto text-zinc-400 dark:text-zinc-600 mb-3 opacity-60" />
-            <h3 className="text-base font-bold text-foreground dark:text-white">No Certificates Found</h3>
+            <h3 className="text-base font-bold text-foreground dark:text-white">No Certificates Available</h3>
             <p className="text-xs text-zinc-500 mt-1 max-w-sm mx-auto">
-              No issued credentials match your current filters. You can request a certificate audit for any of your completed projects.
+              You do not have any certificates assigned to your account yet. When the administrator uploads a certificate document for you, it will appear here.
             </p>
             <button
               onClick={() => setRequestModalOpen(true)}
-              className="mt-5 px-4 py-2 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer"
+              className="mt-5 px-4 py-2 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer inline-flex items-center gap-2"
             >
-              Submit Certificate Request
+              <Send size={14} />
+              <span>Send Certificate Request Message</span>
             </button>
           </div>
         ) : (
@@ -323,7 +319,7 @@ export default function Certificates() {
 
                     {/* Description / Summary */}
                     <p className="text-xs text-zinc-600 dark:text-zinc-400 line-clamp-2 mb-4 leading-relaxed">
-                      {cert.description || "Official verification of project completion and cryptographic identity signature validation."}
+                      {cert.description || "Official certificate document issued by RecodeX Administration."}
                     </p>
 
                     {/* Meta Details */}
@@ -333,12 +329,8 @@ export default function Certificates() {
                         <span className="text-foreground dark:text-zinc-300 font-bold">{cert.issueDate}</span>
                       </div>
                       <div className="flex items-center justify-between text-zinc-500">
-                        <span>Credential ID:</span>
+                        <span>Certificate ID:</span>
                         <span className="text-primary font-bold">{cert.credentialId || cert.id}</span>
-                      </div>
-                      <div className="flex items-center justify-between text-zinc-500">
-                        <span>Cryptographic Hash:</span>
-                        <span className="text-zinc-400 truncate max-w-[120px]">{cert.verificationHash || "0x8f4c...cdef"}</span>
                       </div>
                     </div>
                   </div>
@@ -346,14 +338,11 @@ export default function Certificates() {
                   {/* Actions */}
                   <div className="flex items-center gap-2 pt-4 border-t border-black/5 dark:border-zinc-800/80">
                     <button
-                      onClick={() => {
-                        setSelectedCert(cert);
-                        setCertModalMode(cert.fileData ? "document" : "credential");
-                      }}
+                      onClick={() => setSelectedCert(cert)}
                       className="flex-1 py-2 px-3 rounded-xl bg-primary/10 hover:bg-primary text-primary hover:text-primary-foreground font-mono text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                     >
                       <Eye size={14} />
-                      View Document
+                      View Certificate
                     </button>
 
                     {cert.fileData && (
@@ -363,7 +352,7 @@ export default function Certificates() {
                         rel="noopener noreferrer"
                         download={cert.fileName || `Certificate_${cert.id}.pdf`}
                         className="p-2 rounded-xl bg-black/5 dark:bg-zinc-900 hover:bg-emerald-500/20 text-zinc-600 dark:text-zinc-300 hover:text-emerald-400 transition-all cursor-pointer"
-                        title="Download / Open Cloudinary Certificate File"
+                        title="Download / Open Certificate File"
                       >
                         <Download size={16} />
                       </a>
@@ -384,7 +373,7 @@ export default function Certificates() {
         )}
       </main>
 
-      {/* DETAILED HIGH-RES CERTIFICATE DOCUMENT VIEWER MODAL */}
+      {/* DETAILED CERTIFICATE DOCUMENT VIEWER MODAL */}
       {selectedCert && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200 select-text"
@@ -395,41 +384,16 @@ export default function Certificates() {
             onClick={(e) => e.stopPropagation()}
             ref={printRef}
           >
-            {/* Modal Header & View Mode Switcher */}
+            {/* Modal Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-zinc-800 print:hidden">
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
                 <span className="text-xs font-mono uppercase tracking-widest text-zinc-300 font-bold">
-                  {selectedCert.fileData ? "Cloudinary Verified Document" : "Cryptographically Signed Credential"}
+                  Official Certificate Document
                 </span>
               </div>
 
               <div className="flex items-center gap-2 flex-wrap">
-                {selectedCert.fileData && (
-                  <div className="flex p-1 bg-zinc-900 rounded-xl border border-zinc-800 text-xs font-mono">
-                    <button
-                      onClick={() => setCertModalMode("document")}
-                      className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
-                        certModalMode === "document"
-                          ? "bg-[#00d1ff] text-black font-extrabold shadow-sm"
-                          : "text-zinc-400 hover:text-white"
-                      }`}
-                    >
-                      Uploaded Document
-                    </button>
-                    <button
-                      onClick={() => setCertModalMode("credential")}
-                      className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
-                        certModalMode === "credential"
-                          ? "bg-[#00d1ff] text-black font-extrabold shadow-sm"
-                          : "text-zinc-400 hover:text-white"
-                      }`}
-                    >
-                      Digital Credential
-                    </button>
-                  </div>
-                )}
-
                 {selectedCert.fileData && (
                   <a
                     href={selectedCert.fileData}
@@ -459,8 +423,8 @@ export default function Certificates() {
               </div>
             </div>
 
-            {/* TAB 1: REAL CLOUDINARY UPLOADED DOCUMENT VIEW */}
-            {selectedCert.fileData && certModalMode === "document" ? (
+            {/* REAL CLOUDINARY UPLOADED DOCUMENT VIEW */}
+            {selectedCert.fileData ? (
               <div className="mt-6 space-y-4">
                 <div className="p-2 sm:p-4 rounded-2xl bg-zinc-950 border border-zinc-800 overflow-hidden flex flex-col items-center justify-center min-h-[420px]">
                   {selectedCert.fileData.toLowerCase().includes(".pdf") || selectedCert.fileType === "application/pdf" || selectedCert.fileData.startsWith("data:application/pdf") ? (
@@ -482,7 +446,7 @@ export default function Certificates() {
 
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 bg-zinc-900/60 rounded-2xl border border-zinc-800 text-xs font-mono">
                   <div className="space-y-0.5 text-left">
-                    <p className="text-zinc-400">Target Student: <strong className="text-white">{selectedCert.studentName}</strong> ({selectedCert.userEmail})</p>
+                    <p className="text-zinc-400">Recipient: <strong className="text-white">{selectedCert.studentName}</strong> ({selectedCert.userEmail})</p>
                     <p className="text-zinc-500 text-[10px]">Project: {selectedCert.projectName} • Issued on: {selectedCert.issueDate}</p>
                   </div>
                   <a
@@ -498,92 +462,19 @@ export default function Certificates() {
                 </div>
               </div>
             ) : (
-              /* TAB 2: HIGH-RES DIGITAL CRYPTOGRAPHIC CERTIFICATE CANVAS */
-              <div className="relative mt-6 p-8 sm:p-14 border-4 border-cyan-500/40 rounded-2xl bg-gradient-to-b from-[#0a0f1d] to-[#040711] text-center shadow-inner overflow-hidden select-text">
-                {/* Guilloche / Watermark Security Background */}
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(0,209,255,0.06)_0%,transparent_70%)] pointer-events-none"></div>
-                <div className="absolute top-4 left-4 w-12 h-12 border-t-2 border-l-2 border-cyan-400/60"></div>
-                <div className="absolute top-4 right-4 w-12 h-12 border-t-2 border-r-2 border-cyan-400/60"></div>
-                <div className="absolute bottom-4 left-4 w-12 h-12 border-b-2 border-l-2 border-cyan-400/60"></div>
-                <div className="absolute bottom-4 right-4 w-12 h-12 border-b-2 border-r-2 border-cyan-400/60"></div>
-
-                {/* Certificate Header */}
-                <div className="flex justify-center items-center gap-3 mb-4">
-                  <img src="/recodeXlogo.png" alt="RecodeX" className="h-10 w-auto object-contain" />
-                </div>
-                
-                <h2 className="text-xs sm:text-sm font-mono tracking-[0.3em] uppercase text-cyan-400 font-black mb-2">
-                  Certificate of Technical Excellence
-                </h2>
-                <p className="text-[11px] font-mono text-zinc-400 uppercase tracking-widest mb-6">
-                  RecodeX Engineering & Distributed Systems Protocol
+              <div className="mt-6 p-8 text-center bg-zinc-950/60 border border-zinc-800 rounded-2xl space-y-3">
+                <FileText size={36} className="mx-auto text-zinc-500" />
+                <h3 className="text-sm font-bold text-white">Official Certificate #{selectedCert.id}</h3>
+                <p className="text-xs text-zinc-400 max-w-sm mx-auto">
+                  Certificate issued for <strong>{selectedCert.projectName}</strong>. The uploaded document is being synchronized by the administration.
                 </p>
-
-                {/* Presented To */}
-                <p className="text-xs text-zinc-400 uppercase tracking-wider mb-2">This is officially presented to</p>
-                <h1 className="text-2xl sm:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-white to-cyan-200 tracking-tight font-sans mb-4">
-                  {selectedCert.studentName}
-                </h1>
-
-                {/* Certification Statement */}
-                <p className="text-xs sm:text-sm text-zinc-300 max-w-xl mx-auto leading-relaxed mb-6 font-sans">
-                  For outstanding technical achievement, code verification, and successful engineering execution on the production system:
-                </p>
-
-                <div className="inline-block px-6 py-2.5 rounded-xl bg-cyan-950/60 border border-cyan-500/40 text-cyan-300 font-bold text-sm sm:text-lg mb-6 tracking-wide">
-                  {selectedCert.projectName}
-                </div>
-
-                <p className="text-xs text-zinc-400 max-w-lg mx-auto leading-relaxed mb-8">
-                  {selectedCert.description || "Official verification of project completion and cryptographic identity signature validation."}
-                </p>
-
-                {/* Signatures & Seal Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 items-end pt-6 border-t border-zinc-800/80">
-                  <div className="text-left font-mono text-[10px] text-zinc-400 space-y-1">
-                    <p className="text-zinc-500 uppercase">Issuance Date:</p>
-                    <p className="text-white font-bold">{selectedCert.issueDate}</p>
-                    <p className="text-zinc-500 uppercase pt-2">Credential ID:</p>
-                    <p className="text-cyan-400 font-bold">{selectedCert.credentialId || selectedCert.id}</p>
-                  </div>
-
-                  {/* Golden Official Seal */}
-                  <div className="flex flex-col items-center">
-                    <div className="w-20 h-20 rounded-full border-2 border-cyan-400/80 bg-cyan-950/80 p-1 flex items-center justify-center shadow-[0_0_30px_rgba(0,209,255,0.4)]">
-                      <div className="w-full h-full rounded-full border border-dashed border-cyan-300/60 flex flex-col items-center justify-center text-center p-1">
-                        <ShieldCheck size={24} className="text-cyan-400" />
-                        <span className="text-[7px] font-mono font-black text-white uppercase tracking-tighter mt-0.5">VERIFIED</span>
-                      </div>
-                    </div>
-                    <span className="text-[9px] font-mono text-cyan-400 font-bold uppercase tracking-widest mt-2">Official Seal</span>
-                  </div>
-
-                  <div className="text-right font-mono text-[10px] text-zinc-400 space-y-1">
-                    <div className="inline-block border-b border-zinc-600 pb-1 w-32 text-center text-cyan-300 font-serif italic text-sm">
-                      Veeresh H P
-                    </div>
-                    <p className="text-zinc-500 uppercase">Lead Protocol Architect</p>
-                    <p className="text-zinc-500 uppercase pt-1">RecodeX Governance</p>
-                  </div>
-                </div>
-
-                {/* Cryptographic Verification Hash Footer */}
-                <div className="mt-8 pt-4 border-t border-zinc-800/50 flex flex-col sm:flex-row items-center justify-between text-[9px] font-mono text-zinc-500 gap-2">
-                  <div className="flex items-center gap-1.5">
-                    <Lock size={11} className="text-emerald-400" />
-                    <span>SHA-256 Signature: {selectedCert.verificationHash || "0x8f4c9a12b6e789d034fe56aa7890bcde1234567890abcdef"}</span>
-                  </div>
-                  <div className="text-cyan-500 font-bold">
-                    verify.recodex.io/{selectedCert.id}
-                  </div>
-                </div>
               </div>
             )}
           </div>
         </div>
       )}
 
-      {/* REQUEST CERTIFICATE MODAL */}
+      {/* REQUEST CERTIFICATE MESSAGE TO ADMIN MODAL */}
       {requestModalOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-150"
@@ -595,8 +486,8 @@ export default function Certificates() {
           >
             <div className="flex items-center justify-between pb-4 border-b border-black/5 dark:border-zinc-800">
               <div className="flex items-center gap-2 text-primary font-mono text-xs font-bold uppercase tracking-wider">
-                <Award size={16} />
-                <span>Certificate Request Application</span>
+                <Send size={16} />
+                <span>Send Certificate Request Message to Admin</span>
               </div>
               <button
                 onClick={() => setRequestModalOpen(false)}
@@ -611,21 +502,21 @@ export default function Certificates() {
                 <div className="w-12 h-12 rounded-full bg-emerald-500/10 text-emerald-500 flex items-center justify-center mx-auto">
                   <Check size={24} />
                 </div>
-                <h3 className="text-base font-bold text-foreground dark:text-white">Certificate Request Submitted!</h3>
+                <h3 className="text-base font-bold text-foreground dark:text-white">Message Sent to Admin!</h3>
                 <p className="text-xs text-zinc-500 max-w-xs mx-auto">
-                  Your project credential request has been sent for technical review and peer audit.
+                  Your request has been forwarded directly to the Admin Dashboard inquiries. Once the admin verifies and uploads your official certificate document, it will appear in your account.
                 </p>
               </div>
             ) : (
               <form onSubmit={handleRequestSubmit} className="space-y-4">
                 <div>
                   <label className="text-xs font-mono text-zinc-500 uppercase tracking-wider font-bold block mb-1.5">
-                    Candidate Name
+                    Your Name & Email
                   </label>
                   <input
                     type="text"
                     disabled
-                    value={fullName}
+                    value={`${fullName} (${userEmail})`}
                     className="w-full px-3.5 py-2.5 rounded-xl bg-black/5 dark:bg-zinc-900 border border-black/10 dark:border-zinc-800 text-xs text-foreground dark:text-zinc-300 font-mono opacity-80"
                   />
                 </div>
@@ -646,11 +537,12 @@ export default function Certificates() {
 
                 <div>
                   <label className="text-xs font-mono text-zinc-500 uppercase tracking-wider font-bold block mb-1.5">
-                    Project Deliverables & Repository Notes
+                    Message to Admin & Project Deliverables / Links *
                   </label>
                   <textarea
-                    rows={3}
-                    placeholder="Provide link to repository, live deployment, or test results..."
+                    rows={4}
+                    required
+                    placeholder="Provide your project link, test deliverables, and message to the admin..."
                     value={requestNotes}
                     onChange={(e) => setRequestNotes(e.target.value)}
                     className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-black/10 dark:border-zinc-800 text-xs text-foreground dark:text-white focus:outline-none focus:border-primary font-sans resize-none"
@@ -667,9 +559,17 @@ export default function Certificates() {
                   </button>
                   <button
                     type="submit"
-                    className="px-5 py-2 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-mono font-bold uppercase tracking-wider transition-all shadow-md cursor-pointer"
+                    disabled={submittingRequest}
+                    className="px-5 py-2 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-mono font-bold uppercase tracking-wider transition-all shadow-md cursor-pointer flex items-center gap-2"
                   >
-                    Submit for Issue
+                    {submittingRequest ? (
+                      <span>Sending...</span>
+                    ) : (
+                      <>
+                        <Send size={14} />
+                        <span>Send Message to Admin</span>
+                      </>
+                    )}
                   </button>
                 </div>
               </form>
