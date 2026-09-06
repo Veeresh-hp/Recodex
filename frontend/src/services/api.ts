@@ -837,7 +837,29 @@ export async function getInquiries(token?: string): Promise<any[]> {
     const key = inq.id || `${inq.email}-${inq.message}`;
     if (deletedInquiryIds.includes(inq.id) || deletedInquiryIds.includes(key)) return;
 
-    const createdTime = inq.createdAt || inq.timestamp || inq.date || new Date().toISOString();
+    // Resolve accurate creation timestamp
+    let createdTime = inq.createdAt || inq.timestamp;
+    if ((!createdTime || isNaN(new Date(createdTime).getTime())) && inq.id && typeof inq.id === "string" && inq.id.startsWith("inq-")) {
+      const parts = inq.id.split("-");
+      const epoch = parseInt(parts[1], 10);
+      if (!isNaN(epoch) && epoch > 1000000000000) {
+        createdTime = new Date(epoch).toISOString();
+      }
+    }
+
+    if (!createdTime || isNaN(new Date(createdTime).getTime())) {
+      if (inq.date) {
+        const parsed = Date.parse(inq.date);
+        if (!isNaN(parsed)) {
+          createdTime = new Date(parsed).toISOString();
+        }
+      }
+    }
+
+    if (!createdTime || isNaN(new Date(createdTime).getTime())) {
+      createdTime = new Date().toISOString();
+    }
+
     const normalized = {
       ...inq,
       id: inq.id || key,

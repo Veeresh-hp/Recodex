@@ -22,6 +22,61 @@ interface Inquiry {
   priority?: "Normal" | "High" | "Critical";
 }
 
+const renderFormattedInquiryMessage = (msg: string) => {
+  if (!msg) return null;
+
+  if (msg.includes("[CERTIFICATE REQUEST]")) {
+    const projectMatch = msg.match(/Project:\s*["']?([^"'\.]+)["']?/i);
+    const notesMatch = msg.match(/Deliverables\s*(?:\/\s*Message to Admin)?:\s*(.*?)(?=\.\s*User:|$)/is);
+    const userMatch = msg.match(/User:\s*(.*?)(?=\.|$)/is);
+
+    const project = projectMatch ? projectMatch[1].trim() : "";
+    const notes = notesMatch ? notesMatch[1].trim() : "";
+    const user = userMatch ? userMatch[1].trim() : "";
+
+    return (
+      <div className="space-y-3 select-text">
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-[10px] font-mono font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/25 uppercase tracking-wider">
+          📜 Certificate Issuance Application
+        </div>
+
+        {project && (
+          <div className="p-3 bg-black/5 dark:bg-zinc-900/60 rounded-xl border border-black/5 dark:border-zinc-800 space-y-1">
+            <span className="text-[10px] font-mono uppercase text-zinc-500 font-bold block">Requested Project / Track:</span>
+            <span className="text-sm font-bold text-foreground dark:text-white font-sans">{project}</span>
+          </div>
+        )}
+
+        {notes && (
+          <div className="p-3 bg-black/5 dark:bg-zinc-900/60 rounded-xl border border-black/5 dark:border-zinc-800 space-y-1">
+            <span className="text-[10px] font-mono uppercase text-zinc-500 font-bold block">Candidate Message & Deliverables:</span>
+            <p className="text-xs text-zinc-700 dark:text-zinc-300 font-sans leading-relaxed whitespace-pre-wrap">{notes}</p>
+          </div>
+        )}
+
+        {user && (
+          <div className="p-2.5 bg-black/5 dark:bg-zinc-900/40 rounded-lg border border-black/5 dark:border-zinc-800 text-[11px] font-mono text-zinc-500 flex items-center justify-between">
+            <span>Candidate Identification:</span>
+            <span className="text-foreground dark:text-zinc-200 font-bold">{user}</span>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Regular messages: split sentences / paragraphs for clean alignment
+  const paragraphs = msg.split(/\n+/).filter(Boolean);
+  return (
+    <div className="space-y-2.5 select-text">
+      {paragraphs.map((para, i) => (
+        <p key={i} className="text-xs text-zinc-700 dark:text-zinc-300 font-sans leading-relaxed">
+          {para}
+        </p>
+      ))}
+    </div>
+  );
+};
+
 export default function Queries() {
   const { isLoaded, userId, getToken } = useAuth();
   const { user } = useUser();
@@ -341,9 +396,7 @@ export default function Queries() {
                         {inq.subject}
                       </h3>
                     )}
-                    <p className="text-xs text-zinc-600 dark:text-zinc-300 leading-relaxed font-sans">
-                      {inq.message}
-                    </p>
+                    {renderFormattedInquiryMessage(inq.message)}
                   </div>
 
                   {/* Admin Response Thread */}

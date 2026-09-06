@@ -124,8 +124,62 @@ const isNewUser = (createdAtStr?: string, email?: string): boolean => {
   const created = new Date(createdAtStr);
   if (isNaN(created.getTime())) return false;
   const diffMs = Date.now() - created.getTime();
-  // Only highlight users who joined strictly within the last 24 hours (24 * 60 * 60 * 1000 ms)
   return diffMs >= 0 && diffMs <= 24 * 60 * 60 * 1000;
+};
+
+const renderFormattedInquiryMessage = (msg: string) => {
+  if (!msg) return null;
+
+  if (msg.includes("[CERTIFICATE REQUEST]")) {
+    const projectMatch = msg.match(/Project:\s*["']?([^"'\.]+)["']?/i);
+    const notesMatch = msg.match(/Deliverables\s*(?:\/\s*Message to Admin)?:\s*(.*?)(?=\.\s*User:|$)/is);
+    const userMatch = msg.match(/User:\s*(.*?)(?=\.|$)/is);
+
+    const project = projectMatch ? projectMatch[1].trim() : "";
+    const notes = notesMatch ? notesMatch[1].trim() : "";
+    const user = userMatch ? userMatch[1].trim() : "";
+
+    return (
+      <div className="space-y-3 select-text">
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-[10px] font-mono font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/25 uppercase tracking-wider">
+          📜 Certificate Issuance Application
+        </div>
+
+        {project && (
+          <div className="p-3.5 bg-black/20 dark:bg-zinc-900/80 rounded-xl border border-white/5 space-y-1">
+            <span className="text-[10px] font-mono uppercase text-zinc-400 font-bold block">Requested Project / Track:</span>
+            <span className="text-sm font-bold text-white font-sans">{project}</span>
+          </div>
+        )}
+
+        {notes && (
+          <div className="p-3.5 bg-black/20 dark:bg-zinc-900/80 rounded-xl border border-white/5 space-y-1">
+            <span className="text-[10px] font-mono uppercase text-zinc-400 font-bold block">Candidate Message & Deliverables:</span>
+            <p className="text-xs text-zinc-200 font-sans leading-relaxed whitespace-pre-wrap">{notes}</p>
+          </div>
+        )}
+
+        {user && (
+          <div className="p-2.5 bg-black/10 dark:bg-zinc-900/40 rounded-lg border border-white/5 text-[11px] font-mono text-zinc-400 flex items-center justify-between">
+            <span>Candidate Identification:</span>
+            <span className="text-zinc-200 font-bold">{user}</span>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Regular messages: split sentences / paragraphs for clean alignment
+  const paragraphs = msg.split(/\n+/).filter(Boolean);
+  return (
+    <div className="space-y-3 select-text">
+      {paragraphs.map((para, i) => (
+        <p key={i} className="text-xs text-zinc-200 font-sans leading-relaxed">
+          {para}
+        </p>
+      ))}
+    </div>
+  );
 };
 
 const UserAvatar = ({
@@ -2699,9 +2753,7 @@ export default function Dashboard() {
                         <div className="space-y-2">
                           <h4 className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest block leading-none">Client Inquiry Description:</h4>
                           <div className="p-4 bg-surface-container-low border border-outline-variant/30 rounded-xl">
-                            <p className="text-xs text-foreground dark:text-zinc-300 font-sans whitespace-pre-wrap leading-relaxed">
-                              {activeInquiry.message}
-                            </p>
+                            {renderFormattedInquiryMessage(activeInquiry.message)}
                           </div>
                         </div>
 
