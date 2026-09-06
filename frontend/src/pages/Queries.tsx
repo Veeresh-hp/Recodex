@@ -178,9 +178,19 @@ export default function Queries() {
       const uniqueList: any[] = [];
       const seenIds = new Set<string>();
 
+      const clerkEmails = (user?.emailAddresses || []).map((e) => e.emailAddress.toLowerCase().trim());
+      if (userEmail && !clerkEmails.includes(userEmail)) {
+        clerkEmails.push(userEmail);
+      }
+
       Array.from(map.values()).forEach((item) => {
         const itemEmail = (item.email || "").toLowerCase().trim();
-        if (userEmail && itemEmail === userEmail) {
+        const matchesUser =
+          clerkEmails.length === 0 ||
+          clerkEmails.includes(itemEmail) ||
+          (userEmail && itemEmail === userEmail);
+
+        if (matchesUser) {
           const uniqueKey = item.ticketId || item.id || `${item.email}-${item.message}`;
           if (!seenIds.has(uniqueKey)) {
             seenIds.add(uniqueKey);
@@ -188,6 +198,8 @@ export default function Queries() {
           }
         }
       });
+
+      uniqueList.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
 
       setInquiries(uniqueList);
     } catch (e) {
@@ -362,137 +374,155 @@ export default function Queries() {
 
         {/* Tickets Stream */}
         {loading ? (
-          <div className="flex flex-col items-center justify-center py-20">
-            <div className="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-            <p className="text-xs font-mono text-zinc-500 uppercase tracking-widest">Syncing Support Desk Pipeline...</p>
+          <div className="flex flex-col items-center justify-center py-20 bg-white/40 dark:bg-zinc-900/40 rounded-2xl border border-black/5 dark:border-zinc-800">
+            <div className="w-10 h-10 border-3 border-amber-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+            <p className="text-xs font-mono text-zinc-500 uppercase tracking-widest">Loading Support Tickets...</p>
           </div>
         ) : filteredInquiries.length === 0 ? (
           <div className="text-center py-20 bg-white/40 dark:bg-zinc-900/40 rounded-2xl border border-dashed border-black/10 dark:border-zinc-800 p-8">
-            <MessageSquare size={40} className="mx-auto text-zinc-400 dark:text-zinc-600 mb-3 opacity-60" />
+            <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center mx-auto mb-4 border border-amber-500/20">
+              <MessageSquare size={22} />
+            </div>
             <h3 className="text-base font-bold text-foreground dark:text-white">No Tickets Found</h3>
             <p className="text-xs text-zinc-500 mt-1 max-w-sm mx-auto">
               You haven't opened any support queries matching this filter. Need assistance? Submit a direct ticket to our team.
             </p>
             <button
               onClick={() => setNewTicketModalOpen(true)}
-              className="mt-5 px-4 py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 border border-amber-500/20 text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer"
+              className="mt-5 px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-mono font-bold uppercase tracking-wider transition-all shadow-md cursor-pointer inline-flex items-center gap-2"
             >
-              Open New Query
+              <Plus size={14} />
+              <span>Open New Query</span>
             </button>
           </div>
         ) : (
           <div className="space-y-6">
             {filteredInquiries.map((inq) => {
               const isResolved = (inq.status || "").toLowerCase() === "resolved" || !!inq.reply;
-              const isSelected = selectedInquiry?.id === inq.id;
 
               return (
                 <div
                   key={inq.id}
-                  className={`bg-white/70 dark:bg-[#07090e]/80 backdrop-blur-xl border rounded-2xl p-5 sm:p-6 transition-all duration-200 space-y-4 ${
+                  className={`bg-white/80 dark:bg-[#090d14] backdrop-blur-xl border rounded-2xl overflow-hidden transition-all duration-200 shadow-sm ${
                     isResolved
-                      ? "border-emerald-500/30 hover:border-emerald-500/50 shadow-sm"
-                      : "border-amber-500/30 hover:border-amber-500/50"
+                      ? "border-emerald-500/30 hover:border-emerald-500/50 shadow-[0_4px_20px_rgba(16,185,129,0.05)]"
+                      : "border-amber-500/30 hover:border-amber-500/50 shadow-[0_4px_20px_rgba(245,158,11,0.05)]"
                   }`}
                 >
-                  {/* Card Top Header */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-black/5 dark:border-zinc-800/70">
+                  {/* Professional Ticket Header Bar */}
+                  <div className="px-6 py-4 bg-black/[0.02] dark:bg-zinc-900/60 border-b border-black/5 dark:border-zinc-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="flex items-center gap-2.5 flex-wrap">
-                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-black uppercase tracking-wider flex items-center gap-1.5 border ${
+                      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-mono font-bold uppercase tracking-wider border ${
                         isResolved
-                          ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/25"
-                          : "bg-amber-500/10 text-amber-500 border-amber-500/25 animate-pulse"
+                          ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/30"
+                          : "bg-amber-500/10 text-amber-500 border-amber-500/30"
                       }`}>
-                        {isResolved ? <CheckCircle2 size={12} /> : <Clock size={12} />}
-                        {isResolved ? "Resolved & Closed" : "Open / Under Review"}
+                        {isResolved ? (
+                          <>
+                            <CheckCircle2 size={13} className="text-emerald-500" />
+                            Resolved & Closed
+                          </>
+                        ) : (
+                          <>
+                            <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping"></span>
+                            In Review / Open
+                          </>
+                        )}
                       </span>
 
-                      <span className="px-2 py-0.5 rounded-md bg-black/5 dark:bg-zinc-900 border border-black/5 dark:border-zinc-800 text-[10px] font-mono font-bold text-zinc-500">
-                        {inq.category || "General Inquiry"}
+                      <span className="px-2.5 py-1 rounded-md bg-black/5 dark:bg-zinc-800/80 border border-black/5 dark:border-zinc-700 text-[11px] font-mono font-semibold text-zinc-600 dark:text-zinc-300">
+                        {inq.category || "Support Inquiry"}
                       </span>
 
-                      <span className="text-xs font-mono text-zinc-400 font-bold">
-                        Ticket: {inq.ticketId || inq.id}
+                      <span className="text-xs font-mono text-zinc-500 font-semibold">
+                        ID: <span className="text-foreground dark:text-zinc-200 font-bold">{inq.ticketId || inq.id}</span>
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs font-mono text-zinc-500">
-                        {inq.createdAt && !isNaN(new Date(inq.createdAt).getTime())
-                          ? new Date(inq.createdAt).toLocaleDateString("en-US", {
-                              month: "short",
-                              day: "numeric",
-                              year: "numeric",
-                              hour: "2-digit",
-                              minute: "2-digit"
-                            })
-                          : "Recently"}
-                      </span>
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-1.5 text-xs font-mono text-zinc-500">
+                        <Clock size={13} />
+                        <span>
+                          {inq.createdAt && !isNaN(new Date(inq.createdAt).getTime())
+                            ? new Date(inq.createdAt).toLocaleDateString("en-US", {
+                                month: "short",
+                                day: "numeric",
+                                year: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit"
+                              })
+                            : "Recently Submitted"}
+                        </span>
+                      </div>
                       <button
                         onClick={() => handleDeleteTicket(inq.id)}
                         className="p-1.5 rounded-lg text-zinc-400 hover:text-rose-500 hover:bg-rose-500/10 transition-colors cursor-pointer"
-                        title="Delete Ticket"
+                        title="Delete Ticket Record"
                       >
-                        <Trash2 size={14} />
+                        <Trash2 size={15} />
                       </button>
                     </div>
                   </div>
 
-                  {/* WhatsApp-Style Conversation Stream */}
-                  <div className="space-y-3 p-4 rounded-xl bg-black/[0.02] dark:bg-[#04060a] border border-black/5 dark:border-zinc-800/80">
-                    
-                    {/* User Question Bubble */}
-                    <div className="flex flex-col items-start max-w-[92%] sm:max-w-[85%] mr-auto">
-                      <div className="flex items-center gap-1.5 mb-1 px-1">
-                        <span className="text-[10px] font-mono font-bold text-cyan-500 dark:text-[#00d1ff]">{inq.name || "You"}</span>
-                        <span className="text-[9px] font-mono text-zinc-500">• Your Query</span>
-                      </div>
-                      <div className="p-4 rounded-2xl rounded-tl-sm bg-white dark:bg-[#121b22] border border-black/10 dark:border-cyan-500/20 text-foreground dark:text-white shadow-sm text-xs space-y-2 w-full select-text">
+                  {/* Body Content */}
+                  <div className="p-6 space-y-6">
+                    {/* User Inquiry Details Section */}
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-mono uppercase tracking-wider text-zinc-500 font-bold flex items-center gap-1.5">
+                          <User size={13} className="text-cyan-500" />
+                          Inquiry Submission Details
+                        </span>
                         {inq.subject && (
-                          <h4 className="font-bold text-sm text-foreground dark:text-white border-b border-black/5 dark:border-white/5 pb-1">
+                          <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
                             {inq.subject}
-                          </h4>
+                          </span>
                         )}
+                      </div>
+
+                      <div className="p-4 rounded-xl bg-black/[0.02] dark:bg-zinc-900/40 border border-black/5 dark:border-zinc-800/80">
                         {renderFormattedInquiryMessage(inq.message)}
-                        <div className="flex justify-end items-center gap-1 text-[9px] font-mono text-zinc-400 pt-1 border-t border-black/5 dark:border-white/5">
-                          <span>{inq.createdAt && !isNaN(new Date(inq.createdAt).getTime()) ? new Date(inq.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Sent"}</span>
-                          <span className="text-cyan-500 dark:text-[#00d1ff] font-bold">✓✓</span>
-                        </div>
                       </div>
                     </div>
 
-                    {/* Admin Response Bubble */}
+                    {/* Official Admin Resolution Response Section */}
                     {inq.reply ? (
-                      <div className="flex flex-col items-end max-w-[92%] sm:max-w-[85%] ml-auto">
-                        <div className="flex items-center gap-1.5 mb-1 px-1">
-                          <ShieldCheck size={12} className="text-emerald-500" />
-                          <span className="text-[10px] font-mono font-bold text-emerald-500">RecodeX Official Response</span>
-                          <span className="text-[9px] font-mono text-zinc-500">• Verified Admin</span>
+                      <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/[0.03] dark:bg-emerald-950/10 overflow-hidden">
+                        <div className="px-4 py-2.5 bg-emerald-500/10 border-b border-emerald-500/20 flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <ShieldCheck size={16} className="text-emerald-500" />
+                            <span className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">
+                              Official Admin Resolution
+                            </span>
+                          </div>
+                          <span className="text-[10px] font-mono text-emerald-600/80 dark:text-emerald-400/80 font-semibold">
+                            Verified Desk Reply
+                          </span>
                         </div>
-                        <div className="p-4 rounded-2xl rounded-tr-sm bg-emerald-500/10 dark:bg-[#005c4b]/30 border border-emerald-500/25 text-foreground dark:text-emerald-50 shadow-sm text-xs space-y-2 w-full select-text">
-                          <p className="leading-relaxed whitespace-pre-wrap font-sans text-xs font-medium">
+                        <div className="p-4 space-y-2">
+                          <p className="text-xs md:text-sm text-foreground dark:text-zinc-100 font-sans leading-relaxed whitespace-pre-wrap">
                             {inq.reply}
                           </p>
-                          <div className="flex justify-end items-center gap-1 text-[9px] font-mono text-emerald-500 pt-1 border-t border-emerald-500/10">
-                            <span>Delivered & Verified</span>
-                            <span className="font-bold">✓✓</span>
+                          <div className="pt-2 border-t border-emerald-500/15 flex items-center justify-between text-[10px] font-mono text-zinc-500">
+                            <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
+                              <CheckCircle2 size={12} />
+                              Resolution Delivered & Synchronized
+                            </span>
+                            <span>Case Closed</span>
                           </div>
                         </div>
                       </div>
                     ) : (
-                      <div className="flex items-center gap-2 text-xs font-mono text-amber-500/90 bg-amber-500/5 p-3 rounded-xl border border-amber-500/15">
-                        <Clock size={14} className="animate-spin text-amber-500" />
-                        <span>Ticket queued in SLA review. Our support team is actively reviewing your request.</span>
-                      </div>
-                    )}
-
-                    {/* Thread Closed Pill */}
-                    {isResolved && (
-                      <div className="flex justify-center pt-2">
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-mono text-emerald-500 bg-emerald-500/10 border border-emerald-500/20">
-                          <CheckCircle2 size={12} />
-                          Ticket Resolved & Thread Closed
-                        </span>
+                      <div className="p-4 rounded-xl bg-amber-500/5 border border-amber-500/20 flex items-start gap-3 text-xs">
+                        <Clock size={16} className="text-amber-500 mt-0.5 shrink-0 animate-spin" />
+                        <div className="space-y-1">
+                          <p className="font-mono font-bold text-amber-500 uppercase tracking-wide text-[11px]">
+                            Ticket In Active SLA Review
+                          </p>
+                          <p className="text-zinc-600 dark:text-zinc-400 text-xs leading-relaxed">
+                            Our team is reviewing your query. You will receive the verified resolution here as soon as an administrator responds.
+                          </p>
+                        </div>
                       </div>
                     )}
                   </div>
