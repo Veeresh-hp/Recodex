@@ -12,16 +12,16 @@ const ROOT_ADMIN_EMAILS = ["veereshhp2004@gmail.com", "udaykumaras34@gmail.com"]
 router.post("/", async (req, res) => {
   const { name, email, phone, type, message } = req.body;
 
-  if (!name || !email || !phone || !message) {
-    return res.status(400).json({ error: "Missing required contact fields: name, email, phone, and message are required." });
+  if (!name || !email || !message) {
+    return res.status(400).json({ error: "Missing required contact fields: name, email, and message are required." });
   }
 
   try {
     const inquiry = await prisma.inquiry.create({
       data: {
         name,
-        email,
-        phone,
+        email: email.trim().toLowerCase(),
+        phone: phone || "",
         type: type || "others",
         message,
       },

@@ -62,24 +62,23 @@ interface Announcement {
   date: string;
 }
 
-const formatRelativeTime = (timestampStr: string): string => {
-  if (!timestampStr) return "";
-  let date = new Date(timestampStr);
+const formatRelativeTime = (timestampStr?: string | number | Date): string => {
+  if (!timestampStr) return "Just now";
+  let date: Date;
 
-  if (isNaN(date.getTime())) {
-    const match = timestampStr.match(/^(\d+)\s*([a-z]+)\s*ago$/i);
-    if (match) {
-      const val = parseInt(match[1], 10);
-      const unit = match[2].toLowerCase();
-      const nowMs = Date.now();
-      if (unit.startsWith("m") && !unit.startsWith("mo")) date = new Date(nowMs - val * 60 * 1000);
-      else if (unit.startsWith("h")) date = new Date(nowMs - val * 3600 * 1000);
-      else if (unit.startsWith("d")) date = new Date(nowMs - val * 86400 * 1000);
-      else if (unit.startsWith("mo")) date = new Date(nowMs - val * 30 * 86400 * 1000);
-      else if (unit.startsWith("y")) date = new Date(nowMs - val * 365 * 86400 * 1000);
-      else return timestampStr;
-    } else {
-      return timestampStr;
+  if (typeof timestampStr === "number") {
+    date = new Date(timestampStr);
+  } else if (timestampStr instanceof Date) {
+    date = timestampStr;
+  } else {
+    date = new Date(timestampStr);
+    if (isNaN(date.getTime())) {
+      const parsed = Date.parse(String(timestampStr));
+      if (!isNaN(parsed)) {
+        date = new Date(parsed);
+      } else {
+        return String(timestampStr);
+      }
     }
   }
 
@@ -92,7 +91,7 @@ const formatRelativeTime = (timestampStr: string): string => {
   const diffMonth = Math.floor(diffDay / 30);
   const diffYear = Math.floor(diffDay / 365);
 
-  if (diffSec < 45) return "Just now";
+  if (diffSec < 60) return "Just now";
   if (diffMin < 60) return `${Math.max(1, diffMin)}m ago`;
   if (diffHour < 24) return `${diffHour}h ago`;
   if (diffDay < 30) return `${diffDay}d ago`;
@@ -2663,7 +2662,7 @@ export default function Dashboard() {
                         <p className="text-xs text-zinc-400 line-clamp-2 leading-relaxed mb-3">{inq.message}</p>
                         <div className="flex justify-between items-center text-[9px] font-mono text-zinc-500 uppercase">
                           <span>{inq.type || "General Inquiry"}</span>
-                          <span>{formatRelativeTime(inq.createdAt)}</span>
+                          <span title={inq.date || inq.createdAt}>{formatRelativeTime(inq.createdAt || inq.timestamp || inq.date)}</span>
                         </div>
                       </div>
                     );
@@ -2690,7 +2689,9 @@ export default function Dashboard() {
                             <span className="inline-flex px-2 py-0.5 rounded text-[9px] font-mono font-black bg-primary/15 border border-primary/20 text-[#00d1ff] uppercase mb-1">
                               {activeInquiry.type || "General Inquiry"}
                             </span>
-                            <p className="text-[10px] text-zinc-400">{formatRelativeTime(activeInquiry.createdAt)}</p>
+                            <p className="text-[10px] text-zinc-400" title={activeInquiry.date || activeInquiry.createdAt}>
+                              {formatRelativeTime(activeInquiry.createdAt || activeInquiry.timestamp || activeInquiry.date)}
+                            </p>
                           </div>
                         </div>
 

@@ -702,18 +702,21 @@ const GOOGLE_SCRIPT_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbxzCq
 export async function submitInquiry(inquiryData: {
   name: string;
   email: string;
-  phone: string;
-  type: string;
+  phone?: string;
+  type?: string;
   message: string;
 }): Promise<any> {
+  const nowIso = new Date().toISOString();
+  const nowFormatted = new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" });
   const payload = {
-    id: `inq-${Date.now()}`,
-    timestamp: new Date().toISOString(),
-    date: new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }),
+    id: `inq-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    createdAt: nowIso,
+    timestamp: nowIso,
+    date: nowFormatted,
     name: inquiryData.name,
-    email: inquiryData.email,
-    phone: inquiryData.phone,
-    type: inquiryData.type || "others",
+    email: (inquiryData.email || "").toLowerCase().trim(),
+    phone: inquiryData.phone || "",
+    type: inquiryData.type || "General Inquiry",
     message: inquiryData.message,
   };
 
@@ -722,18 +725,15 @@ export async function submitInquiry(inquiryData: {
     if (typeof window !== "undefined") {
       const raw = localStorage.getItem("recodex_submitted_inquiries");
       const list: any[] = raw ? JSON.parse(raw) : [];
-      const isDup = list.some((i) => i.email === payload.email && i.message === payload.message);
-      if (!isDup) {
-        list.unshift(payload);
-        localStorage.setItem("recodex_submitted_inquiries", JSON.stringify(list));
-      }
+      list.unshift(payload);
+      localStorage.setItem("recodex_submitted_inquiries", JSON.stringify(list.slice(0, 200)));
       window.dispatchEvent(new Event("recodex-inquiry-submitted"));
     }
   } catch (lErr) {
     console.warn("[RECODEX API] Local storage inquiry save warning:", lErr);
   }
 
-  // 2. Attempt primary Express backend POST request (which syncs to Google Sheets once)
+  // 2. Attempt primary Express backend POST request
   let backendSuccess = false;
   try {
     const response = await fetch(`${API_BASE_URL}/contacts`, {
@@ -742,12 +742,16 @@ export async function submitInquiry(inquiryData: {
         "Content-Type": "application/json",
         "Accept": "application/json",
       },
-      body: JSON.stringify(inquiryData),
+      body: JSON.stringify({
+        ...inquiryData,
+        createdAt: nowIso,
+      }),
     });
 
     if (response.ok) {
       backendSuccess = true;
-      return await response.json();
+      const data = await response.json();
+      return { success: true, message: "Inquiry submitted successfully.", data };
     }
   } catch (backendError) {
     console.warn("[RECODEX API] Backend submit inquiry warning (using direct Google Sheet sync fallback):", backendError);
@@ -827,32 +831,40 @@ export async function getInquiries(token?: string): Promise<any[]> {
   } catch (e) {}
 
   const map = new Map<string, any>();
-  backendInquiries.forEach((inq) => {
-    if (inq && (inq.id || inq.email)) {
-      const key = inq.id || `${inq.email}-${inq.message}`;
-      if (!deletedInquiryIds.includes(inq.id) && !deletedInquiryIds.includes(key)) {
-        map.set(key, inq);
-      }
-    }
-  });
 
-  sheetInquiries.forEach((inq) => {
-    if (inq && (inq.id || inq.email)) {
-      const key = inq.id || `${inq.email}-${inq.message}`;
-      if (!deletedInquiryIds.includes(inq.id) && !deletedInquiryIds.includes(key) && !map.has(key)) {
-        map.set(key, inq);
-      }
-    }
-  });
-
-  localInquiries.forEach((inq) => {
+  const processInquiry = (inq: any) => {
+    if (!inq) return;
     const key = inq.id || `${inq.email}-${inq.message}`;
-    if (key && !deletedInquiryIds.includes(inq.id) && !deletedInquiryIds.includes(key) && !map.has(key)) {
-      map.set(key, inq);
-    }
-  });
+    if (deletedInquiryIds.includes(inq.id) || deletedInquiryIds.includes(key)) return;
 
-  return Array.from(map.values());
+    const createdTime = inq.createdAt || inq.timestamp || inq.date || new Date().toISOString();
+    const normalized = {
+      ...inq,
+      id: inq.id || key,
+      createdAt: createdTime,
+      timestamp: createdTime,
+      date: inq.date || new Date(createdTime).toLocaleString("en-US", { timeZone: "Asia/Kolkata" }),
+      name: inq.name || inq.email?.split("@")[0] || "Client",
+      email: (inq.email || "").toLowerCase().trim(),
+      phone: inq.phone || "",
+      type: inq.type || "General Inquiry",
+      message: inq.message || "",
+    };
+
+    if (!map.has(key)) {
+      map.set(key, normalized);
+    }
+  };
+
+  backendInquiries.forEach(processInquiry);
+  localInquiries.forEach(processInquiry);
+  sheetInquiries.forEach(processInquiry);
+
+  return Array.from(map.values()).sort((a, b) => {
+    const timeA = new Date(a.createdAt || a.timestamp || 0).getTime();
+    const timeB = new Date(b.createdAt || b.timestamp || 0).getTime();
+    return timeB - timeA;
+  });
 }
 
 /**
