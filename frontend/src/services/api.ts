@@ -971,6 +971,7 @@ export async function getCertificatesApi(userEmail?: string, userId?: string): P
       if (Array.isArray(data)) {
         if (!userEmail && !userId) {
           localStorage.setItem("recodex_global_certificates", JSON.stringify(data));
+          localStorage.setItem("recodex_synced_certificates", JSON.stringify(data));
         }
         return data;
       }
@@ -978,14 +979,24 @@ export async function getCertificatesApi(userEmail?: string, userId?: string): P
   } catch (e) {
     console.warn("[CERTIFICATES API] Backend fetch warning (using local fallback):", e);
   }
-  const stored = localStorage.getItem("recodex_global_certificates");
-  const allCerts: any[] = stored ? JSON.parse(stored) : [];
+
+  const stored1 = localStorage.getItem("recodex_global_certificates");
+  const stored2 = localStorage.getItem("recodex_synced_certificates");
+  const certs1: any[] = stored1 ? JSON.parse(stored1) : [];
+  const certs2: any[] = stored2 ? JSON.parse(stored2) : [];
+  const combinedMap = new Map<string, any>();
+  [...certs1, ...certs2].forEach((c) => {
+    if (c && c.id) combinedMap.set(c.id, c);
+  });
+  const allCerts: any[] = Array.from(combinedMap.values());
+
   if (userEmail || userId) {
     const emailClean = (userEmail || "").toLowerCase().trim();
     return allCerts.filter(
-      (c: any) =>
-        (emailClean && (c.userEmail || "").toLowerCase().trim() === emailClean) ||
-        (userId && c.userId === userId)
+      (c: any) => {
+        const cEmail = (c.userEmail || c.recipientEmail || "").toLowerCase().trim();
+        return (emailClean && cEmail === emailClean) || (userId && c.userId === userId);
+      }
     );
   }
   return allCerts;

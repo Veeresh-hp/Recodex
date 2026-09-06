@@ -693,6 +693,7 @@ const formatPrismaCertificate = (c: any) => ({
   certificateId: c.certificateId || c.id,
   userId: c.userId,
   userEmail: (c.recipientEmail || "").toLowerCase().trim(),
+  recipientEmail: (c.recipientEmail || "").toLowerCase().trim(),
   studentName: c.recipientName || "Developer",
   recipientName: c.recipientName || "Developer",
   projectName: c.projectTitle || "Software Solution Project",
@@ -943,7 +944,12 @@ router.get("/", async (req: Request, res: Response) => {
     let dbCerts: any[] = [];
     try {
       const where: any = {};
-      if (email) {
+      if (email && userId) {
+        where.OR = [
+          { recipientEmail: { equals: String(email).trim().toLowerCase(), mode: "insensitive" } },
+          { userId: String(userId) },
+        ];
+      } else if (email) {
         where.recipientEmail = { equals: String(email).trim().toLowerCase(), mode: "insensitive" };
       } else if (userId) {
         where.userId = String(userId);
@@ -968,7 +974,10 @@ router.get("/", async (req: Request, res: Response) => {
     let allCerts = Array.from(mergedMap.values());
     if (email) {
       const emailClean = String(email).toLowerCase().trim();
-      allCerts = allCerts.filter((c: any) => (c.userEmail || "").toLowerCase().trim() === emailClean);
+      allCerts = allCerts.filter((c: any) => {
+        const cEmail = (c.userEmail || c.recipientEmail || "").toLowerCase().trim();
+        return cEmail === emailClean;
+      });
     } else if (userId) {
       allCerts = allCerts.filter((c: any) => c.userId === String(userId));
     }

@@ -41,20 +41,37 @@ export default function Certificates() {
 
   const printRef = useRef<HTMLDivElement>(null);
 
-  const userEmail = (user?.primaryEmailAddress?.emailAddress || "").toLowerCase().trim();
+  const userEmail = (
+    user?.primaryEmailAddress?.emailAddress ||
+    user?.emailAddresses?.[0]?.emailAddress ||
+    ""
+  ).toLowerCase().trim();
+
+  const allUserEmails = (user?.emailAddresses || [])
+    .map((e) => (e.emailAddress || "").toLowerCase().trim())
+    .filter(Boolean);
+  if (userEmail && !allUserEmails.includes(userEmail)) {
+    allUserEmails.push(userEmail);
+  }
+
   const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(" ") || user?.fullName || user?.username || "RecodeX Engineer";
 
   const fetchCerts = async () => {
     setLoading(true);
     try {
-      const serverCerts: any[] = await getCertificatesApi(userEmail, userId || undefined);
-      const localRaw = localStorage.getItem("recodex_global_certificates");
-      const localCerts: any[] = localRaw ? JSON.parse(localRaw) : [];
+      const serverCerts: any[] = await getCertificatesApi(userEmail || undefined, userId || undefined);
+      const localRaw1 = localStorage.getItem("recodex_global_certificates");
+      const localRaw2 = localStorage.getItem("recodex_synced_certificates");
+      const localCerts1: any[] = localRaw1 ? JSON.parse(localRaw1) : [];
+      const localCerts2: any[] = localRaw2 ? JSON.parse(localRaw2) : [];
 
       // Combine and de-duplicate by ID
       const combinedMap = new Map<string, any>();
-      [...serverCerts, ...localCerts].forEach((c) => {
-        if (c && c.id) combinedMap.set(c.id, c);
+      [...serverCerts, ...localCerts1, ...localCerts2].forEach((c) => {
+        if (c && (c.id || c.certificateId)) {
+          const key = c.id || c.certificateId;
+          combinedMap.set(key, c);
+        }
       });
 
       const allList = Array.from(combinedMap.values());
@@ -64,18 +81,16 @@ export default function Certificates() {
       const userCerts = allList.filter((c: any) => {
         if (!c) return false;
         // Filter out any dummy sample certificates
-        if (["john doe", "alice vance", "sarah connor"].includes((c.studentName || "").toLowerCase().trim())) return false;
+        if (["john doe", "alice vance", "sarah connor"].includes((c.studentName || c.recipientName || "").toLowerCase().trim())) return false;
         if (["cert-9402", "cert-1842", "cert-0691"].includes((c.id || "").toLowerCase().trim())) return false;
 
-        const certEmail = (c.userEmail || "").toLowerCase().trim();
+        const certEmail = (c.userEmail || c.recipientEmail || "").toLowerCase().trim();
         const certUserId = c.userId || "";
-        const certName = (c.studentName || "").toLowerCase().trim();
 
-        const matchEmail = Boolean(userEmail && certEmail && certEmail === userEmail);
+        const matchEmail = allUserEmails.length > 0 && certEmail && allUserEmails.includes(certEmail);
         const matchUserId = Boolean(userId && certUserId && certUserId === userId);
-        const matchName = Boolean(fullName && certName && certName === fullName.toLowerCase().trim() && certEmail === userEmail);
 
-        return matchEmail || matchUserId || matchName;
+        return matchEmail || matchUserId;
       });
 
       setCertificates(userCerts);
@@ -98,7 +113,7 @@ export default function Certificates() {
       window.removeEventListener("recodex-certificates-update", fetchCerts);
       window.removeEventListener("storage", fetchCerts);
     };
-  }, [isLoaded, userId, userEmail, fullName]);
+  }, [isLoaded, userId, userEmail, fullName, user]);
 
   const handleCopyLink = (cert: Certificate) => {
     const shareUrl = `${window.location.origin}/certificates?verify=${cert.id}`;
