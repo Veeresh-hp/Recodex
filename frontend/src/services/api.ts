@@ -49,7 +49,7 @@ export async function getProjects(category?: string, search?: string): Promise<P
     }
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 1200);
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
 
     const response = await fetch(url.toString(), {
       method: "GET",

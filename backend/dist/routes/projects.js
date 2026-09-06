@@ -37,7 +37,26 @@ router.get("/", async (req, res) => {
         }
         const projects = await db_1.default.project.findMany({
             where: filters,
-            include: {
+            select: {
+                id: true,
+                title: true,
+                description: true,
+                longDescription: true,
+                status: true,
+                imageUrl: true,
+                category: true,
+                tags: true,
+                devsCount: true,
+                stars: true,
+                forks: true,
+                certificateEnabled: true,
+                certificateName: true,
+                completionMethod: true,
+                scheduledCompletionAt: true,
+                automaticIssuance: true,
+                issuanceDelayDays: true,
+                createdAt: true,
+                updatedAt: true,
                 assignments: {
                     select: {
                         id: true,

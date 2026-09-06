@@ -20,27 +20,20 @@ const MOCK_USERS: any[] = [
   { id: "sandbox-client-003", email: "veereshhp_client@gmail.com", name: "Veeresh H P (Client)", role: "client", profileImage: null, createdAt: new Date(), updatedAt: new Date() }
 ];
 
-const MOCK_PROJECTS: any[] = [
-  {
-    id: "recodex-live-demo-project",
-    title: "Enterprise Custom Portal Implementation",
-    description: "Interactive visual metrics interface aligned to custom API synchronization modules.",
-    longDescription: "Detailed sandbox platform providing developers and client organizations full end-to-end monitoring metrics, live deployment timeline records, secure role elevation, and compiler simulation tools.",
-    status: "Active",
-    imageUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=600",
-    category: "Web Systems",
-    tags: ["VITE", "REACT", "TYPESCRIPT", "TAILWIND", "EXPRESS", "PRISMA"],
-    devsCount: 1,
-    stars: 38,
-    forks: 14,
-    files: JSON.stringify({
-      "src/server.ts": "import express from 'express';\nconst app = express();\napp.listen(5000, () => console.log('Mock Server Ready'));",
-      "README.md": "# Mock Project Node\nThis is a simulation sandbox node."
-    }),
-    createdAt: new Date(),
-    updatedAt: new Date()
+let MOCK_PROJECTS: any[] = [];
+try {
+  const rawProjects = require("./mockProjects.json");
+  if (Array.isArray(rawProjects) && rawProjects.length > 0) {
+    MOCK_PROJECTS = rawProjects.map((p: any) => ({
+      ...p,
+      imageUrl: p.image || p.imageUrl,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }));
   }
-];
+} catch (e) {
+  MOCK_PROJECTS = [];
+}
 
 const MOCK_PROJECT_DEVS: any[] = [
   { projectId: "recodex-live-demo-project", userId: "sandbox-dev-002" }
