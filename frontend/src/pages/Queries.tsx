@@ -218,7 +218,8 @@ export default function Queries() {
             if (existingIdx >= 0) {
               uniqueList.splice(existingIdx, 1);
             }
-            uniqueList.unshift(directMatch);
+            const resolvedDirect = map.get(uKey) || directMatch;
+            uniqueList.unshift(resolvedDirect);
           }
         } catch (dirErr) {
           console.warn("Direct ticket lookup error:", dirErr);

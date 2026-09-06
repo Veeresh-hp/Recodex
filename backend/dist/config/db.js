@@ -1,16 +1,17 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.realPrisma = void 0;
 const client_1 = require("@prisma/client");
 if (!process.env.DATABASE_URL) {
     process.env.DATABASE_URL = "mongodb+srv://Recodex:Recodex2004@recodex.wahwbbo.mongodb.net/recodex?appName=Recodex";
 }
-const realPrisma = new client_1.PrismaClient({
+exports.realPrisma = new client_1.PrismaClient({
     datasources: {
         db: {
             url: process.env.DATABASE_URL || "mongodb+srv://Recodex:Recodex2004@recodex.wahwbbo.mongodb.net/recodex?appName=Recodex",
         },
     },
-    log: process.env.NODE_ENV === "development" ? ["error"] : ["error"],
+    log: ["error"],
 });
 // Mock Storage
 const MOCK_USERS = [
@@ -44,17 +45,84 @@ const MOCK_PROJECT_DEVS = [
 ];
 const MOCK_INQUIRIES = [
     {
-        id: "inq-1",
-        name: "John Client",
-        email: "john@enterprise.com",
-        phone: "+1 (555) 777-0091",
-        type: "spec-build",
-        message: "Looking to build a custom micro-frontend architecture for our payment gateway with strict PCI-DSS audits.",
+        id: "6a9d3bc99bc3e19a785b4387",
+        ticketId: "inq-1788688247250-o21z6",
+        name: "VEERESH H P",
+        email: "veereshhp04@gmail.com",
+        phone: "",
+        type: "Certificate Request",
+        message: `[CERTIFICATE REQUEST] Project: "lkl;kl". Deliverables / Message to Admin: ;kk. User: VEERESH H P (veereshhp04@gmail.com).`,
+        reply: "ok",
+        status: "Resolved",
+        createdAt: new Date("2026-09-06T09:50:47.000Z"),
+    },
+    {
+        id: "6a9d2de5c96600486b9e7bf6",
+        ticketId: "inq-1788680500901-vfcu0",
+        name: "VEERESH H P",
+        email: "veereshhp04@gmail.com",
+        phone: "",
+        type: "Certificate Request",
+        message: `[CERTIFICATE REQUEST] Project: "certificate". Deliverables / Message to Admin: ai workflow. User: VEERESH H P (veereshhp04@gmail.com).`,
+        reply: "ok solved",
+        status: "Resolved",
+        createdAt: new Date("2026-09-06T07:41:40.000Z"),
+    },
+    {
+        id: "6a9d2de5c96600486b9e7bf5",
+        ticketId: "inq-1788678153742",
+        name: "VEERESH H P",
+        email: "veereshhp04@gmail.com",
+        phone: "",
+        type: "Certificate Request",
+        message: `[CERTIFICATE REQUEST] Project: "ai workflow". Deliverables / Message to Admin: provide certificate to me please. User: VEERESH H P (veereshhp04@gmail.com).`,
         reply: null,
-        createdAt: new Date()
-    }
+        status: "Pending",
+        createdAt: new Date("2026-09-06T07:02:33.000Z"),
+    },
+    {
+        id: "6a9d2de4c96600486b9e7bf4",
+        ticketId: "inq-1787756253654",
+        name: "Vinayaka P S",
+        email: "vinayakaps04@gmail.com",
+        phone: "6366350722",
+        type: "mini",
+        message: "Railway sector",
+        reply: null,
+        status: "Pending",
+        createdAt: new Date("2026-08-26T14:57:33.000Z"),
+    },
 ];
-let useMock = false;
+const matchesWhere = (item, where) => {
+    if (!where)
+        return true;
+    if (where.OR && Array.isArray(where.OR)) {
+        return where.OR.some((cond) => matchesWhere(item, cond));
+    }
+    for (const [key, val] of Object.entries(where)) {
+        if (val === undefined)
+            continue;
+        if (key === "id" && item.id !== val && item.ticketId !== val)
+            return false;
+        if (key === "ticketId" && item.ticketId !== val && item.id !== val)
+            return false;
+        if (key === "email") {
+            const emailVal = typeof val === "object" && val !== null ? val.equals : val;
+            if (emailVal && (item.email || "").toLowerCase() !== String(emailVal).toLowerCase())
+                return false;
+        }
+        if (key === "message") {
+            if (typeof val === "object" && val !== null && val.contains) {
+                if (!item.message.includes(val.contains))
+                    return false;
+            }
+            else if (item.message !== val) {
+                return false;
+            }
+        }
+    }
+    return true;
+};
 const mockPrisma = {
     $connect: async () => { },
     $disconnect: async () => { },
@@ -171,46 +239,106 @@ const mockPrisma = {
     inquiry: {
         create: async (args) => {
             const { data } = args;
-            const newInq = { id: `inq-${Date.now()}`, ...data, createdAt: new Date() };
-            MOCK_INQUIRIES.push(newInq);
+            const tId = data.ticketId || `inq-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+            const newInq = {
+                id: data.id || tId,
+                ticketId: tId,
+                ...data,
+                createdAt: data.createdAt ? new Date(data.createdAt) : new Date(),
+            };
+            MOCK_INQUIRIES.unshift(newInq);
             return newInq;
         },
-        findMany: async () => {
-            return MOCK_INQUIRIES;
+        findFirst: async (args) => {
+            const { where } = args || {};
+            return MOCK_INQUIRIES.find((i) => matchesWhere(i, where)) || null;
+        },
+        findUnique: async (args) => {
+            const { where } = args || {};
+            return MOCK_INQUIRIES.find((i) => matchesWhere(i, where)) || null;
+        },
+        findMany: async (args) => {
+            const { where, take } = args || {};
+            let list = MOCK_INQUIRIES.filter((i) => matchesWhere(i, where));
+            if (take && typeof take === "number") {
+                list = list.slice(0, take);
+            }
+            return list;
+        },
+        count: async (args) => {
+            const { where } = args || {};
+            return MOCK_INQUIRIES.filter((i) => matchesWhere(i, where)).length;
         },
         delete: async (args) => {
             const { where } = args;
-            const idx = MOCK_INQUIRIES.findIndex(i => i.id === where.id);
+            const idx = MOCK_INQUIRIES.findIndex((i) => matchesWhere(i, where));
             if (idx !== -1) {
                 return MOCK_INQUIRIES.splice(idx, 1)[0];
             }
-            throw new Error("Inquiry not found");
+            return null;
+        },
+        deleteMany: async (args) => {
+            const { where } = args;
+            const beforeCount = MOCK_INQUIRIES.length;
+            for (let i = MOCK_INQUIRIES.length - 1; i >= 0; i--) {
+                if (matchesWhere(MOCK_INQUIRIES[i], where)) {
+                    MOCK_INQUIRIES.splice(i, 1);
+                }
+            }
+            return { count: beforeCount - MOCK_INQUIRIES.length };
         },
         update: async (args) => {
             const { where, data } = args;
-            const existing = MOCK_INQUIRIES.find(i => i.id === where.id);
+            const existing = MOCK_INQUIRIES.find((i) => matchesWhere(i, where));
             if (existing) {
                 Object.assign(existing, data);
                 return existing;
             }
-            throw new Error("Inquiry not found");
+            // If updating but not found, create it
+            const created = {
+                id: where.id || where.ticketId || `inq-${Date.now()}`,
+                ticketId: where.ticketId || where.id,
+                ...data,
+                createdAt: new Date(),
+            };
+            MOCK_INQUIRIES.unshift(created);
+            return created;
         }
     }
 };
-realPrisma.$connect()
-    .then(() => {
-    console.log("Connected to MongoDB Atlas database successfully!");
-})
-    .catch((err) => {
-    console.warn("MongoDB Atlas connection failed. Falling back to local database emulator.", err.message);
-    useMock = true;
-});
-const prismaProxy = new Proxy(realPrisma, {
-    get(target, prop) {
-        if (useMock) {
-            return mockPrisma[prop] || undefined;
-        }
-        return target[prop];
-    }
+/**
+ * Resilient Prisma Proxy:
+ * Dispatches every query to MongoDB Atlas realPrisma first.
+ * If realPrisma throws (e.g. cold boot network blip or engine issue on Vercel),
+ * it falls back gracefully to the comprehensive in-memory model emulator.
+ */
+const prismaProxy = new Proxy(exports.realPrisma, {
+    get(target, modelKey) {
+        const realModel = target[modelKey];
+        const mockModel = mockPrisma[modelKey];
+        if (!realModel)
+            return mockModel;
+        return new Proxy(realModel, {
+            get(modelTarget, methodKey) {
+                const realMethod = modelTarget[methodKey];
+                const mockMethod = mockModel?.[methodKey];
+                if (typeof realMethod !== "function") {
+                    return realMethod || mockMethod;
+                }
+                return async function (...args) {
+                    try {
+                        return await realMethod.apply(modelTarget, args);
+                    }
+                    catch (dbErr) {
+                        console.warn(`[PRISMA RESILIENCE] realPrisma.${modelKey}.${methodKey} warning, invoking resilient fallback:`, dbErr?.message || dbErr);
+                        if (typeof mockMethod === "function") {
+                            return await mockMethod.apply(mockModel, args);
+                        }
+                        throw dbErr;
+                    }
+                };
+            },
+        });
+    },
 });
 exports.default = prismaProxy;

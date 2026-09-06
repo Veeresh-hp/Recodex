@@ -289,6 +289,23 @@ router.put("/:id/reply", async (req: Request, res: Response) => {
         },
       });
 
+      // Also forward reply to Google Sheet Webhook in background
+      try {
+        const webhookUrl = process.env.GOOGLE_SHEET_WEBHOOK_URL || "https://script.google.com/macros/s/AKfycbxzCq2Zsk5b_dCD0eysi3X7MOa5CLgu80EZRFXllz50Djf3GJd0NAAyxsMGFfMoMtxm9w/exec";
+        fetch(webhookUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "reply",
+            id: updated.ticketId || updated.id,
+            ticketId: updated.ticketId || updated.id,
+            reply,
+            status: "Resolved",
+            email: updated.email,
+          }),
+        }).catch(() => {});
+      } catch (e) {}
+
       return res.json({
         ...updated,
         id: updated.ticketId || updated.id,

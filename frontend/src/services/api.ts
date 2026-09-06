@@ -1075,11 +1075,45 @@ export async function replyToInquiry(id: string, reply: string, token: string, i
     });
 
     if (response.ok) {
-      return await response.json();
+      const data = await response.json();
+      // Forward to Google Sheet Webhook
+      try {
+        fetch(GOOGLE_SCRIPT_WEBHOOK_URL, {
+          method: "POST",
+          mode: "no-cors",
+          headers: { "Content-Type": "text/plain" },
+          body: JSON.stringify({
+            action: "reply",
+            id,
+            ticketId: id,
+            reply,
+            status: "Resolved",
+            email: inqData?.email,
+          }),
+        }).catch(() => {});
+      } catch (e) {}
+      return data;
     }
   } catch (error) {
     console.warn("[RECODEX API] Reply to inquiry backend warning (saved locally):", error);
   }
+
+  // Also push to Google Sheet Webhook on fallback
+  try {
+    fetch(GOOGLE_SCRIPT_WEBHOOK_URL, {
+      method: "POST",
+      mode: "no-cors",
+      headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify({
+        action: "reply",
+        id,
+        ticketId: id,
+        reply,
+        status: "Resolved",
+        email: inqData?.email,
+      }),
+    }).catch(() => {});
+  } catch (e) {}
 
   return { id, reply, status: "Resolved" };
 }
