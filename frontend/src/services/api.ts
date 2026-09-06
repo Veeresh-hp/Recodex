@@ -777,14 +777,15 @@ export async function submitInquiry(inquiryData: {
 /**
  * Fetches all contact inquiries from backend API, Google Sheet & local sync (admin only).
  */
-export async function getInquiries(token?: string): Promise<any[]> {
+export async function getInquiries(token?: string, email?: string): Promise<any[]> {
   let backendInquiries: any[] = [];
   try {
     const headers: Record<string, string> = { "Accept": "application/json" };
     if (token) {
       headers["Authorization"] = `Bearer ${token}`;
     }
-    const response = await fetch(`${API_BASE_URL}/contacts`, {
+    const url = email ? `${API_BASE_URL}/contacts?email=${encodeURIComponent(email.toLowerCase().trim())}` : `${API_BASE_URL}/contacts`;
+    const response = await fetch(url, {
       method: "GET",
       headers,
     });
@@ -848,8 +849,12 @@ export async function getInquiries(token?: string): Promise<any[]> {
   const processInquiry = (inq: any) => {
     if (!inq) return;
     const inqId = inq.id || inq.ticketId || "";
-    const key = inqId || `${inq.email}-${inq.message}`;
-    if (deletedInquiryIds.includes(inqId) || deletedInquiryIds.includes(key)) return;
+    const inqEmail = (inq.email || "").toLowerCase().trim();
+    const inqMsg = (inq.message || "").trim();
+    const emailMsgKey = `${inqEmail}-${inqMsg}`;
+    const key = inqId || emailMsgKey;
+
+    if (deletedInquiryIds.includes(inqId) || deletedInquiryIds.includes(key) || deletedInquiryIds.includes(emailMsgKey)) return;
 
     // Resolve accurate creation timestamp
     let createdTime = inq.createdAt || inq.timestamp;
@@ -874,43 +879,57 @@ export async function getInquiries(token?: string): Promise<any[]> {
       createdTime = new Date().toISOString();
     }
 
-    const resolvedReply = inq.reply || repliesMap[inqId] || repliesMap[key] || (inq.ticketId ? repliesMap[inq.ticketId] : undefined);
-    const resolvedStatus = inq.status || statusesMap[inqId] || statusesMap[key] || (resolvedReply ? "Resolved" : "Pending");
+    const existing = map.get(key) || (inqId ? map.get(inqId) : undefined) || map.get(emailMsgKey) ||
+      Array.from(map.values()).find((x: any) =>
+        (x.ticketId && inq.ticketId && x.ticketId === inq.ticketId) ||
+        (x.id && inq.id && x.id === inq.id) ||
+        (x.email && inqEmail && x.email.toLowerCase().trim() === inqEmail && x.message && inqMsg && x.message.trim() === inqMsg)
+      );
+
+    const resolvedReply = inq.reply || existing?.reply || repliesMap[inqId] || repliesMap[key] || repliesMap[emailMsgKey] || (inq.ticketId ? repliesMap[inq.ticketId] : undefined);
+    const resolvedStatus = (inq.status === "Resolved" || existing?.status === "Resolved" || statusesMap[inqId] === "Resolved" || statusesMap[key] === "Resolved" || resolvedReply)
+      ? "Resolved"
+      : (inq.status || existing?.status || statusesMap[inqId] || statusesMap[key] || "Pending");
 
     const normalized = {
+      ...existing,
       ...inq,
-      id: inqId || key,
-      ticketId: inq.ticketId || inqId || key,
+      id: inqId || existing?.id || key,
+      ticketId: inq.ticketId || existing?.ticketId || inqId || key,
       createdAt: createdTime,
       timestamp: createdTime,
-      date: inq.date || new Date(createdTime).toLocaleString("en-US", { timeZone: "Asia/Kolkata" }),
-      name: inq.name || inq.email?.split("@")[0] || "Client",
-      email: (inq.email || "").toLowerCase().trim(),
-      phone: inq.phone || "",
-      type: inq.type || "General Inquiry",
-      message: inq.message || "",
+      date: inq.date || existing?.date || new Date(createdTime).toLocaleString("en-US", { timeZone: "Asia/Kolkata" }),
+      name: inq.name || existing?.name || inq.email?.split("@")[0] || "Client",
+      email: inqEmail,
+      phone: inq.phone || existing?.phone || "",
+      type: inq.type || existing?.type || "General Inquiry",
+      message: inq.message || existing?.message || "",
       reply: resolvedReply || undefined,
       status: resolvedStatus,
     };
 
-    if (map.has(key)) {
-      const existing = map.get(key);
-      map.set(key, {
-        ...existing,
-        ...normalized,
-        reply: normalized.reply || existing.reply,
-        status: normalized.reply || existing.reply ? "Resolved" : (normalized.status || existing.status || "Pending"),
-      });
-    } else {
-      map.set(key, normalized);
-    }
+    map.set(key, normalized);
+    map.set(emailMsgKey, normalized);
+    if (inqId) map.set(inqId, normalized);
   };
 
   backendInquiries.forEach(processInquiry);
-  localInquiries.forEach(processInquiry);
   sheetInquiries.forEach(processInquiry);
+  localInquiries.forEach(processInquiry);
 
-  return Array.from(map.values()).sort((a, b) => {
+  // Return unique inquiries by primary key
+  const uniqueList: any[] = [];
+  const seenIds = new Set<string>();
+
+  Array.from(map.values()).forEach((item) => {
+    const uniqueKey = item.ticketId || item.id || `${item.email}-${item.message}`;
+    if (!seenIds.has(uniqueKey)) {
+      seenIds.add(uniqueKey);
+      uniqueList.push(item);
+    }
+  });
+
+  return uniqueList.sort((a, b) => {
     const timeA = new Date(a.createdAt || a.timestamp || 0).getTime();
     const timeB = new Date(b.createdAt || b.timestamp || 0).getTime();
     return timeB - timeA;

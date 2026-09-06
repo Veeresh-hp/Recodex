@@ -10,6 +10,7 @@ import {
 
 interface Inquiry {
   id: string;
+  ticketId?: string;
   name: string;
   email: string;
   subject?: string;
@@ -119,7 +120,7 @@ export default function Queries() {
         }
       } catch (e) {}
 
-      const all: any[] = await getInquiries("");
+      const all: any[] = await getInquiries("", userEmail);
       const localRepliesRaw = localStorage.getItem("recodex_inquiry_replies");
       const repliesMap = localRepliesRaw ? JSON.parse(localRepliesRaw) : {};
 
@@ -129,39 +130,66 @@ export default function Queries() {
       const localInquiriesRaw = localStorage.getItem("recodex_submitted_inquiries");
       const localInquiries: any[] = localInquiriesRaw ? JSON.parse(localInquiriesRaw) : [];
 
-      // Merge and map
-      const mergedMap = new Map<string, any>();
-      [...all, ...localInquiries].forEach((inq) => {
-        if (inq && inq.id) {
-          // Filter out the requested test inquiry ID or test message
-          if (inq.id === "inq-1787642424751" || (inq.message || "").trim() === "sdsadas") return;
-          const inqId = inq.id || inq.ticketId;
-          const r = repliesMap[inqId] || (inq.ticketId ? repliesMap[inq.ticketId] : undefined) || inq.reply;
-          const s = statusesMap[inqId] || (inq.ticketId ? statusesMap[inq.ticketId] : undefined) || inq.status || (r ? "Resolved" : "Pending");
-          const finalStatus = (s || "").toLowerCase() === "resolved" || !!r ? "Resolved" : "Pending";
+      const map = new Map<string, any>();
 
-          mergedMap.set(inq.id, {
-            ...inq,
-            reply: r,
-            status: finalStatus,
-            category: inq.category || "Technical Query",
-            priority: inq.priority || "Normal"
-          });
+      const processItem = (inq: any) => {
+        if (!inq) return;
+        if (inq.id === "inq-1787642424751" || (inq.message || "").trim() === "sdsadas") return;
+        if (inq.subject === "Account Onboarding & Security Clearance") return;
+
+        const inqId = inq.ticketId || inq.id || "";
+        const inqEmail = (inq.email || "").toLowerCase().trim();
+        const inqMsg = (inq.message || "").trim();
+        const emailMsgKey = `${inqEmail}-${inqMsg}`;
+        const key = inqId || emailMsgKey;
+
+        const existing = map.get(key) || (inqId ? map.get(inqId) : undefined) || map.get(emailMsgKey) ||
+          Array.from(map.values()).find((x: any) =>
+            (x.ticketId && inq.ticketId && x.ticketId === inq.ticketId) ||
+            (x.id && inq.id && x.id === inq.id) ||
+            (x.email && inqEmail && x.email.toLowerCase().trim() === inqEmail && x.message && inqMsg && x.message.trim() === inqMsg)
+          );
+
+        const r = inq.reply || existing?.reply || repliesMap[inqId] || repliesMap[key] || repliesMap[emailMsgKey] || (inq.ticketId ? repliesMap[inq.ticketId] : undefined);
+        const s = inq.status || existing?.status || statusesMap[inqId] || statusesMap[key] || (r ? "Resolved" : "Pending");
+        const finalStatus = (s || "").toLowerCase() === "resolved" || !!r ? "Resolved" : "Pending";
+
+        const normalized = {
+          ...existing,
+          ...inq,
+          id: inqId || existing?.id || key,
+          ticketId: inq.ticketId || existing?.ticketId || inqId || key,
+          reply: r || undefined,
+          status: finalStatus,
+          category: inq.category || existing?.category || "Technical Query",
+          priority: inq.priority || existing?.priority || "Normal",
+          createdAt: inq.createdAt || existing?.createdAt || inq.timestamp || new Date().toISOString(),
+        };
+
+        map.set(key, normalized);
+        map.set(emailMsgKey, normalized);
+        if (inqId) map.set(inqId, normalized);
+      };
+
+      all.forEach(processItem);
+      localInquiries.forEach(processItem);
+
+      // Return unique inquiries for this user
+      const uniqueList: any[] = [];
+      const seenIds = new Set<string>();
+
+      Array.from(map.values()).forEach((item) => {
+        const itemEmail = (item.email || "").toLowerCase().trim();
+        if (userEmail && itemEmail === userEmail) {
+          const uniqueKey = item.ticketId || item.id || `${item.email}-${item.message}`;
+          if (!seenIds.has(uniqueKey)) {
+            seenIds.add(uniqueKey);
+            uniqueList.push(item);
+          }
         }
       });
 
-      const allMerged = Array.from(mergedMap.values());
-
-      // Filter for this user's queries
-      const userList = allMerged.filter((inq: any) => {
-        if (!inq) return false;
-        if (inq.id === "inq-1787642424751" || (inq.message || "").trim() === "sdsadas") return false;
-        if (inq.subject === "Account Onboarding & Security Clearance") return false;
-        const inqEmail = (inq.email || "").toLowerCase().trim();
-        return userEmail && inqEmail === userEmail;
-      });
-
-      setInquiries(userList);
+      setInquiries(uniqueList);
     } catch (e) {
       console.warn("Failed to load inquiries:", e);
     } finally {
@@ -173,11 +201,11 @@ export default function Queries() {
     try {
       const token = await getToken();
       await deleteInquiry(id, token || "");
-      const updated = inquiries.filter((i) => i.id !== id);
+      const updated = inquiries.filter((i) => i.id !== id && i.ticketId !== id);
       setInquiries(updated);
     } catch (e) {
       console.warn("Failed to delete ticket:", e);
-      const updated = inquiries.filter((i) => i.id !== id);
+      const updated = inquiries.filter((i) => i.id !== id && i.ticketId !== id);
       setInquiries(updated);
     }
   };
@@ -242,7 +270,7 @@ export default function Queries() {
       inq.id.toLowerCase().includes(searchQuery.toLowerCase());
 
     if (statusFilter === "ALL") return matchesSearch;
-    return matchesSearch && inq.status === statusFilter;
+    return matchesSearch && (inq.status || "Pending") === statusFilter;
   });
 
   return (
@@ -275,50 +303,53 @@ export default function Queries() {
           <div>
             <div className="flex items-center gap-2 text-amber-500 font-mono text-xs uppercase tracking-widest font-bold mb-2">
               <MessageSquare size={16} />
-              <span>Direct Protocol Help Desk</span>
+              <span>Direct Support Telemetry</span>
             </div>
-            <h1 className="text-3xl sm:text-4xl font-black text-foreground dark:text-white tracking-tight">
-              Support Queries & Tickets
+            <h1 className="text-3xl md:text-4xl font-extrabold text-foreground dark:text-white tracking-tight">
+              Support Queries & Resolution
             </h1>
-            <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-2 max-w-2xl">
-              Track submitted technical inquiries, project modifications, and direct answers from lead engineers and system administrators.
+            <p className="text-zinc-500 text-sm mt-2 max-w-xl">
+              Track your service inquiries, support tickets, and direct verified admin resolutions in real-time.
             </p>
           </div>
 
-          <div className="flex items-center gap-3 shrink-0">
-            <button
-              onClick={() => setNewTicketModalOpen(true)}
-              className="px-4 py-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 dark:text-amber-400 border border-amber-500/30 hover:border-amber-500/60 font-semibold text-xs tracking-wide transition-all shadow-[0_0_15px_rgba(245,158,11,0.12)] hover:scale-[1.02] active:scale-95 flex items-center gap-2 cursor-pointer font-sans"
-            >
-              <Plus size={16} />
-              Submit New Ticket
-            </button>
-          </div>
+          <button
+            onClick={() => setNewTicketModalOpen(true)}
+            className="px-5 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-mono font-bold text-xs uppercase tracking-wider flex items-center gap-2 shadow-[0_0_20px_rgba(245,158,11,0.2)] hover:shadow-[0_0_30px_rgba(245,158,11,0.4)] transition-all cursor-pointer shrink-0"
+          >
+            <Plus size={16} />
+            <span>Open Support Query</span>
+          </button>
         </div>
 
-        {/* Filter Bar */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-8">
-          <div className="relative w-full sm:w-80">
-            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
+        {/* Filter Controls */}
+        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 mb-8">
+          {/* Search */}
+          <div className="relative flex-1 max-w-md">
+            <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" />
             <input
               type="text"
-              placeholder="Search by ticket ID, subject, or message..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-white/70 dark:bg-zinc-900/70 border border-black/10 dark:border-zinc-800 rounded-xl text-xs text-foreground placeholder:text-zinc-500 focus:outline-none focus:border-amber-500 transition-all font-sans"
+              placeholder="Search by ticket ID, subject, or message..."
+              className="w-full pl-11 pr-4 py-2.5 rounded-xl bg-white/50 dark:bg-zinc-900/50 border border-black/10 dark:border-zinc-800 focus:outline-none focus:border-amber-500 text-xs font-mono transition-all"
             />
           </div>
 
-          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-            <span className="text-xs font-mono text-zinc-400 font-bold uppercase mr-1">Status:</span>
-            <div className="flex items-center gap-1 p-1 bg-black/5 dark:bg-zinc-900/80 border border-black/10 dark:border-zinc-800 rounded-xl">
+          {/* Status Filter Tabs */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0">
+            <div className="bg-black/5 dark:bg-zinc-900/80 p-1 rounded-xl border border-black/5 dark:border-zinc-800 flex items-center gap-1">
               {(["ALL", "Pending", "Resolved"] as const).map((status) => (
                 <button
                   key={status}
                   onClick={() => setStatusFilter(status)}
-                  className={`px-3 py-1.5 rounded-lg text-xs transition-all cursor-pointer font-sans ${
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
                     statusFilter === status
-                      ? "bg-white dark:bg-zinc-800 text-foreground dark:text-white shadow-sm border border-black/5 dark:border-zinc-700 font-semibold"
+                      ? status === "Resolved"
+                        ? "bg-emerald-500/15 text-emerald-500 border border-emerald-500/30 shadow-sm"
+                        : status === "Pending"
+                        ? "bg-amber-500/15 text-amber-500 border border-amber-500/30 shadow-sm"
+                        : "bg-white dark:bg-zinc-800 text-foreground dark:text-white shadow-sm border border-black/5 dark:border-zinc-700"
                       : "text-zinc-500 hover:text-foreground dark:hover:text-zinc-200"
                   }`}
                 >
@@ -350,37 +381,38 @@ export default function Queries() {
             </button>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-6">
             {filteredInquiries.map((inq) => {
-              const isResolved = inq.status === "Resolved";
+              const isResolved = (inq.status || "").toLowerCase() === "resolved" || !!inq.reply;
               const isSelected = selectedInquiry?.id === inq.id;
 
               return (
                 <div
                   key={inq.id}
-                  className={`bg-white/70 dark:bg-[#07090e]/80 backdrop-blur-xl border rounded-2xl p-6 transition-all duration-200 ${
-                    isSelected
-                      ? "border-amber-500/60 shadow-[0_10px_30px_rgba(245,158,11,0.12)]"
-                      : "border-black/10 dark:border-zinc-800/90 hover:border-amber-500/30"
+                  className={`bg-white/70 dark:bg-[#07090e]/80 backdrop-blur-xl border rounded-2xl p-5 sm:p-6 transition-all duration-200 space-y-4 ${
+                    isResolved
+                      ? "border-emerald-500/30 hover:border-emerald-500/50 shadow-sm"
+                      : "border-amber-500/30 hover:border-amber-500/50"
                   }`}
                 >
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-black/5 dark:border-zinc-800/70">
+                  {/* Card Top Header */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-black/5 dark:border-zinc-800/70">
                     <div className="flex items-center gap-2.5 flex-wrap">
                       <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-black uppercase tracking-wider flex items-center gap-1.5 border ${
                         isResolved
                           ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/25"
-                          : "bg-amber-500/10 text-amber-500 border-amber-500/25"
+                          : "bg-amber-500/10 text-amber-500 border-amber-500/25 animate-pulse"
                       }`}>
                         {isResolved ? <CheckCircle2 size={12} /> : <Clock size={12} />}
-                        {inq.status}
+                        {isResolved ? "Resolved & Closed" : "Open / Under Review"}
                       </span>
 
                       <span className="px-2 py-0.5 rounded-md bg-black/5 dark:bg-zinc-900 border border-black/5 dark:border-zinc-800 text-[10px] font-mono font-bold text-zinc-500">
-                        {inq.category || "General"}
+                        {inq.category || "General Inquiry"}
                       </span>
 
                       <span className="text-xs font-mono text-zinc-400 font-bold">
-                        Ticket: {inq.id}
+                        Ticket: {inq.ticketId || inq.id}
                       </span>
                     </div>
 
@@ -406,36 +438,64 @@ export default function Queries() {
                     </div>
                   </div>
 
-                  {/* Question / Message */}
-                  <div className="pt-4 space-y-2">
-                    {inq.subject && (
-                      <h3 className="text-base font-bold text-foreground dark:text-white">
-                        {inq.subject}
-                      </h3>
-                    )}
-                    {renderFormattedInquiryMessage(inq.message)}
-                  </div>
-
-                  {/* Admin Response Thread */}
-                  {inq.reply ? (
-                    <div className="mt-5 p-4 rounded-xl bg-emerald-500/5 dark:bg-emerald-950/20 border border-emerald-500/20 space-y-2">
-                      <div className="flex items-center justify-between text-xs font-mono text-emerald-600 dark:text-emerald-400 font-bold">
-                        <div className="flex items-center gap-2">
-                          <ShieldCheck size={15} />
-                          <span>Official Response from RecodeX Administration</span>
-                        </div>
-                        <span className="text-[10px] opacity-80">Verified Protocol Lead</span>
+                  {/* WhatsApp-Style Conversation Stream */}
+                  <div className="space-y-3 p-4 rounded-xl bg-black/[0.02] dark:bg-[#04060a] border border-black/5 dark:border-zinc-800/80">
+                    
+                    {/* User Question Bubble */}
+                    <div className="flex flex-col items-start max-w-[92%] sm:max-w-[85%] mr-auto">
+                      <div className="flex items-center gap-1.5 mb-1 px-1">
+                        <span className="text-[10px] font-mono font-bold text-cyan-500 dark:text-[#00d1ff]">{inq.name || "You"}</span>
+                        <span className="text-[9px] font-mono text-zinc-500">• Your Query</span>
                       </div>
-                      <p className="text-xs text-zinc-700 dark:text-zinc-200 leading-relaxed font-sans">
-                        {inq.reply}
-                      </p>
+                      <div className="p-4 rounded-2xl rounded-tl-sm bg-white dark:bg-[#121b22] border border-black/10 dark:border-cyan-500/20 text-foreground dark:text-white shadow-sm text-xs space-y-2 w-full select-text">
+                        {inq.subject && (
+                          <h4 className="font-bold text-sm text-foreground dark:text-white border-b border-black/5 dark:border-white/5 pb-1">
+                            {inq.subject}
+                          </h4>
+                        )}
+                        {renderFormattedInquiryMessage(inq.message)}
+                        <div className="flex justify-end items-center gap-1 text-[9px] font-mono text-zinc-400 pt-1 border-t border-black/5 dark:border-white/5">
+                          <span>{inq.createdAt && !isNaN(new Date(inq.createdAt).getTime()) ? new Date(inq.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Sent"}</span>
+                          <span className="text-cyan-500 dark:text-[#00d1ff] font-bold">✓✓</span>
+                        </div>
+                      </div>
                     </div>
-                  ) : (
-                    <div className="mt-4 flex items-center gap-2 text-xs font-mono text-amber-500/80 bg-amber-500/5 p-3 rounded-xl border border-amber-500/10">
-                      <Clock size={14} className="animate-spin" />
-                      <span>Ticket queued in SLA review. Estimated response within 2 hours.</span>
-                    </div>
-                  )}
+
+                    {/* Admin Response Bubble */}
+                    {inq.reply ? (
+                      <div className="flex flex-col items-end max-w-[92%] sm:max-w-[85%] ml-auto">
+                        <div className="flex items-center gap-1.5 mb-1 px-1">
+                          <ShieldCheck size={12} className="text-emerald-500" />
+                          <span className="text-[10px] font-mono font-bold text-emerald-500">RecodeX Official Response</span>
+                          <span className="text-[9px] font-mono text-zinc-500">• Verified Admin</span>
+                        </div>
+                        <div className="p-4 rounded-2xl rounded-tr-sm bg-emerald-500/10 dark:bg-[#005c4b]/30 border border-emerald-500/25 text-foreground dark:text-emerald-50 shadow-sm text-xs space-y-2 w-full select-text">
+                          <p className="leading-relaxed whitespace-pre-wrap font-sans text-xs font-medium">
+                            {inq.reply}
+                          </p>
+                          <div className="flex justify-end items-center gap-1 text-[9px] font-mono text-emerald-500 pt-1 border-t border-emerald-500/10">
+                            <span>Delivered & Verified</span>
+                            <span className="font-bold">✓✓</span>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 text-xs font-mono text-amber-500/90 bg-amber-500/5 p-3 rounded-xl border border-amber-500/15">
+                        <Clock size={14} className="animate-spin text-amber-500" />
+                        <span>Ticket queued in SLA review. Our support team is actively reviewing your request.</span>
+                      </div>
+                    )}
+
+                    {/* Thread Closed Pill */}
+                    {isResolved && (
+                      <div className="flex justify-center pt-2">
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-mono text-emerald-500 bg-emerald-500/10 border border-emerald-500/20">
+                          <CheckCircle2 size={12} />
+                          Ticket Resolved & Thread Closed
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               );
             })}

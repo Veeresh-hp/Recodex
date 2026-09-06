@@ -7,7 +7,7 @@ import {
   Settings as SettingsIcon, Users, BarChart3, 
   Trash2, Plus, Edit3, Globe,
   AlertTriangle, Search, FileText, CheckCircle, Award, XCircle, RefreshCw, Send, Menu, X,
-  Mail, MessageSquare, Upload, Download, Eye, FileUp, PlusCircle, Calendar, Slash, CheckCircle2, HelpCircle, Clock
+  Mail, MessageSquare, Upload, Download, Eye, FileUp, PlusCircle, Calendar, Slash, CheckCircle2, HelpCircle, Clock, ShieldCheck, Lock
 } from "lucide-react";
 import { useAuth, useUser, useClerk } from "@clerk/clerk-react";
 import Chart from "chart.js/auto";
@@ -2807,171 +2807,227 @@ export default function Dashboard() {
                   })}
                 </div>
 
-                {/* Right Pane: Inquiry Full View Details */}
-                <div className="lg:col-span-7 glass-card p-md min-h-[520px] flex flex-col justify-between space-y-6">
+                {/* Right Pane: Inquiry Full View Details (WhatsApp-Style Thread) */}
+                <div className="lg:col-span-7 glass-card p-5 md:p-6 min-h-[560px] flex flex-col justify-between space-y-5 rounded-2xl border border-black/5 dark:border-white/10">
                   {activeInquiry ? (
-                    <div className="space-y-6 flex-grow flex flex-col justify-between">
-                      <div className="space-y-5">
-                        {/* Detail Header */}
-                        <div className="flex justify-between items-start border-b border-outline-variant/40 pb-4">
-                          <div className="flex gap-3 items-center">
-                            <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-lg border border-primary/20">
-                              {activeInquiry.name[0]}
-                            </div>
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <h3 className="font-headline-sm text-sm font-bold text-foreground dark:text-white">{activeInquiry.name}</h3>
-                                <span className={`px-2 py-0.5 rounded-full text-[9px] font-mono font-black uppercase flex items-center gap-1 border ${
-                                  isActiveResolved ? "bg-emerald-500/10 border-emerald-500/25 text-emerald-500" : "bg-amber-500/10 border-amber-500/25 text-amber-500"
-                                }`}>
-                                  {isActiveResolved ? <CheckCircle2 size={10} /> : <Clock size={10} />}
-                                  {isActiveResolved ? "Resolved" : "Pending"}
-                                </span>
-                              </div>
-                              <p className="text-xs text-zinc-400 font-mono mt-0.5">{activeInquiry.email} {activeInquiry.phone ? `• ${activeInquiry.phone}` : ""}</p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => handleToggleResolveInquiry(activeInquiry)}
-                              className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer border ${
-                                isActiveResolved
-                                  ? "bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 border-amber-500/30"
-                                  : "bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 border-emerald-500/30"
-                              }`}
-                              title={isActiveResolved ? "Click to Reopen Inquiry as Pending" : "Click to Mark Inquiry as Resolved"}
-                            >
-                              {isActiveResolved ? (
-                                <>
-                                  <Clock size={13} />
-                                  <span>Reopen</span>
-                                </>
-                              ) : (
-                                <>
-                                  <CheckCircle2 size={13} />
-                                  <span>Mark Resolved</span>
-                                </>
-                              )}
-                            </button>
-                            <button
-                              onClick={() => handleDeleteInquiry(activeInquiry.id)}
-                              className="p-2 bg-red-500/5 hover:bg-red-500/10 border border-red-500/20 text-red-400 hover:text-red-300 rounded-xl transition-all cursor-pointer"
-                              title="Delete Inquiry Record"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Full Message */}
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
-                            <span>Client Inquiry Description:</span>
-                            <span title={activeInquiry.date || activeInquiry.createdAt}>
-                              {formatRelativeTime(activeInquiry.createdAt || activeInquiry.timestamp || activeInquiry.date)}
-                            </span>
-                          </div>
-                          <div className="p-4 bg-surface-container-low border border-outline-variant/30 rounded-xl">
-                            {renderFormattedInquiryMessage(activeInquiry.message)}
-                          </div>
-                        </div>
-
-                        {/* Sent Reply View */}
-                        {activeInquiry.reply && (
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between text-[10px] font-mono text-emerald-500 uppercase tracking-widest">
-                              <span className="flex items-center gap-1.5 font-bold">
-                                <CheckCircle2 size={13} />
-                                Sent Admin Reply:
+                    <div className="flex-grow flex flex-col justify-between space-y-5">
+                      
+                      {/* Chat Header */}
+                      <div className="flex justify-between items-start border-b border-outline-variant/30 pb-4">
+                        <div className="flex gap-3 items-center">
+                          <UserAvatar
+                            name={activeInquiry.name}
+                            email={activeInquiry.email}
+                            className="w-11 h-11 rounded-xl"
+                            textClassName="text-sm font-extrabold"
+                          />
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h3 className="font-headline-sm text-sm font-bold text-foreground dark:text-white">{activeInquiry.name}</h3>
+                              <span className={`px-2 py-0.5 rounded-full text-[9px] font-mono font-black uppercase flex items-center gap-1 border ${
+                                isActiveResolved 
+                                  ? "bg-emerald-500/10 border-emerald-500/25 text-emerald-500" 
+                                  : "bg-amber-500/10 border-amber-500/25 text-amber-500"
+                              }`}>
+                                {isActiveResolved ? <CheckCircle2 size={10} /> : <Clock size={10} />}
+                                {isActiveResolved ? "Resolved & Closed" : "Open / Pending"}
                               </span>
-                              <span className="text-emerald-500/80">Delivered & Synced</span>
                             </div>
-                            <div className="p-4 bg-emerald-500/5 border border-emerald-500/10 dark:border-emerald-500/20 rounded-xl">
-                              <p className="text-xs text-foreground dark:text-zinc-200 font-sans leading-relaxed whitespace-pre-wrap">
-                                {activeInquiry.reply}
-                              </p>
-                            </div>
+                            <p className="text-xs text-zinc-400 font-mono mt-0.5">
+                              {activeInquiry.email} {activeInquiry.phone ? `• ${activeInquiry.phone}` : ""} • Ticket: {activeInquiry.ticketId || activeInquiry.id}
+                            </p>
                           </div>
-                        )}
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleToggleResolveInquiry(activeInquiry)}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer border ${
+                              isActiveResolved
+                                ? "bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 border-amber-500/30"
+                                : "bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 border-emerald-500/30"
+                            }`}
+                            title={isActiveResolved ? "Click to Reopen Inquiry Chat" : "Click to Mark Inquiry as Resolved"}
+                          >
+                            {isActiveResolved ? (
+                              <>
+                                <RefreshCw size={13} />
+                                <span>Reopen</span>
+                              </>
+                            ) : (
+                              <>
+                                <CheckCircle2 size={13} />
+                                <span>Resolve</span>
+                              </>
+                            )}
+                          </button>
+                          <button
+                            onClick={() => handleDeleteInquiry(activeInquiry.id)}
+                            className="p-2 bg-red-500/5 hover:bg-red-500/10 border border-red-500/20 text-red-400 hover:text-red-300 rounded-xl transition-all cursor-pointer"
+                            title="Delete Inquiry Record"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
                       </div>
 
-                      {/* Reply Composer Form / Action Footer */}
-                      <div className="pt-5 border-t border-outline-variant/40 space-y-3">
-                        <form 
-                          onSubmit={async (e) => {
-                            e.preventDefault();
-                            if (!replyText.trim()) return;
-                            setSubmittingReply(true);
-                            try {
-                              const token = await getAuthToken();
-                              const updated = await replyToInquiry(activeInquiry.id, replyText.trim(), token, activeInquiry);
-                              setInquiries((prev) =>
-                                prev.map((inq) =>
-                                  inq.id === activeInquiry.id || (activeInquiry.ticketId && inq.id === activeInquiry.ticketId)
-                                    ? { ...inq, reply: updated.reply || replyText.trim(), status: "Resolved" }
-                                    : inq
-                                )
-                              );
-                              setToast({ message: "Reply sent and inquiry marked as Resolved.", type: "success" });
-                              setReplyText("");
-                              logAdminActivityApi({
-                                adminName: adminName || user?.fullName || "Admin",
-                                adminEmail: adminEmail || user?.primaryEmailAddress?.emailAddress || "",
-                                action: "REPLIED TO INQUIRY",
-                                target: `${activeInquiry.name} (${activeInquiry.email})`,
-                                details: `Sent reply for inquiry [${activeInquiry.id}]`,
-                              });
-                              fetchAuditLogs();
-                            } catch (err: any) {
-                              setToast({ message: err.message || "Failed to send reply.", type: "error" });
-                            } finally {
-                              setSubmittingReply(false);
-                            }
-                          }} 
-                          className="space-y-3"
-                        >
-                          <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest block leading-none">
-                            {activeInquiry.reply ? "Send Additional / Updated Reply:" : "Compose Reply Message:"}
-                          </label>
-                          <textarea
-                            required
-                            rows={3}
-                            value={replyText}
-                            onChange={(e) => setReplyText(e.target.value)}
-                            placeholder={activeInquiry.reply ? "Write an updated or additional response..." : "Write your official reply details..."}
-                            className="w-full p-3 bg-surface-container-low border border-outline-variant/40 rounded-xl text-xs font-sans text-foreground dark:text-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30"
-                          />
-                          <div className="flex justify-between items-center gap-3">
-                            <button 
+                      {/* WhatsApp-Style Chat Stream Area */}
+                      <div className="flex-1 space-y-4 max-h-[380px] overflow-y-auto p-4 rounded-2xl bg-black/[0.03] dark:bg-[#07090e]/80 border border-black/5 dark:border-white/5 no-scrollbar">
+                        
+                        {/* Conversation Start Date Pill */}
+                        <div className="flex justify-center">
+                          <span className="px-3 py-0.5 rounded-full text-[10px] font-mono text-zinc-500 dark:text-zinc-400 bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5">
+                            {formatRelativeTime(activeInquiry.createdAt || activeInquiry.timestamp || activeInquiry.date)}
+                          </span>
+                        </div>
+
+                        {/* 1. Client / Candidate Message Bubble (Left) */}
+                        <div className="flex flex-col items-start max-w-[90%] sm:max-w-[85%] mr-auto">
+                          <div className="flex items-center gap-1.5 mb-1 px-1">
+                            <span className="text-[10px] font-mono font-bold text-cyan-500 dark:text-[#00d1ff]">{activeInquiry.name}</span>
+                            <span className="text-[9px] font-mono text-zinc-500">• User Inquiry</span>
+                          </div>
+                          <div className="p-4 rounded-2xl rounded-tl-sm bg-white dark:bg-[#121b22] border border-black/10 dark:border-cyan-500/20 text-foreground dark:text-white shadow-sm text-xs space-y-2 w-full">
+                            {renderFormattedInquiryMessage(activeInquiry.message)}
+                            <div className="flex justify-end items-center gap-1 text-[9px] font-mono text-zinc-400 pt-1 border-t border-black/5 dark:border-white/5">
+                              <span>{new Date(activeInquiry.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                              <span className="text-cyan-500 dark:text-[#00d1ff] font-bold">✓✓</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 2. Admin Official Response Bubble (Right) */}
+                        {activeInquiry.reply ? (
+                          <div className="flex flex-col items-end max-w-[90%] sm:max-w-[85%] ml-auto">
+                            <div className="flex items-center gap-1.5 mb-1 px-1">
+                              <ShieldCheck size={12} className="text-emerald-500" />
+                              <span className="text-[10px] font-mono font-bold text-emerald-500">RecodeX Admin</span>
+                              <span className="text-[9px] font-mono text-zinc-500">• Official Reply</span>
+                            </div>
+                            <div className="p-4 rounded-2xl rounded-tr-sm bg-emerald-500/10 dark:bg-[#005c4b]/30 border border-emerald-500/25 text-foreground dark:text-emerald-50 shadow-sm text-xs space-y-2 w-full">
+                              <p className="leading-relaxed whitespace-pre-wrap font-sans text-xs">
+                                {activeInquiry.reply}
+                              </p>
+                              <div className="flex justify-end items-center gap-1 text-[9px] font-mono text-emerald-500 pt-1 border-t border-emerald-500/10">
+                                <span>Delivered</span>
+                                <span className="font-bold">✓✓</span>
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex justify-center py-2">
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-mono bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                              <Clock size={11} className="animate-spin" />
+                              Awaiting admin response...
+                            </span>
+                          </div>
+                        )}
+
+                        {/* 3. Resolution Status Banner in Chat */}
+                        {isActiveResolved && (
+                          <div className="flex justify-center pt-2">
+                            <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-500 border border-emerald-500/30 shadow-sm">
+                              <Lock size={11} />
+                              Conversation Marked as Resolved & Closed
+                            </span>
+                          </div>
+                        )}
+
+                      </div>
+
+                      {/* Reply Composer Form / Locked State Action Footer */}
+                      <div className="pt-4 border-t border-outline-variant/30">
+                        {isActiveResolved ? (
+                          /* Locked State when Resolved */
+                          <div className="p-4 rounded-xl bg-emerald-500/5 dark:bg-emerald-950/20 border border-emerald-500/20 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
+                            <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-mono text-xs">
+                              <Lock size={15} className="shrink-0" />
+                              <span>This query is <strong>Resolved & Closed</strong>. Chat is locked.</span>
+                            </div>
+                            <button
                               type="button"
                               onClick={() => handleToggleResolveInquiry(activeInquiry)}
-                              className={`px-3.5 py-2 rounded-lg text-[10px] font-mono font-bold uppercase tracking-wider border transition-all cursor-pointer ${
-                                isActiveResolved
-                                  ? "bg-amber-500/10 text-amber-500 border-amber-500/20 hover:bg-amber-500/20"
-                                  : "bg-emerald-500/10 text-emerald-500 border-emerald-500/20 hover:bg-emerald-500/20"
-                              }`}
+                              className="px-4 py-2 bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-500 font-mono font-bold text-xs rounded-xl flex items-center gap-1.5 transition-all cursor-pointer shadow-sm shrink-0"
                             >
-                              {isActiveResolved ? "Mark as Pending" : "Mark as Resolved"}
-                            </button>
-                            <button
-                              type="submit"
-                              disabled={submittingReply || !replyText.trim()}
-                              className="px-5 py-2.5 bg-primary dark:bg-[#00d1ff] text-on-primary dark:text-black font-extrabold rounded-lg text-[10px] flex items-center justify-center gap-1.5 uppercase hover:brightness-110 active:scale-95 transition-all disabled:opacity-50 cursor-pointer shadow-sm"
-                            >
-                              {submittingReply ? (
-                                <>
-                                  <div className="w-3 h-3 border-2 border-on-primary dark:border-black border-t-transparent rounded-full animate-spin"></div>
-                                  Sending...
-                                </>
-                              ) : (
-                                <>
-                                  <Send size={11} />
-                                  Send & Resolve
-                                </>
-                              )}
+                              <RefreshCw size={13} />
+                              <span>Reopen Chat to Message</span>
                             </button>
                           </div>
-                        </form>
+                        ) : (
+                          /* Open State: Reply Composer Form */
+                          <form 
+                            onSubmit={async (e) => {
+                              e.preventDefault();
+                              if (!replyText.trim()) return;
+                              setSubmittingReply(true);
+                              try {
+                                const token = await getAuthToken();
+                                const updated = await replyToInquiry(activeInquiry.id, replyText.trim(), token, activeInquiry);
+                                setInquiries((prev) =>
+                                  prev.map((inq) =>
+                                    inq.id === activeInquiry.id || (activeInquiry.ticketId && inq.id === activeInquiry.ticketId)
+                                      ? { ...inq, reply: updated.reply || replyText.trim(), status: "Resolved" }
+                                      : inq
+                                  )
+                                );
+                                setToast({ message: "Reply sent and conversation marked as Resolved.", type: "success" });
+                                setReplyText("");
+                                logAdminActivityApi({
+                                  adminName: adminName || user?.fullName || "Admin",
+                                  adminEmail: adminEmail || user?.primaryEmailAddress?.emailAddress || "",
+                                  action: "REPLIED TO INQUIRY",
+                                  target: `${activeInquiry.name} (${activeInquiry.email})`,
+                                  details: `Sent reply for inquiry [${activeInquiry.id}]`,
+                                });
+                                fetchAuditLogs();
+                              } catch (err: any) {
+                                setToast({ message: err.message || "Failed to send reply.", type: "error" });
+                              } finally {
+                                setSubmittingReply(false);
+                              }
+                            }} 
+                            className="space-y-3"
+                          >
+                            <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest block leading-none flex items-center justify-between">
+                              <span>Compose WhatsApp Reply Message:</span>
+                              <span className="text-emerald-500 font-bold">Chat Open</span>
+                            </label>
+                            <textarea
+                              required
+                              rows={3}
+                              value={replyText}
+                              onChange={(e) => setReplyText(e.target.value)}
+                              placeholder="Type your official response details here..."
+                              className="w-full p-3 bg-surface-container-low border border-outline-variant/40 rounded-xl text-xs font-sans text-foreground dark:text-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30"
+                            />
+                            <div className="flex justify-between items-center gap-3">
+                              <button 
+                                type="button"
+                                onClick={() => handleToggleResolveInquiry(activeInquiry)}
+                                className="px-3.5 py-2 rounded-lg text-[10px] font-mono font-bold uppercase tracking-wider border transition-all cursor-pointer bg-emerald-500/10 text-emerald-500 border-emerald-500/20 hover:bg-emerald-500/20"
+                              >
+                                Mark as Resolved (No Reply)
+                              </button>
+                              <button
+                                type="submit"
+                                disabled={submittingReply || !replyText.trim()}
+                                className="px-5 py-2.5 bg-primary dark:bg-[#00d1ff] text-on-primary dark:text-black font-extrabold rounded-lg text-[10px] flex items-center justify-center gap-1.5 uppercase hover:brightness-110 active:scale-95 transition-all disabled:opacity-50 cursor-pointer shadow-sm"
+                              >
+                                {submittingReply ? (
+                                  <>
+                                    <div className="w-3 h-3 border-2 border-on-primary dark:border-black border-t-transparent rounded-full animate-spin"></div>
+                                    Sending...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Send size={11} />
+                                    Send & Resolve (Close)
+                                  </>
+                                )}
+                              </button>
+                            </div>
+                          </form>
+                        )}
                       </div>
 
                     </div>
