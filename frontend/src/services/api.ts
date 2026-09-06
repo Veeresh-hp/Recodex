@@ -2,13 +2,14 @@ import { Project, MOCK_PROJECTS } from "@/data/mockData";
 
 
 const getApiBaseUrl = () => {
-  const isVercelProd = typeof window !== "undefined" && (
-    window.location.hostname.endsWith(".vercel.app") ||
-    window.location.hostname === "recodex1.vercel.app"
-  );
-  
-  if (isVercelProd) {
-    return "/api";
+  if (typeof window !== "undefined") {
+    const host = window.location.hostname;
+    if (host === "recodex.in" || host === "www.recodex.in") {
+      return "https://www.recodex.in/api";
+    }
+    if (host.endsWith(".vercel.app") || host === "recodex1.vercel.app") {
+      return "/api";
+    }
   }
 
   const envUrl = typeof import.meta !== "undefined" && import.meta.env && (import.meta.env.VITE_API_URL || import.meta.env.NEXT_PUBLIC_API_URL);
@@ -744,6 +745,8 @@ export async function submitInquiry(inquiryData: {
       },
       body: JSON.stringify({
         ...inquiryData,
+        id: payload.id,
+        ticketId: payload.id,
         createdAt: nowIso,
       }),
     });
@@ -887,9 +890,13 @@ export async function getInquiries(token?: string, email?: string): Promise<any[
       );
 
     const resolvedReply = inq.reply || existing?.reply || repliesMap[inqId] || repliesMap[key] || repliesMap[emailMsgKey] || (inq.ticketId ? repliesMap[inq.ticketId] : undefined);
-    const resolvedStatus = (inq.status === "Resolved" || existing?.status === "Resolved" || statusesMap[inqId] === "Resolved" || statusesMap[key] === "Resolved" || resolvedReply)
-      ? "Resolved"
-      : (inq.status || existing?.status || statusesMap[inqId] || statusesMap[key] || "Pending");
+    const isResolved =
+      (existing?.status || "").toLowerCase() === "resolved" ||
+      (inq.status || "").toLowerCase() === "resolved" ||
+      (statusesMap[inqId] || "").toLowerCase() === "resolved" ||
+      (statusesMap[key] || "").toLowerCase() === "resolved" ||
+      !!resolvedReply;
+    const resolvedStatus = isResolved ? "Resolved" : "Pending";
 
     const normalized = {
       ...existing,
@@ -934,6 +941,38 @@ export async function getInquiries(token?: string, email?: string): Promise<any[
     const timeB = new Date(b.createdAt || b.timestamp || 0).getTime();
     return timeB - timeA;
   });
+}
+
+/**
+ * Fetches a single inquiry by ticket ID or database ID.
+ */
+export async function getInquiryById(id: string): Promise<any | null> {
+  if (!id) return null;
+
+  // 1. Try backend API direct single lookup
+  try {
+    const response = await fetch(`${API_BASE_URL}/contacts/${encodeURIComponent(id)}`, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+    });
+    if (response.ok) {
+      const data = await response.json();
+      if (data && (data.id || data.ticketId)) {
+        return data;
+      }
+    }
+  } catch (err) {
+    console.warn("[RECODEX API] Direct inquiry fetch warning:", err);
+  }
+
+  // 2. Fallback search across all unified inquiries
+  try {
+    const all = await getInquiries();
+    const match = all.find((i) => i.ticketId === id || i.id === id);
+    if (match) return match;
+  } catch (e) {}
+
+  return null;
 }
 
 /**

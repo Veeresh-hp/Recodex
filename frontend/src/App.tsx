@@ -173,7 +173,9 @@ export default function App() {
                 <Route path="/my-certificates" element={<Certificates />} />
                 <Route path="/my-projects" element={<MyProjects />} />
                 <Route path="/queries" element={<Queries />} />
+                <Route path="/queries/:id" element={<Queries />} />
                 <Route path="/my-queries" element={<Queries />} />
+                <Route path="/my-queries/:id" element={<Queries />} />
                 <Route path="/announcements" element={<Announcements />} />
                 <Route path="/about" element={<About />} />
               </Route>

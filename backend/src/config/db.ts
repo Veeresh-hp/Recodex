@@ -1,6 +1,15 @@
 import { PrismaClient } from "@prisma/client";
 
+if (!process.env.DATABASE_URL) {
+  process.env.DATABASE_URL = "mongodb+srv://Recodex:Recodex2004@recodex.wahwbbo.mongodb.net/recodex?appName=Recodex";
+}
+
 const realPrisma = new PrismaClient({
+  datasources: {
+    db: {
+      url: process.env.DATABASE_URL || "mongodb+srv://Recodex:Recodex2004@recodex.wahwbbo.mongodb.net/recodex?appName=Recodex",
+    },
+  },
   log: process.env.NODE_ENV === "development" ? ["error"] : ["error"],
 });
 

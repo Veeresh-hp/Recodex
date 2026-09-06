@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { useAuth, useUser } from "@clerk/clerk-react";
-import { getInquiries, deleteInquiry } from "../services/api";
+import { getInquiries, getInquiryById, deleteInquiry } from "../services/api";
 import {
   MessageSquare, ShieldCheck, Clock, CheckCircle2, ArrowLeft,
   Search, Filter, Plus, Send, AlertCircle, ChevronRight,
-  User, Check, Sparkles, RefreshCw, HelpCircle, FileText, Trash2
+  User, Check, Sparkles, RefreshCw, HelpCircle, FileText, Trash2,
+  Share2, ExternalLink, Copy
 } from "lucide-react";
 
 interface Inquiry {
@@ -79,13 +80,15 @@ const renderFormattedInquiryMessage = (msg: string) => {
 };
 
 export default function Queries() {
+  const { id: queryParamId } = useParams();
   const { isLoaded, userId, getToken } = useAuth();
   const { user } = useUser();
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(queryParamId || "");
   const [statusFilter, setStatusFilter] = useState<"ALL" | "Pending" | "Resolved">("ALL");
   const [selectedInquiry, setSelectedInquiry] = useState<Inquiry | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   // New ticket state
   const [newTicketModalOpen, setNewTicketModalOpen] = useState(false);
@@ -151,8 +154,13 @@ export default function Queries() {
           );
 
         const r = inq.reply || existing?.reply || repliesMap[inqId] || repliesMap[key] || repliesMap[emailMsgKey] || (inq.ticketId ? repliesMap[inq.ticketId] : undefined);
-        const s = inq.status || existing?.status || statusesMap[inqId] || statusesMap[key] || (r ? "Resolved" : "Pending");
-        const finalStatus = (s || "").toLowerCase() === "resolved" || !!r ? "Resolved" : "Pending";
+        const isResolved =
+          (existing?.status || "").toLowerCase() === "resolved" ||
+          (inq.status || "").toLowerCase() === "resolved" ||
+          (statusesMap[inqId] || "").toLowerCase() === "resolved" ||
+          (statusesMap[key] || "").toLowerCase() === "resolved" ||
+          !!r;
+        const finalStatus: "Resolved" | "Pending" = isResolved ? "Resolved" : "Pending";
 
         const normalized = {
           ...existing,
@@ -199,6 +207,24 @@ export default function Queries() {
         }
       });
 
+      // If direct ticket ID is requested via URL (/queries/:id), load and prioritize it
+      if (queryParamId) {
+        try {
+          const directMatch = await getInquiryById(queryParamId);
+          if (directMatch) {
+            processItem(directMatch);
+            const uKey = directMatch.ticketId || directMatch.id;
+            const existingIdx = uniqueList.findIndex((x) => x.id === uKey || x.ticketId === uKey);
+            if (existingIdx >= 0) {
+              uniqueList.splice(existingIdx, 1);
+            }
+            uniqueList.unshift(directMatch);
+          }
+        } catch (dirErr) {
+          console.warn("Direct ticket lookup error:", dirErr);
+        }
+      }
+
       uniqueList.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
 
       setInquiries(uniqueList);
@@ -237,7 +263,7 @@ export default function Queries() {
       window.removeEventListener("recodex-inquiry-submitted", handleSync);
       window.removeEventListener("recodex-inquiry-deleted", handleSync);
     };
-  }, [isLoaded, userEmail]);
+  }, [isLoaded, userEmail, queryParamId]);
 
   const handleCreateTicket = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -372,6 +398,46 @@ export default function Queries() {
           </div>
         </div>
 
+        {/* Direct Query Focus Banner when accessing /queries/:id */}
+        {queryParamId && (
+          <div className="mb-6 p-4 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex flex-col sm:flex-row items-center justify-between gap-3 animate-fade-in shadow-[0_0_25px_rgba(0,209,255,0.1)]">
+            <div className="flex items-center gap-2.5 text-cyan-400 text-xs font-mono">
+              <Sparkles size={16} className="shrink-0 animate-pulse text-cyan-400" />
+              <span>Viewing Direct Ticket: <strong className="text-foreground dark:text-white underline">{queryParamId}</strong></span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  const directUrl = `${window.location.origin}/queries/${queryParamId}`;
+                  navigator.clipboard.writeText(directUrl);
+                  setCopiedId(queryParamId);
+                  setTimeout(() => setCopiedId(null), 2500);
+                }}
+                className="px-3 py-1.5 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-400 text-xs font-mono font-bold flex items-center gap-1.5 transition-all cursor-pointer border border-cyan-500/30"
+              >
+                {copiedId === queryParamId ? (
+                  <>
+                    <Check size={13} className="text-emerald-400" />
+                    <span className="text-emerald-400">Link Copied!</span>
+                  </>
+                ) : (
+                  <>
+                    <Share2 size={13} />
+                    <span>Copy Ticket URL</span>
+                  </>
+                )}
+              </button>
+              <Link
+                to="/queries"
+                onClick={() => setSearchQuery("")}
+                className="px-3 py-1.5 rounded-lg bg-black/10 hover:bg-black/20 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-xs font-mono font-bold text-zinc-600 dark:text-zinc-300 transition-all border border-black/5 dark:border-zinc-700"
+              >
+                View All Queries
+              </Link>
+            </div>
+          </div>
+        )}
+
         {/* Tickets Stream */}
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 bg-white/40 dark:bg-zinc-900/40 rounded-2xl border border-black/5 dark:border-zinc-800">
@@ -434,12 +500,62 @@ export default function Queries() {
                         {inq.category || "Support Inquiry"}
                       </span>
 
-                      <span className="text-xs font-mono text-zinc-500 font-semibold">
-                        ID: <span className="text-foreground dark:text-zinc-200 font-bold">{inq.ticketId || inq.id}</span>
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-mono text-zinc-500 font-semibold">
+                          ID: <span className="text-foreground dark:text-zinc-200 font-bold">{inq.ticketId || inq.id}</span>
+                        </span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const tid = inq.ticketId || inq.id;
+                            const directUrl = `${window.location.origin}/queries/${tid}`;
+                            navigator.clipboard.writeText(directUrl);
+                            setCopiedId(tid);
+                            setTimeout(() => setCopiedId(null), 2500);
+                          }}
+                          className="p-1 rounded text-zinc-400 hover:text-cyan-400 hover:bg-cyan-500/10 transition-colors cursor-pointer"
+                          title="Copy direct ticket URL (https://www.recodex.in/queries/...)"
+                        >
+                          {copiedId === (inq.ticketId || inq.id) ? (
+                            <Check size={13} className="text-emerald-400" />
+                          ) : (
+                            <Copy size={13} />
+                          )}
+                        </button>
+                        <Link
+                          to={`/queries/${inq.ticketId || inq.id}`}
+                          className="p-1 rounded text-zinc-400 hover:text-cyan-400 hover:bg-cyan-500/10 transition-colors cursor-pointer"
+                          title="Open dedicated ticket view"
+                        >
+                          <ExternalLink size={13} />
+                        </Link>
+                      </div>
                     </div>
 
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => {
+                          const tid = inq.ticketId || inq.id;
+                          const directUrl = `${window.location.origin}/queries/${tid}`;
+                          navigator.clipboard.writeText(directUrl);
+                          setCopiedId(tid);
+                          setTimeout(() => setCopiedId(null), 2500);
+                        }}
+                        className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-black/5 dark:bg-zinc-800 text-[11px] font-mono text-zinc-400 hover:text-cyan-400 border border-black/5 dark:border-zinc-700 transition-colors cursor-pointer"
+                        title="Share Ticket Link"
+                      >
+                        {copiedId === (inq.ticketId || inq.id) ? (
+                          <>
+                            <Check size={12} className="text-emerald-400" />
+                            <span className="text-emerald-400">Link Copied!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Share2 size={12} />
+                            <span>Share</span>
+                          </>
+                        )}
+                      </button>
                       <div className="flex items-center gap-1.5 text-xs font-mono text-zinc-500">
                         <Clock size={13} />
                         <span>
