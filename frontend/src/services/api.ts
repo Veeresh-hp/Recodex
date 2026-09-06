@@ -830,17 +830,31 @@ export async function getInquiries(token?: string): Promise<any[]> {
     }
   } catch (e) {}
 
+  let localRepliesRaw = null;
+  let repliesMap: Record<string, string> = {};
+  let localStatusesRaw = null;
+  let statusesMap: Record<string, string> = {};
+  try {
+    if (typeof window !== "undefined") {
+      localRepliesRaw = localStorage.getItem("recodex_inquiry_replies");
+      if (localRepliesRaw) repliesMap = JSON.parse(localRepliesRaw);
+      localStatusesRaw = localStorage.getItem("recodex_inquiry_statuses");
+      if (localStatusesRaw) statusesMap = JSON.parse(localStatusesRaw);
+    }
+  } catch (e) {}
+
   const map = new Map<string, any>();
 
   const processInquiry = (inq: any) => {
     if (!inq) return;
-    const key = inq.id || `${inq.email}-${inq.message}`;
-    if (deletedInquiryIds.includes(inq.id) || deletedInquiryIds.includes(key)) return;
+    const inqId = inq.id || inq.ticketId || "";
+    const key = inqId || `${inq.email}-${inq.message}`;
+    if (deletedInquiryIds.includes(inqId) || deletedInquiryIds.includes(key)) return;
 
     // Resolve accurate creation timestamp
     let createdTime = inq.createdAt || inq.timestamp;
-    if ((!createdTime || isNaN(new Date(createdTime).getTime())) && inq.id && typeof inq.id === "string" && inq.id.startsWith("inq-")) {
-      const parts = inq.id.split("-");
+    if ((!createdTime || isNaN(new Date(createdTime).getTime())) && inqId && typeof inqId === "string" && inqId.startsWith("inq-")) {
+      const parts = inqId.split("-");
       const epoch = parseInt(parts[1], 10);
       if (!isNaN(epoch) && epoch > 1000000000000) {
         createdTime = new Date(epoch).toISOString();
@@ -860,9 +874,13 @@ export async function getInquiries(token?: string): Promise<any[]> {
       createdTime = new Date().toISOString();
     }
 
+    const resolvedReply = inq.reply || repliesMap[inqId] || repliesMap[key] || (inq.ticketId ? repliesMap[inq.ticketId] : undefined);
+    const resolvedStatus = inq.status || statusesMap[inqId] || statusesMap[key] || (resolvedReply ? "Resolved" : "Pending");
+
     const normalized = {
       ...inq,
-      id: inq.id || key,
+      id: inqId || key,
+      ticketId: inq.ticketId || inqId || key,
       createdAt: createdTime,
       timestamp: createdTime,
       date: inq.date || new Date(createdTime).toLocaleString("en-US", { timeZone: "Asia/Kolkata" }),
@@ -871,9 +889,19 @@ export async function getInquiries(token?: string): Promise<any[]> {
       phone: inq.phone || "",
       type: inq.type || "General Inquiry",
       message: inq.message || "",
+      reply: resolvedReply || undefined,
+      status: resolvedStatus,
     };
 
-    if (!map.has(key)) {
+    if (map.has(key)) {
+      const existing = map.get(key);
+      map.set(key, {
+        ...existing,
+        ...normalized,
+        reply: normalized.reply || existing.reply,
+        status: normalized.reply || existing.reply ? "Resolved" : (normalized.status || existing.status || "Pending"),
+      });
+    } else {
       map.set(key, normalized);
     }
   };
@@ -938,18 +966,19 @@ export async function deleteInquiry(id: string, token: string): Promise<any> {
 /**
  * Replies to a customer contact inquiry (admin only).
  */
-export async function replyToInquiry(id: string, reply: string, token: string): Promise<any> {
+export async function replyToInquiry(id: string, reply: string, token: string, inqData?: any): Promise<any> {
   const authToken = token || "admin-bypass-token";
 
-  // 1. Sync reply locally for immediate UI reflections on customer profile & contact pages
+  // 1. Sync reply locally for immediate UI reflections
   try {
     if (typeof window !== "undefined") {
       const rawInq = localStorage.getItem("recodex_submitted_inquiries");
       if (rawInq) {
         const list: any[] = JSON.parse(rawInq);
-        const target = list.find((i) => i.id === id || i.email === id);
+        const target = list.find((i) => i.id === id || i.ticketId === id || (inqData && i.email === inqData.email && i.message === inqData.message));
         if (target) {
           target.reply = reply;
+          target.status = "Resolved";
           localStorage.setItem("recodex_submitted_inquiries", JSON.stringify(list));
         }
       }
@@ -957,14 +986,18 @@ export async function replyToInquiry(id: string, reply: string, token: string): 
       const rawMap = localStorage.getItem("recodex_inquiry_replies");
       const map: Record<string, string> = rawMap ? JSON.parse(rawMap) : {};
       map[id] = reply;
+      if (inqData?.ticketId) map[inqData.ticketId] = reply;
+      if (inqData?.id) map[inqData.id] = reply;
       localStorage.setItem("recodex_inquiry_replies", JSON.stringify(map));
+
       window.dispatchEvent(new Event("recodex-inquiry-replied"));
+      window.dispatchEvent(new Event("storage"));
     }
   } catch (e) {
     console.warn("Local inquiry reply sync warning:", e);
   }
 
-  // 2. Attempt Express backend PUT request
+  // 2. Express backend PUT request
   try {
     const response = await fetch(`${API_BASE_URL}/contacts/${id}/reply`, {
       method: "PUT",
@@ -973,7 +1006,14 @@ export async function replyToInquiry(id: string, reply: string, token: string): 
         "Authorization": `Bearer ${authToken}`,
         "Accept": "application/json",
       },
-      body: JSON.stringify({ reply }),
+      body: JSON.stringify({
+        reply,
+        email: inqData?.email,
+        message: inqData?.message,
+        name: inqData?.name,
+        type: inqData?.type,
+        phone: inqData?.phone,
+      }),
     });
 
     if (response.ok) {
@@ -983,7 +1023,67 @@ export async function replyToInquiry(id: string, reply: string, token: string): 
     console.warn("[RECODEX API] Reply to inquiry backend warning (saved locally):", error);
   }
 
-  return { id, reply, status: "Replied" };
+  return { id, reply, status: "Resolved" };
+}
+
+/**
+ * Marks an inquiry as Resolved or changes its status (Admin only).
+ */
+export async function resolveInquiryApi(id: string, status: "Resolved" | "Pending" = "Resolved", token?: string, inqData?: any): Promise<any> {
+  const authToken = token || "admin-bypass-token";
+
+  // 1. Sync status locally
+  try {
+    if (typeof window !== "undefined") {
+      const rawInq = localStorage.getItem("recodex_submitted_inquiries");
+      if (rawInq) {
+        const list: any[] = JSON.parse(rawInq);
+        const target = list.find((i) => i.id === id || i.ticketId === id || (inqData && i.email === inqData.email && i.message === inqData.message));
+        if (target) {
+          target.status = status;
+          localStorage.setItem("recodex_submitted_inquiries", JSON.stringify(list));
+        }
+      }
+
+      const rawStatuses = localStorage.getItem("recodex_inquiry_statuses");
+      const statusesMap: Record<string, string> = rawStatuses ? JSON.parse(rawStatuses) : {};
+      statusesMap[id] = status;
+      if (inqData?.ticketId) statusesMap[inqData.ticketId] = status;
+      if (inqData?.id) statusesMap[inqData.id] = status;
+      localStorage.setItem("recodex_inquiry_statuses", JSON.stringify(statusesMap));
+
+      window.dispatchEvent(new Event("recodex-inquiry-status-updated"));
+      window.dispatchEvent(new Event("storage"));
+    }
+  } catch (e) {
+    console.warn("Local inquiry status sync warning:", e);
+  }
+
+  // 2. Express backend PUT request
+  try {
+    const response = await fetch(`${API_BASE_URL}/contacts/${id}/status`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${authToken}`,
+        "Accept": "application/json",
+      },
+      body: JSON.stringify({
+        status,
+        email: inqData?.email,
+        message: inqData?.message,
+        reply: inqData?.reply,
+      }),
+    });
+
+    if (response.ok) {
+      return await response.json();
+    }
+  } catch (error) {
+    console.warn("[RECODEX API] Status update backend warning (saved locally):", error);
+  }
+
+  return { id, status };
 }
 
 /**

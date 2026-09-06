@@ -123,6 +123,9 @@ export default function Queries() {
       const localRepliesRaw = localStorage.getItem("recodex_inquiry_replies");
       const repliesMap = localRepliesRaw ? JSON.parse(localRepliesRaw) : {};
 
+      const localStatusesRaw = localStorage.getItem("recodex_inquiry_statuses");
+      const statusesMap = localStatusesRaw ? JSON.parse(localStatusesRaw) : {};
+
       const localInquiriesRaw = localStorage.getItem("recodex_submitted_inquiries");
       const localInquiries: any[] = localInquiriesRaw ? JSON.parse(localInquiriesRaw) : [];
 
@@ -132,12 +135,15 @@ export default function Queries() {
         if (inq && inq.id) {
           // Filter out the requested test inquiry ID or test message
           if (inq.id === "inq-1787642424751" || (inq.message || "").trim() === "sdsadas") return;
-          const r = repliesMap[inq.id] || inq.reply;
-          const status = r ? "Resolved" : (inq.status || "Pending");
+          const inqId = inq.id || inq.ticketId;
+          const r = repliesMap[inqId] || (inq.ticketId ? repliesMap[inq.ticketId] : undefined) || inq.reply;
+          const s = statusesMap[inqId] || (inq.ticketId ? statusesMap[inq.ticketId] : undefined) || inq.status || (r ? "Resolved" : "Pending");
+          const finalStatus = (s || "").toLowerCase() === "resolved" || !!r ? "Resolved" : "Pending";
+
           mergedMap.set(inq.id, {
             ...inq,
             reply: r,
-            status: status,
+            status: finalStatus,
             category: inq.category || "Technical Query",
             priority: inq.priority || "Normal"
           });
@@ -180,6 +186,17 @@ export default function Queries() {
     if (isLoaded) {
       fetchUserInquiries();
     }
+    const handleSync = () => fetchUserInquiries();
+    window.addEventListener("recodex-inquiry-replied", handleSync);
+    window.addEventListener("recodex-inquiry-status-updated", handleSync);
+    window.addEventListener("recodex-inquiry-submitted", handleSync);
+    window.addEventListener("recodex-inquiry-deleted", handleSync);
+    return () => {
+      window.removeEventListener("recodex-inquiry-replied", handleSync);
+      window.removeEventListener("recodex-inquiry-status-updated", handleSync);
+      window.removeEventListener("recodex-inquiry-submitted", handleSync);
+      window.removeEventListener("recodex-inquiry-deleted", handleSync);
+    };
   }, [isLoaded, userEmail]);
 
   const handleCreateTicket = async (e: React.FormEvent) => {

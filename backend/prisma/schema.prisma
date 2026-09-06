@@ -235,12 +235,14 @@ model CertificateAuditLog {
 
 model Inquiry {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  ticketId  String?
   name      String
   email     String
   phone     String   @default("")
   type      String
   message   String
   reply     String?
+  status    String   @default("Pending")
   createdAt DateTime @default(now()) @map("created_at")
 
   @@map("inquiries")

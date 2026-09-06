@@ -7,14 +7,14 @@ import {
   Settings as SettingsIcon, Users, BarChart3, 
   Trash2, Plus, Edit3, Globe,
   AlertTriangle, Search, FileText, CheckCircle, Award, XCircle, RefreshCw, Send, Menu, X,
-  Mail, MessageSquare, Upload, Download, Eye, FileUp, PlusCircle, Calendar, Slash, CheckCircle2, HelpCircle
+  Mail, MessageSquare, Upload, Download, Eye, FileUp, PlusCircle, Calendar, Slash, CheckCircle2, HelpCircle, Clock
 } from "lucide-react";
 import { useAuth, useUser, useClerk } from "@clerk/clerk-react";
 import Chart from "chart.js/auto";
 import { 
   getProjects, getUsers, updateUser, deleteUser, 
   updateProject, deleteProject, getInquiries, 
-  deleteInquiry, replyToInquiry, getUserProfile,
+  deleteInquiry, replyToInquiry, resolveInquiryApi, getUserProfile,
   getCertificatesApi, saveCertificateApi, deleteCertificateApi, approveCertificateApi,
   getPromotedAdminsApi, getAuditLogsApi, logAdminActivityApi,
   AuditLogEntry
@@ -271,6 +271,7 @@ export default function Dashboard() {
   const [replyText, setReplyText] = useState("");
   const [submittingReply, setSubmittingReply] = useState(false);
   const [selectedInquiryId, setSelectedInquiryId] = useState<string | null>(null);
+  const [inquiryStatusFilter, setInquiryStatusFilter] = useState<"All" | "Pending" | "Resolved">("All");
 
   // User edit and reset password states
   const [userMenuAnchor, setUserMenuAnchor] = useState<{ id: string; top: number; right: number; openUp: boolean } | null>(null);
@@ -1312,6 +1313,33 @@ export default function Dashboard() {
       link.click();
       link.remove();
       URL.revokeObjectURL(url);
+    }
+  };
+
+  const handleToggleResolveInquiry = async (inq: any) => {
+    if (!inq) return;
+    const isCurrentlyResolved = (inq.status || "").toLowerCase() === "resolved" || (!!inq.reply && inq.status !== "Pending");
+    const targetStatus = isCurrentlyResolved ? "Pending" : "Resolved";
+    try {
+      const token = await getAuthToken();
+      await resolveInquiryApi(inq.id, targetStatus as any, token, inq);
+      setInquiries((prev) =>
+        prev.map((i) => (i.id === inq.id || (inq.ticketId && i.id === inq.ticketId) ? { ...i, status: targetStatus } : i))
+      );
+      setToast({
+        message: targetStatus === "Resolved" ? "Inquiry conversation marked as Resolved." : "Inquiry reopened as Pending.",
+        type: "success",
+      });
+      logAdminActivityApi({
+        adminName: adminName || user?.fullName || "Admin",
+        adminEmail: adminEmail || user?.primaryEmailAddress?.emailAddress || "",
+        action: targetStatus === "Resolved" ? "RESOLVED INQUIRY TICKET" : "REOPENED INQUIRY TICKET",
+        target: `${inq.name} (${inq.email})`,
+        details: `Updated inquiry [${inq.id || inq.ticketId}] status to ${targetStatus}`,
+      });
+      fetchAuditLogs();
+    } catch (err: any) {
+      setToast({ message: "Failed to update inquiry status.", type: "error" });
     }
   };
 
@@ -2654,23 +2682,76 @@ export default function Dashboard() {
         );
 
       case "Inquiries":
-        const activeInquiry = inquiries.find((i) => i.id === selectedInquiryId) || inquiries[0];
+        const isResolvedInq = (inq: any) => (inq?.status || "").toLowerCase() === "resolved" || (!!inq?.reply && inq?.status !== "Pending");
+
+        const pendingCount = inquiries.filter((i) => !isResolvedInq(i)).length;
+        const resolvedCount = inquiries.filter((i) => isResolvedInq(i)).length;
+
+        const filteredInquiries = inquiries.filter((inq) => {
+          if (inquiryStatusFilter === "Pending") return !isResolvedInq(inq);
+          if (inquiryStatusFilter === "Resolved") return isResolvedInq(inq);
+          return true;
+        });
+
+        const activeInquiry = filteredInquiries.find((i) => i.id === selectedInquiryId) || filteredInquiries[0] || inquiries[0];
+        const isActiveResolved = activeInquiry ? isResolvedInq(activeInquiry) : false;
 
         return (
           <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-black/5 dark:border-white/5 pb-4">
               <div>
                 <h3 className="text-lg font-bold text-foreground dark:text-white font-sans font-extrabold uppercase">Client Service Inquiries</h3>
                 <p className="text-xs text-zinc-400 dark:text-zinc-500">Respond to development proposals, system estimates, and support tickets submitted via contact forms.</p>
               </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    const API_URL = typeof window !== "undefined" && window.location.hostname !== "localhost" ? "/api" : "http://localhost:5000/api";
+                    window.open(`${API_URL}/contacts/export-csv`, "_blank");
+                  }}
+                  className="px-3.5 py-1.5 bg-primary/10 border border-primary/20 text-primary dark:text-[#00d1ff] rounded-xl text-xs font-mono font-bold hover:bg-primary/20 transition-all flex items-center gap-2 shrink-0 cursor-pointer"
+                >
+                  <FileText size={14} /> Export CSV
+                </button>
+              </div>
+            </div>
+
+            {/* Filter Pills */}
+            <div className="flex items-center gap-2 pb-2">
               <button
-                onClick={() => {
-                  const API_URL = typeof window !== "undefined" && window.location.hostname !== "localhost" ? "/api" : "http://localhost:5000/api";
-                  window.open(`${API_URL}/contacts/export-csv`, "_blank");
-                }}
-                className="px-4 py-2 bg-primary/10 border border-primary/20 text-primary dark:text-[#00d1ff] rounded-xl text-xs font-mono font-bold hover:bg-primary/20 transition-all flex items-center gap-2 shrink-0 cursor-pointer"
+                onClick={() => setInquiryStatusFilter("All")}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer flex items-center gap-2 border ${
+                  inquiryStatusFilter === "All"
+                    ? "bg-primary/15 dark:bg-[#00d1ff]/15 text-primary dark:text-[#00d1ff] border-primary/30 dark:border-[#00d1ff]/30 shadow-sm"
+                    : "bg-black/5 dark:bg-white/5 text-zinc-400 border-transparent hover:text-foreground"
+                }`}
               >
-                <FileText size={14} /> Export CSV for Google Docs/Sheets
+                <span>All Queries</span>
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-black/10 dark:bg-white/10">{inquiries.length}</span>
+              </button>
+              <button
+                onClick={() => setInquiryStatusFilter("Pending")}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer flex items-center gap-2 border ${
+                  inquiryStatusFilter === "Pending"
+                    ? "bg-amber-500/15 text-amber-500 border-amber-500/30 shadow-sm"
+                    : "bg-black/5 dark:bg-white/5 text-zinc-400 border-transparent hover:text-amber-500"
+                }`}
+              >
+                <Clock size={13} />
+                <span>Pending</span>
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-500/10 text-amber-500">{pendingCount}</span>
+              </button>
+              <button
+                onClick={() => setInquiryStatusFilter("Resolved")}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer flex items-center gap-2 border ${
+                  inquiryStatusFilter === "Resolved"
+                    ? "bg-emerald-500/15 text-emerald-500 border-emerald-500/30 shadow-sm"
+                    : "bg-black/5 dark:bg-white/5 text-zinc-400 border-transparent hover:text-emerald-500"
+                }`}
+              >
+                <CheckCircle2 size={13} />
+                <span>Resolved</span>
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-500/10 text-emerald-500">{resolvedCount}</span>
               </button>
             </div>
 
@@ -2679,19 +2760,21 @@ export default function Dashboard() {
                 <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
                 <span className="text-xs font-mono text-zinc-500 tracking-wider">Synchronizing secure inquiry nodes...</span>
               </div>
-            ) : inquiries.length === 0 ? (
-              <div className="glass-card p-12 text-center text-zinc-450 border border-dashed border-outline-variant/40">
+            ) : filteredInquiries.length === 0 ? (
+              <div className="glass-card p-12 text-center text-zinc-450 border border-dashed border-outline-variant/40 rounded-2xl">
                 <span className="material-symbols-outlined text-[48px] text-zinc-650 mb-2">question_answer</span>
-                <p className="text-xs font-mono uppercase tracking-wider">No inquiries found in database.</p>
+                <p className="text-xs font-mono uppercase tracking-wider">
+                  No {inquiryStatusFilter !== "All" ? inquiryStatusFilter.toLowerCase() : ""} inquiries found.
+                </p>
               </div>
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-gutter items-start">
                 
                 {/* Left Pane: Inquiries List */}
                 <div className="lg:col-span-5 space-y-3 max-h-[580px] overflow-y-auto pr-2 no-scrollbar">
-                  {inquiries.map((inq) => {
+                  {filteredInquiries.map((inq) => {
                     const isSelected = inq.id === activeInquiry?.id;
-                    const hasReplied = !!inq.reply;
+                    const resolved = isResolvedInq(inq);
                     return (
                       <div 
                         key={inq.id}
@@ -2707,10 +2790,11 @@ export default function Dashboard() {
                             <h4 className="font-label-md text-label-md font-bold text-foreground dark:text-white truncate">{inq.name}</h4>
                             <p className="text-[10px] text-zinc-400 truncate">{inq.email}</p>
                           </div>
-                          <span className={`px-2 py-0.5 rounded text-[8px] font-mono font-black uppercase flex-shrink-0 border ${
-                            hasReplied ? "bg-green-500/10 border-green-500/25 text-green-500" : "bg-amber-500/10 border-amber-500/25 text-amber-500 animate-pulse"
+                          <span className={`px-2 py-0.5 rounded text-[8px] font-mono font-black uppercase flex-shrink-0 flex items-center gap-1 border ${
+                            resolved ? "bg-emerald-500/10 border-emerald-500/25 text-emerald-500" : "bg-amber-500/10 border-amber-500/25 text-amber-500 animate-pulse"
                           }`}>
-                            {hasReplied ? "Replied" : "Unreplied"}
+                            {resolved ? <CheckCircle2 size={10} /> : <Clock size={10} />}
+                            {resolved ? "Resolved" : "Pending"}
                           </span>
                         </div>
                         <p className="text-xs text-zinc-400 line-clamp-2 leading-relaxed mb-3">{inq.message}</p>
@@ -2735,23 +2819,58 @@ export default function Dashboard() {
                               {activeInquiry.name[0]}
                             </div>
                             <div>
-                              <h3 className="font-headline-sm text-sm font-bold text-foreground dark:text-white">{activeInquiry.name}</h3>
+                              <div className="flex items-center gap-2">
+                                <h3 className="font-headline-sm text-sm font-bold text-foreground dark:text-white">{activeInquiry.name}</h3>
+                                <span className={`px-2 py-0.5 rounded-full text-[9px] font-mono font-black uppercase flex items-center gap-1 border ${
+                                  isActiveResolved ? "bg-emerald-500/10 border-emerald-500/25 text-emerald-500" : "bg-amber-500/10 border-amber-500/25 text-amber-500"
+                                }`}>
+                                  {isActiveResolved ? <CheckCircle2 size={10} /> : <Clock size={10} />}
+                                  {isActiveResolved ? "Resolved" : "Pending"}
+                                </span>
+                              </div>
                               <p className="text-xs text-zinc-400 font-mono mt-0.5">{activeInquiry.email} {activeInquiry.phone ? `• ${activeInquiry.phone}` : ""}</p>
                             </div>
                           </div>
-                          <div className="text-right">
-                            <span className="inline-flex px-2 py-0.5 rounded text-[9px] font-mono font-black bg-primary/15 border border-primary/20 text-[#00d1ff] uppercase mb-1">
-                              {activeInquiry.type || "General Inquiry"}
-                            </span>
-                            <p className="text-[10px] text-zinc-400" title={activeInquiry.date || activeInquiry.createdAt}>
-                              {formatRelativeTime(activeInquiry.createdAt || activeInquiry.timestamp || activeInquiry.date)}
-                            </p>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => handleToggleResolveInquiry(activeInquiry)}
+                              className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer border ${
+                                isActiveResolved
+                                  ? "bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 border-amber-500/30"
+                                  : "bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 border-emerald-500/30"
+                              }`}
+                              title={isActiveResolved ? "Click to Reopen Inquiry as Pending" : "Click to Mark Inquiry as Resolved"}
+                            >
+                              {isActiveResolved ? (
+                                <>
+                                  <Clock size={13} />
+                                  <span>Reopen</span>
+                                </>
+                              ) : (
+                                <>
+                                  <CheckCircle2 size={13} />
+                                  <span>Mark Resolved</span>
+                                </>
+                              )}
+                            </button>
+                            <button
+                              onClick={() => handleDeleteInquiry(activeInquiry.id)}
+                              className="p-2 bg-red-500/5 hover:bg-red-500/10 border border-red-500/20 text-red-400 hover:text-red-300 rounded-xl transition-all cursor-pointer"
+                              title="Delete Inquiry Record"
+                            >
+                              <Trash2 size={14} />
+                            </button>
                           </div>
                         </div>
 
                         {/* Full Message */}
                         <div className="space-y-2">
-                          <h4 className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest block leading-none">Client Inquiry Description:</h4>
+                          <div className="flex items-center justify-between text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
+                            <span>Client Inquiry Description:</span>
+                            <span title={activeInquiry.date || activeInquiry.createdAt}>
+                              {formatRelativeTime(activeInquiry.createdAt || activeInquiry.timestamp || activeInquiry.date)}
+                            </span>
+                          </div>
                           <div className="p-4 bg-surface-container-low border border-outline-variant/30 rounded-xl">
                             {renderFormattedInquiryMessage(activeInquiry.message)}
                           </div>
@@ -2760,9 +2879,15 @@ export default function Dashboard() {
                         {/* Sent Reply View */}
                         {activeInquiry.reply && (
                           <div className="space-y-2">
-                            <h4 className="text-[10px] font-mono text-green-500 uppercase tracking-widest block leading-none">Sent Admin Reply:</h4>
-                            <div className="p-4 bg-green-500/5 border border-green-500/10 dark:border-green-500/20 rounded-xl">
-                              <p className="text-xs text-foreground dark:text-zinc-300 font-sans italic leading-relaxed whitespace-pre-wrap">
+                            <div className="flex items-center justify-between text-[10px] font-mono text-emerald-500 uppercase tracking-widest">
+                              <span className="flex items-center gap-1.5 font-bold">
+                                <CheckCircle2 size={13} />
+                                Sent Admin Reply:
+                              </span>
+                              <span className="text-emerald-500/80">Delivered & Synced</span>
+                            </div>
+                            <div className="p-4 bg-emerald-500/5 border border-emerald-500/10 dark:border-emerald-500/20 rounded-xl">
+                              <p className="text-xs text-foreground dark:text-zinc-200 font-sans leading-relaxed whitespace-pre-wrap">
                                 {activeInquiry.reply}
                               </p>
                             </div>
@@ -2771,76 +2896,82 @@ export default function Dashboard() {
                       </div>
 
                       {/* Reply Composer Form / Action Footer */}
-                      <div className="pt-5 border-t border-outline-variant/40">
-                        {activeInquiry.reply ? (
-                          <div className="flex justify-between items-center">
-                            <span className="text-[10px] font-mono text-zinc-500 uppercase">Status: Action completed</span>
+                      <div className="pt-5 border-t border-outline-variant/40 space-y-3">
+                        <form 
+                          onSubmit={async (e) => {
+                            e.preventDefault();
+                            if (!replyText.trim()) return;
+                            setSubmittingReply(true);
+                            try {
+                              const token = await getAuthToken();
+                              const updated = await replyToInquiry(activeInquiry.id, replyText.trim(), token, activeInquiry);
+                              setInquiries((prev) =>
+                                prev.map((inq) =>
+                                  inq.id === activeInquiry.id || (activeInquiry.ticketId && inq.id === activeInquiry.ticketId)
+                                    ? { ...inq, reply: updated.reply || replyText.trim(), status: "Resolved" }
+                                    : inq
+                                )
+                              );
+                              setToast({ message: "Reply sent and inquiry marked as Resolved.", type: "success" });
+                              setReplyText("");
+                              logAdminActivityApi({
+                                adminName: adminName || user?.fullName || "Admin",
+                                adminEmail: adminEmail || user?.primaryEmailAddress?.emailAddress || "",
+                                action: "REPLIED TO INQUIRY",
+                                target: `${activeInquiry.name} (${activeInquiry.email})`,
+                                details: `Sent reply for inquiry [${activeInquiry.id}]`,
+                              });
+                              fetchAuditLogs();
+                            } catch (err: any) {
+                              setToast({ message: err.message || "Failed to send reply.", type: "error" });
+                            } finally {
+                              setSubmittingReply(false);
+                            }
+                          }} 
+                          className="space-y-3"
+                        >
+                          <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest block leading-none">
+                            {activeInquiry.reply ? "Send Additional / Updated Reply:" : "Compose Reply Message:"}
+                          </label>
+                          <textarea
+                            required
+                            rows={3}
+                            value={replyText}
+                            onChange={(e) => setReplyText(e.target.value)}
+                            placeholder={activeInquiry.reply ? "Write an updated or additional response..." : "Write your official reply details..."}
+                            className="w-full p-3 bg-surface-container-low border border-outline-variant/40 rounded-xl text-xs font-sans text-foreground dark:text-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30"
+                          />
+                          <div className="flex justify-between items-center gap-3">
                             <button 
-                              onClick={() => handleDeleteInquiry(activeInquiry.id)}
-                              className="px-3.5 py-2 bg-red-500/5 hover:bg-red-500/10 border border-red-500/10 text-red-400 hover:text-red-300 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all"
+                              type="button"
+                              onClick={() => handleToggleResolveInquiry(activeInquiry)}
+                              className={`px-3.5 py-2 rounded-lg text-[10px] font-mono font-bold uppercase tracking-wider border transition-all cursor-pointer ${
+                                isActiveResolved
+                                  ? "bg-amber-500/10 text-amber-500 border-amber-500/20 hover:bg-amber-500/20"
+                                  : "bg-emerald-500/10 text-emerald-500 border-emerald-500/20 hover:bg-emerald-500/20"
+                              }`}
                             >
-                              Delete Inquiry Record
+                              {isActiveResolved ? "Mark as Pending" : "Mark as Resolved"}
+                            </button>
+                            <button
+                              type="submit"
+                              disabled={submittingReply || !replyText.trim()}
+                              className="px-5 py-2.5 bg-primary dark:bg-[#00d1ff] text-on-primary dark:text-black font-extrabold rounded-lg text-[10px] flex items-center justify-center gap-1.5 uppercase hover:brightness-110 active:scale-95 transition-all disabled:opacity-50 cursor-pointer shadow-sm"
+                            >
+                              {submittingReply ? (
+                                <>
+                                  <div className="w-3 h-3 border-2 border-on-primary dark:border-black border-t-transparent rounded-full animate-spin"></div>
+                                  Sending...
+                                </>
+                              ) : (
+                                <>
+                                  <Send size={11} />
+                                  Send & Resolve
+                                </>
+                              )}
                             </button>
                           </div>
-                        ) : (
-                          <form 
-                            onSubmit={async (e) => {
-                              e.preventDefault();
-                              if (!replyText.trim()) return;
-                              setSubmittingReply(true);
-                              try {
-                                const token = await getAuthToken();
-                                const updated = await replyToInquiry(activeInquiry.id, replyText.trim(), token);
-                                setInquiries((prev) =>
-                                  prev.map((inq) => (inq.id === activeInquiry.id ? { ...inq, reply: updated.reply } : inq))
-                                );
-                                setToast({ message: "Reply message sent/recorded successfully.", type: "success" });
-                                setReplyText("");
-                              } catch (err: any) {
-                                setToast({ message: err.message || "Failed to send reply.", type: "error" });
-                              } finally {
-                                setSubmittingReply(false);
-                              }
-                            }} 
-                            className="space-y-3"
-                          >
-                            <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest block leading-none">Compose Reply Message:</label>
-                            <textarea
-                              required
-                              rows={4}
-                              value={replyText}
-                              onChange={(e) => setReplyText(e.target.value)}
-                              placeholder="Write your email reply details..."
-                              className="w-full p-3 bg-surface-container-low border border-outline-variant/40 rounded-xl text-xs font-sans text-foreground dark:text-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30"
-                            />
-                            <div className="flex justify-between items-center gap-3">
-                              <button 
-                                type="button"
-                                onClick={() => handleDeleteInquiry(activeInquiry.id)}
-                                className="px-3 py-2.5 bg-red-500/5 hover:bg-red-500/10 border border-red-500/10 text-red-400 hover:text-red-300 rounded-lg text-[10px] font-mono font-bold uppercase tracking-wider transition-all"
-                              >
-                                Delete
-                              </button>
-                              <button
-                                type="submit"
-                                disabled={submittingReply || !replyText.trim()}
-                                className="px-5 py-2.5 bg-primary dark:bg-[#00d1ff] text-on-primary dark:text-black font-extrabold rounded-lg text-[10px] flex items-center justify-center gap-1.5 uppercase hover:brightness-110 active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
-                              >
-                                {submittingReply ? (
-                                  <>
-                                    <div className="w-3 h-3 border-2 border-on-primary dark:border-black border-t-transparent rounded-full animate-spin"></div>
-                                    Sending...
-                                  </>
-                                ) : (
-                                  <>
-                                    <Send size={11} />
-                                    Send Reply
-                                  </>
-                                )}
-                              </button>
-                            </div>
-                          </form>
-                        )}
+                        </form>
                       </div>
 
                     </div>

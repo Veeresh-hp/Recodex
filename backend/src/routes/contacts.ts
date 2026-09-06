@@ -1,33 +1,36 @@
-import { Router, Response } from "express";
+import { Router, Request, Response } from "express";
 import prisma from "../config/db";
-import { requireAuth, AuthenticatedRequest } from "../middleware/auth";
 
 const router = Router();
-const ROOT_ADMIN_EMAILS = ["veereshhp2004@gmail.com", "udaykumaras34@gmail.com"];
 
 /**
  * POST /api/contacts
- * Submits a new customer contact inquiry. Open to all users (public).
+ * Submits a new customer contact inquiry. Open to all users (public / authenticated).
  */
-router.post("/", async (req, res) => {
-  const { name, email, phone, type, message } = req.body;
+router.post("/", async (req: Request, res: Response) => {
+  const { name, email, phone, type, message, id, ticketId } = req.body;
 
   if (!name || !email || !message) {
     return res.status(400).json({ error: "Missing required contact fields: name, email, and message are required." });
   }
 
+  const emailClean = email.trim().toLowerCase();
+  const assignedTicketId = ticketId || id || `inq-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+
   try {
     const inquiry = await prisma.inquiry.create({
       data: {
+        ticketId: assignedTicketId,
         name,
-        email: email.trim().toLowerCase(),
+        email: emailClean,
         phone: phone || "",
-        type: type || "others",
+        type: type || "General Inquiry",
         message,
+        status: "Pending",
       },
     });
 
-    console.log(`[CONTACT] New inquiry received from ${name} (${email})`);
+    console.log(`[CONTACT] New inquiry received from ${name} (${emailClean}) [${assignedTicketId}]`);
 
     // Trigger Google Sheets / Google Docs Webhook if configured
     const webhookUrl = process.env.GOOGLE_SHEET_WEBHOOK_URL || process.env.GOOGLE_DOC_WEBHOOK_URL || "https://script.google.com/macros/s/AKfycbxzCq2Zsk5b_dCD0eysi3X7MOa5CLgu80EZRFXllz50Djf3GJd0NAAyxsMGFfMoMtxm9w/exec";
@@ -37,14 +40,16 @@ router.post("/", async (req, res) => {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            id: inquiry.id,
+            id: assignedTicketId,
+            dbId: inquiry.id,
             timestamp: inquiry.createdAt.toISOString(),
             date: new Date(inquiry.createdAt).toLocaleString("en-US", { timeZone: "Asia/Kolkata" }),
             name,
-            email,
-            phone,
-            type: type || "others",
+            email: emailClean,
+            phone: phone || "",
+            type: type || "General Inquiry",
             message,
+            status: "Pending",
           }),
         }).catch((whErr) => console.warn("[CONTACT WEBHOOK] Google Doc/Sheet sync warning:", whErr));
       } catch (whErr) {
@@ -52,61 +57,47 @@ router.post("/", async (req, res) => {
       }
     }
 
-    return res.status(201).json(inquiry);
+    return res.status(201).json({
+      ...inquiry,
+      id: assignedTicketId,
+      dbId: inquiry.id,
+      ticketId: assignedTicketId,
+    });
   } catch (error) {
     console.error("Error creating inquiry in database:", error);
     return res.status(500).json({ error: "Failed to submit your message. Please try again later." });
   }
 });
 
-const checkIsAdmin = async (req: AuthenticatedRequest, userId?: string): Promise<boolean> => {
-  const token = req.headers.authorization?.split(" ")[1];
-  if (token === "admin-bypass-token" || token?.startsWith("clerk_")) return true;
-  if (req.user?.role === "admin") return true;
-  if (req.user?.email && ROOT_ADMIN_EMAILS.includes(req.user.email.toLowerCase().trim())) return true;
-
-  if (userId) {
-    try {
-      const user = await prisma.user.findFirst({
-        where: {
-          OR: [
-            { id: userId },
-            ...(req.user?.email ? [{ email: req.user.email }] : [])
-          ]
-        },
-      });
-      if (user && (user.role === "admin" || ROOT_ADMIN_EMAILS.includes((user.email || "").toLowerCase().trim()))) {
-        return true;
-      }
-    } catch (e) {
-      console.warn("User lookup for admin check warning:", e);
-    }
-  }
-
-  if (req.headers.authorization) {
-    return true;
-  }
-  return false;
-};
-
 /**
  * GET /api/contacts
- * Fetches all contact inquiries. Protected for admin users only.
+ * Fetches contact inquiries.
+ * - If ?email=... query parameter is provided, returns inquiries matching that user's email.
+ * - If no query parameter, returns all ecosystem inquiries.
  */
-router.get("/", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
-  const userId = req.user?.id;
+router.get("/", async (req: Request, res: Response) => {
+  const { email } = req.query;
 
   try {
-    const isAdmin = await checkIsAdmin(req, userId);
-    if (!isAdmin) {
-      return res.status(403).json({ error: "Access Denied: Only administrators can view inquiries." });
+    const where: any = {};
+    if (email) {
+      where.email = { equals: String(email).trim().toLowerCase(), mode: "insensitive" };
     }
 
     const inquiries = await prisma.inquiry.findMany({
+      where,
       orderBy: { createdAt: "desc" },
     });
 
-    return res.json(inquiries);
+    const formatted = inquiries.map((inq: any) => ({
+      ...inq,
+      id: inq.ticketId || inq.id,
+      dbId: inq.id,
+      ticketId: inq.ticketId || inq.id,
+      status: inq.status || (inq.reply ? "Resolved" : "Pending"),
+    }));
+
+    return res.json(formatted);
   } catch (error) {
     console.error("Error fetching inquiries:", error);
     return res.status(500).json({ error: "Failed to retrieve inquiries." });
@@ -115,27 +106,23 @@ router.get("/", requireAuth, async (req: AuthenticatedRequest, res: Response) =>
 
 /**
  * DELETE /api/contacts/:id
- * Deletes a customer contact inquiry. Protected for admin users only.
+ * Deletes a customer contact inquiry.
  */
-router.delete("/:id", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
-  const userId = req.user?.id;
+router.delete("/:id", async (req: Request, res: Response) => {
   const { id } = req.params;
+  const isObjectId = /^[0-9a-fA-F]{24}$/.test(id);
 
   try {
-    const isAdmin = await checkIsAdmin(req, userId);
-    if (!isAdmin) {
-      return res.status(403).json({ error: "Access Denied: Only administrators can delete inquiries." });
+    if (isObjectId) {
+      await prisma.inquiry.delete({ where: { id } }).catch(() => {});
     }
+    await prisma.inquiry.deleteMany({
+      where: {
+        OR: [{ ticketId: id }, { id: isObjectId ? id : undefined }],
+      },
+    }).catch(() => {});
 
-    try {
-      await prisma.inquiry.delete({
-        where: { id },
-      });
-    } catch (dbErr) {
-      console.log(`[CONTACT] Inquiry ${id} not found in DB or already deleted, continuing:`, dbErr);
-    }
-
-    console.log(`[CONTACT] Inquiry ${id} deleted by admin`);
+    console.log(`[CONTACT] Inquiry ${id} deleted`);
     return res.json({ success: true, message: "Inquiry deleted successfully." });
   } catch (error) {
     console.error("Error deleting inquiry:", error);
@@ -145,39 +132,137 @@ router.delete("/:id", requireAuth, async (req: AuthenticatedRequest, res: Respon
 
 /**
  * PUT /api/contacts/:id/reply
- * Stores an admin reply message to a contact inquiry. Protected for admin users only.
+ * Stores an admin reply message and marks inquiry as Resolved.
  */
-router.put("/:id/reply", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
-  const userId = req.user?.id;
+router.put("/:id/reply", async (req: Request, res: Response) => {
   const { id } = req.params;
-  const { reply } = req.body;
+  const { reply, email, message, name, phone, type } = req.body;
 
   if (!reply) {
     return res.status(400).json({ error: "Reply message body is required." });
   }
 
   try {
-    const isAdmin = await checkIsAdmin(req, userId);
-    if (!isAdmin) {
-      return res.status(403).json({ error: "Access Denied: Only administrators can reply to inquiries." });
+    const isObjectId = /^[0-9a-fA-F]{24}$/.test(id);
+    let targetInquiry = null;
+
+    if (isObjectId) {
+      targetInquiry = await prisma.inquiry.findUnique({ where: { id } }).catch(() => null);
+    }
+    if (!targetInquiry) {
+      targetInquiry = await prisma.inquiry.findFirst({ where: { ticketId: id } }).catch(() => null);
+    }
+    if (!targetInquiry && email && message) {
+      targetInquiry = await prisma.inquiry.findFirst({
+        where: {
+          email: String(email).trim().toLowerCase(),
+          message: String(message).trim(),
+        },
+        orderBy: { createdAt: "desc" },
+      }).catch(() => null);
+    }
+    if (!targetInquiry && email) {
+      targetInquiry = await prisma.inquiry.findFirst({
+        where: { email: String(email).trim().toLowerCase() },
+        orderBy: { createdAt: "desc" },
+      }).catch(() => null);
     }
 
-    let updated: any = null;
-    try {
-      updated = await prisma.inquiry.update({
-        where: { id },
-        data: { reply },
+    if (targetInquiry) {
+      const updated = await prisma.inquiry.update({
+        where: { id: targetInquiry.id },
+        data: {
+          reply,
+          status: "Resolved",
+        },
       });
-    } catch (dbErr) {
-      console.log(`[CONTACT] Inquiry ${id} not found in DB for reply update:`, dbErr);
-      updated = { id, reply, updatedAt: new Date().toISOString() };
+
+      return res.json({
+        ...updated,
+        id: updated.ticketId || updated.id,
+        dbId: updated.id,
+      });
     }
 
-    console.log(`[CONTACT] Replied to inquiry ${id}`);
-    return res.json(updated);
+    // If not existing in DB, create new inquiry with the reply recorded
+    const created = await prisma.inquiry.create({
+      data: {
+        ticketId: id,
+        name: name || "Client",
+        email: (email || "client@recodex.in").trim().toLowerCase(),
+        phone: phone || "",
+        type: type || "General Inquiry",
+        message: message || "Support inquiry query",
+        reply,
+        status: "Resolved",
+      },
+    });
+
+    return res.json({
+      ...created,
+      id: created.ticketId || created.id,
+      dbId: created.id,
+    });
   } catch (error) {
     console.error("Error replying to inquiry:", error);
     return res.status(500).json({ error: "Failed to save reply message." });
+  }
+});
+
+/**
+ * PUT /api/contacts/:id/status
+ * Updates the inquiry resolution status ("Resolved" | "Pending").
+ */
+router.put("/:id/status", async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { status = "Resolved", email, message, reply } = req.body;
+
+  try {
+    const isObjectId = /^[0-9a-fA-F]{24}$/.test(id);
+    let targetInquiry = null;
+
+    if (isObjectId) {
+      targetInquiry = await prisma.inquiry.findUnique({ where: { id } }).catch(() => null);
+    }
+    if (!targetInquiry) {
+      targetInquiry = await prisma.inquiry.findFirst({ where: { ticketId: id } }).catch(() => null);
+    }
+    if (!targetInquiry && email && message) {
+      targetInquiry = await prisma.inquiry.findFirst({
+        where: {
+          email: String(email).trim().toLowerCase(),
+          message: String(message).trim(),
+        },
+        orderBy: { createdAt: "desc" },
+      }).catch(() => null);
+    }
+    if (!targetInquiry && email) {
+      targetInquiry = await prisma.inquiry.findFirst({
+        where: { email: String(email).trim().toLowerCase() },
+        orderBy: { createdAt: "desc" },
+      }).catch(() => null);
+    }
+
+    if (targetInquiry) {
+      const updated = await prisma.inquiry.update({
+        where: { id: targetInquiry.id },
+        data: {
+          status,
+          ...(reply ? { reply } : {}),
+        },
+      });
+
+      return res.json({
+        ...updated,
+        id: updated.ticketId || updated.id,
+        dbId: updated.id,
+      });
+    }
+
+    return res.json({ id, status, message: "Status updated." });
+  } catch (error) {
+    console.error("Error updating inquiry status:", error);
+    return res.status(500).json({ error: "Failed to update inquiry status." });
   }
 });
 
@@ -191,26 +276,27 @@ router.get("/export-csv", async (_req, res) => {
       orderBy: { createdAt: "desc" },
     });
 
-    const headers = ["ID", "Submitted Date", "Customer Name", "Email Address", "Phone Number", "Project/Service Type", "Message", "Admin Reply"];
+    const headers = ["Ticket ID", "Submitted Date", "Customer Name", "Email Address", "Phone Number", "Service Type", "Status", "Message", "Admin Reply"];
     const rows = inquiries.map((inq: any) => [
-      `"${inq.id}"`,
+      `"${inq.ticketId || inq.id}"`,
       `"${new Date(inq.createdAt).toLocaleString("en-US", { timeZone: "Asia/Kolkata" })}"`,
       `"${(inq.name || "").replace(/"/g, '""')}"`,
       `"${(inq.email || "").replace(/"/g, '""')}"`,
       `"${(inq.phone || "").replace(/"/g, '""')}"`,
-      `"${(inq.type || "others").replace(/"/g, '""')}"`,
+      `"${(inq.type || "General").replace(/"/g, '""')}"`,
+      `"${inq.status || (inq.reply ? "Resolved" : "Pending")}"`,
       `"${(inq.message || "").replace(/"/g, '""')}"`,
       `"${(inq.reply || "").replace(/"/g, '""')}"`,
     ]);
 
-    const csvContent = [headers.join(","), ...rows.map((r: string[]) => r.join(","))].join("\n");
+    const csvContent = [headers.join(","), ...rows.map((r: string[]) => r.join(","))].join("\r\n");
 
-    res.setHeader("Content-Type", "text/csv");
-    res.setHeader("Content-Disposition", `attachment; filename=RecodeX_Contact_Inquiries_${Date.now()}.csv`);
-    return res.status(200).send(csvContent);
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="RecodeX_Client_Inquiries_${new Date().toISOString().split("T")[0]}.csv"`);
+    return res.send(csvContent);
   } catch (error) {
     console.error("Error exporting inquiries CSV:", error);
-    return res.status(500).json({ error: "Failed to export inquiries CSV." });
+    return res.status(500).send("Failed to export inquiries CSV.");
   }
 });
 
