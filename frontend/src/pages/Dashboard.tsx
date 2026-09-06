@@ -669,23 +669,39 @@ export default function Dashboard() {
     fetchInquiries();
   }, [userId]);
 
-  // Live user registration sync & 15s telemetry polling
+  // Live user registration, inquiries sync & telemetry polling
   useEffect(() => {
     const syncUsers = () => {
       fetchUsers();
     };
 
+    const syncInquiries = () => {
+      fetchInquiries();
+    };
+
     window.addEventListener("recodex-user-registered", syncUsers);
     window.addEventListener("recodex-auth-update", syncUsers);
-    window.addEventListener("storage", syncUsers);
+    window.addEventListener("recodex-inquiry-submitted", syncInquiries);
+    window.addEventListener("recodex-inquiry-replied", syncInquiries);
+    window.addEventListener("recodex-inquiry-status-updated", syncInquiries);
+    window.addEventListener("recodex-inquiry-deleted", syncInquiries);
+    window.addEventListener("storage", () => {
+      syncUsers();
+      syncInquiries();
+    });
 
     const userPollTimer = setInterval(syncUsers, 15000);
+    const inqPollTimer = setInterval(syncInquiries, 8000);
 
     return () => {
       window.removeEventListener("recodex-user-registered", syncUsers);
       window.removeEventListener("recodex-auth-update", syncUsers);
-      window.removeEventListener("storage", syncUsers);
+      window.removeEventListener("recodex-inquiry-submitted", syncInquiries);
+      window.removeEventListener("recodex-inquiry-replied", syncInquiries);
+      window.removeEventListener("recodex-inquiry-status-updated", syncInquiries);
+      window.removeEventListener("recodex-inquiry-deleted", syncInquiries);
       clearInterval(userPollTimer);
+      clearInterval(inqPollTimer);
     };
   }, []);
 
@@ -2704,6 +2720,15 @@ export default function Dashboard() {
                 <p className="text-xs text-zinc-400 dark:text-zinc-500">Respond to development proposals, system estimates, and support tickets submitted via contact forms.</p>
               </div>
               <div className="flex items-center gap-2">
+                <button
+                  onClick={() => fetchInquiries()}
+                  disabled={inquiriesLoading}
+                  className="px-3.5 py-1.5 bg-black/5 hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10 border border-black/10 dark:border-white/10 text-foreground dark:text-white rounded-xl text-xs font-mono font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer disabled:opacity-50"
+                  title="Refresh Inquiries Feed"
+                >
+                  <RefreshCw size={13} className={inquiriesLoading ? "animate-spin text-primary" : ""} />
+                  <span>Refresh</span>
+                </button>
                 <button
                   onClick={() => {
                     const API_URL = typeof window !== "undefined" && window.location.hostname !== "localhost" ? "/api" : "http://localhost:5000/api";

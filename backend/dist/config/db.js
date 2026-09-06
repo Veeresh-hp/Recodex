@@ -16,8 +16,7 @@ exports.realPrisma = new client_1.PrismaClient({
 // Mock Storage
 const MOCK_USERS = [
     { id: "sandbox-admin-001", email: "veereshhp2004@gmail.com", name: "Veeresh H P", role: "admin", profileImage: null, createdAt: new Date(), updatedAt: new Date() },
-    { id: "sandbox-dev-002", email: "veereshhp04@gmail.com", name: "Veeresh H P (Dev)", role: "developer", profileImage: null, createdAt: new Date(), updatedAt: new Date() },
-    { id: "sandbox-client-003", email: "veereshhp_client@gmail.com", name: "Veeresh H P (Client)", role: "client", profileImage: null, createdAt: new Date(), updatedAt: new Date() }
+    { id: "sandbox-dev-002", email: "veereshhp04@gmail.com", name: "Veeresh H P (Dev)", role: "developer", profileImage: null, createdAt: new Date(), updatedAt: new Date() }
 ];
 let MOCK_PROJECTS = [];
 try {
