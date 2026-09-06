@@ -603,40 +603,20 @@ export default function Dashboard() {
     }
   };
 
-  const fetchInquiries = async () => {
-    setInquiriesLoading(true);
+  const fetchInquiries = async (silent = false) => {
+    if (!silent && inquiries.length === 0) {
+      setInquiriesLoading(true);
+    }
     try {
       const data = await getInquiries();
-      setInquiries(data);
+      if (Array.isArray(data) && data.length > 0) {
+        setInquiries((prev) => {
+          if (JSON.stringify(prev) === JSON.stringify(data)) return prev;
+          return data;
+        });
+      }
     } catch (err) {
       console.log("[RECODEX ERROR] Backend inquiries fetch failed:", err);
-      // Mock inquiries fallback if backend is offline
-      setInquiries([
-        {
-          id: "inq-1",
-          name: "David Vance",
-          email: "vance@blackmesa.org",
-          type: "backend",
-          message: "Looking for an engineer to architect an event-driven Go microservices cluster with Kafka.",
-          createdAt: new Date(Date.now() - 3600 * 1000 * 5).toISOString()
-        },
-        {
-          id: "inq-2",
-          name: "Sarah Builder",
-          email: "sarah@startup.io",
-          type: "frontend",
-          message: "Need a high-performance Landing Page using Vite, React, Tailwind CSS, and custom particle overlays.",
-          createdAt: new Date(Date.now() - 3600 * 1000 * 24).toISOString()
-        },
-        {
-          id: "inq-3",
-          name: "Alexander Mercer",
-          email: "mercer@gentek.org",
-          type: "major",
-          message: "Requesting development on low-latency data replication nodes across multi-cloud environments.",
-          createdAt: new Date(Date.now() - 3600 * 1000 * 24 * 3).toISOString()
-        }
-      ]);
     } finally {
       setInquiriesLoading(false);
     }
@@ -676,7 +656,7 @@ export default function Dashboard() {
     };
 
     const syncInquiries = () => {
-      fetchInquiries();
+      fetchInquiries(true);
     };
 
     window.addEventListener("recodex-user-registered", syncUsers);
@@ -690,8 +670,8 @@ export default function Dashboard() {
       syncInquiries();
     });
 
-    const userPollTimer = setInterval(syncUsers, 15000);
-    const inqPollTimer = setInterval(syncInquiries, 8000);
+    const userPollTimer = setInterval(syncUsers, 20000);
+    const inqPollTimer = setInterval(syncInquiries, 20000);
 
     return () => {
       window.removeEventListener("recodex-user-registered", syncUsers);
@@ -2780,7 +2760,7 @@ export default function Dashboard() {
               </button>
             </div>
 
-            {inquiriesLoading ? (
+            {inquiriesLoading && inquiries.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 gap-3 select-none">
                 <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
                 <span className="text-xs font-mono text-zinc-500 tracking-wider">Synchronizing secure inquiry nodes...</span>
