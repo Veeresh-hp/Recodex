@@ -5,6 +5,7 @@ import prisma from "../config/db";
 import { requireAuth, AuthenticatedRequest } from "../middleware/auth";
 import { CertificateService } from "../services/certificateService";
 import { generateCertificatePdf } from "../services/pdfGenerator";
+import { uploadCertificateToCloudinary } from "../config/cloudinary";
 
 const router = Router();
 const DB_FILE = path.join(__dirname, "../../certificates_db.json");
@@ -543,6 +544,23 @@ router.post("/admin/manual-upload", async (req: Request, res: Response) => {
     const generatedCertId = `RCX-${certYear}-${randomSuffix}`;
     const certId = req.body.id || req.body.certificateId || generatedCertId;
 
+    // Direct Cloudinary Upload into respective user's folder
+    let finalCloudinaryUrl: string | undefined = fileData;
+    if (fileData && typeof fileData === "string" && (fileData.startsWith("data:") || fileData.startsWith("http"))) {
+      try {
+        if (fileData.startsWith("data:")) {
+          const uploadResult = await uploadCertificateToCloudinary(
+            fileData,
+            finalRecipientEmail || finalRecipientName,
+            certId
+          );
+          finalCloudinaryUrl = uploadResult.secure_url;
+        }
+      } catch (uploadErr) {
+        console.warn("Cloudinary certificate manual upload warning:", uploadErr);
+      }
+    }
+
     const certRecord: any = {
       id: certId,
       certificateId: certId,
@@ -558,7 +576,7 @@ router.post("/admin/manual-upload", async (req: Request, res: Response) => {
       status: finalStatus === "Approved" || finalStatus === "ISSUED" ? "Approved" : finalStatus,
       finalScore: score ? Number(score) : 100,
       grade: grade || "A+",
-      fileData: fileData || undefined,
+      fileData: finalCloudinaryUrl || undefined,
       fileName: fileName || undefined,
       fileType: fileType || undefined,
       description: description || undefined,
@@ -620,14 +638,9 @@ router.post("/admin/manual-upload", async (req: Request, res: Response) => {
       if (targetUser && targetProject) {
         await prisma.certificate.upsert({
           where: {
-            userId_projectId_certificateType: {
-              userId: targetUser.id,
-              projectId: targetProject.id,
-              certificateType: "PROJECT_COMPLETION",
-            },
+            certificateId: certId,
           },
           update: {
-            certificateId: certId,
             recipientName: finalRecipientName,
             recipientEmail: finalRecipientEmail,
             projectTitle: finalProjectTitle,
@@ -638,12 +651,13 @@ router.post("/admin/manual-upload", async (req: Request, res: Response) => {
             issuanceMethod: "ADMIN_MANUAL",
             finalScore: score ? Number(score) : 100,
             grade: grade || "A+",
-            pdfUrl: fileData || undefined,
-            previewUrl: fileType?.startsWith("image/") ? fileData : undefined,
+            pdfUrl: finalCloudinaryUrl || undefined,
+            previewUrl: finalCloudinaryUrl || undefined,
             verificationUrl: `/verify/${certId}`,
             metadata: {
               fileName: fileName || null,
               fileType: fileType || null,
+              fileData: finalCloudinaryUrl || null,
               customUpload: true,
               description: description || null,
             },
@@ -662,12 +676,13 @@ router.post("/admin/manual-upload", async (req: Request, res: Response) => {
             issuanceMethod: "ADMIN_MANUAL",
             finalScore: score ? Number(score) : 100,
             grade: grade || "A+",
-            pdfUrl: fileData || undefined,
-            previewUrl: fileType?.startsWith("image/") ? fileData : undefined,
+            pdfUrl: finalCloudinaryUrl || undefined,
+            previewUrl: finalCloudinaryUrl || undefined,
             verificationUrl: `/verify/${certId}`,
             metadata: {
               fileName: fileName || null,
               fileType: fileType || null,
+              fileData: finalCloudinaryUrl || null,
               customUpload: true,
               description: description || null,
             },
@@ -1005,17 +1020,34 @@ router.post("/", async (req: Request, res: Response) => {
     const issueDateObj = new Date(issueDateStr);
     const certStatus = cert.status || "Approved";
 
+    // Direct Cloudinary Upload into respective user's folder
+    let finalCloudinaryUrl: string | undefined = cert.fileData;
+    if (cert.fileData && typeof cert.fileData === "string" && cert.fileData.startsWith("data:")) {
+      try {
+        const uploadResult = await uploadCertificateToCloudinary(
+          cert.fileData,
+          emailClean || studentName,
+          certId
+        );
+        finalCloudinaryUrl = uploadResult.secure_url;
+      } catch (uploadErr) {
+        console.warn("Cloudinary certificate upload warning in POST /:", uploadErr);
+      }
+    }
+
     const updatedCert = {
       ...cert,
       id: certId,
       certificateId: certId,
       userEmail: emailClean,
+      recipientEmail: emailClean,
       studentName,
       recipientName: studentName,
       projectName,
       projectTitle: projectName,
       issueDate: issueDateStr,
       status: certStatus,
+      fileData: finalCloudinaryUrl || cert.fileData,
       updatedAt: new Date().toISOString(),
     };
 
@@ -1082,11 +1114,12 @@ router.post("/", async (req: Request, res: Response) => {
             issueDate: issueDateObj,
             completionDate: issueDateObj,
             status: prismaStatus,
-            pdfUrl: cert.fileData || undefined,
+            pdfUrl: finalCloudinaryUrl || cert.fileData || undefined,
+            previewUrl: finalCloudinaryUrl || cert.fileData || undefined,
             metadata: {
               fileName: cert.fileName || null,
               fileType: cert.fileType || null,
-              fileData: cert.fileData || null,
+              fileData: finalCloudinaryUrl || cert.fileData || null,
               description: cert.description || null,
             },
           },
@@ -1102,12 +1135,13 @@ router.post("/", async (req: Request, res: Response) => {
             completionDate: issueDateObj,
             status: prismaStatus,
             issuanceMethod: "ADMIN_MANUAL",
-            pdfUrl: cert.fileData || undefined,
+            pdfUrl: finalCloudinaryUrl || cert.fileData || undefined,
+            previewUrl: finalCloudinaryUrl || cert.fileData || undefined,
             verificationUrl: `/verify/${certId}`,
             metadata: {
               fileName: cert.fileName || null,
               fileType: cert.fileType || null,
-              fileData: cert.fileData || null,
+              fileData: finalCloudinaryUrl || cert.fileData || null,
               description: cert.description || null,
             },
           },

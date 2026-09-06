@@ -10,6 +10,7 @@ const db_1 = __importDefault(require("../config/db"));
 const auth_1 = require("../middleware/auth");
 const certificateService_1 = require("../services/certificateService");
 const pdfGenerator_1 = require("../services/pdfGenerator");
+const cloudinary_1 = require("../config/cloudinary");
 const router = (0, express_1.Router)();
 const DB_FILE = path_1.default.join(__dirname, "../../certificates_db.json");
 // Helper to read local json DB (legacy fallback)
@@ -474,6 +475,19 @@ router.post("/admin/manual-upload", async (req, res) => {
         const certYear = new Date().getFullYear();
         const generatedCertId = `RCX-${certYear}-${randomSuffix}`;
         const certId = req.body.id || req.body.certificateId || generatedCertId;
+        // Direct Cloudinary Upload into respective user's folder
+        let finalCloudinaryUrl = fileData;
+        if (fileData && typeof fileData === "string" && (fileData.startsWith("data:") || fileData.startsWith("http"))) {
+            try {
+                if (fileData.startsWith("data:")) {
+                    const uploadResult = await (0, cloudinary_1.uploadCertificateToCloudinary)(fileData, finalRecipientEmail || finalRecipientName, certId);
+                    finalCloudinaryUrl = uploadResult.secure_url;
+                }
+            }
+            catch (uploadErr) {
+                console.warn("Cloudinary certificate manual upload warning:", uploadErr);
+            }
+        }
         const certRecord = {
             id: certId,
             certificateId: certId,
@@ -489,7 +503,7 @@ router.post("/admin/manual-upload", async (req, res) => {
             status: finalStatus === "Approved" || finalStatus === "ISSUED" ? "Approved" : finalStatus,
             finalScore: score ? Number(score) : 100,
             grade: grade || "A+",
-            fileData: fileData || undefined,
+            fileData: finalCloudinaryUrl || undefined,
             fileName: fileName || undefined,
             fileType: fileType || undefined,
             description: description || undefined,
@@ -546,14 +560,9 @@ router.post("/admin/manual-upload", async (req, res) => {
             if (targetUser && targetProject) {
                 await db_1.default.certificate.upsert({
                     where: {
-                        userId_projectId_certificateType: {
-                            userId: targetUser.id,
-                            projectId: targetProject.id,
-                            certificateType: "PROJECT_COMPLETION",
-                        },
+                        certificateId: certId,
                     },
                     update: {
-                        certificateId: certId,
                         recipientName: finalRecipientName,
                         recipientEmail: finalRecipientEmail,
                         projectTitle: finalProjectTitle,
@@ -564,12 +573,13 @@ router.post("/admin/manual-upload", async (req, res) => {
                         issuanceMethod: "ADMIN_MANUAL",
                         finalScore: score ? Number(score) : 100,
                         grade: grade || "A+",
-                        pdfUrl: fileData || undefined,
-                        previewUrl: fileType?.startsWith("image/") ? fileData : undefined,
+                        pdfUrl: finalCloudinaryUrl || undefined,
+                        previewUrl: finalCloudinaryUrl || undefined,
                         verificationUrl: `/verify/${certId}`,
                         metadata: {
                             fileName: fileName || null,
                             fileType: fileType || null,
+                            fileData: finalCloudinaryUrl || null,
                             customUpload: true,
                             description: description || null,
                         },
@@ -588,12 +598,13 @@ router.post("/admin/manual-upload", async (req, res) => {
                         issuanceMethod: "ADMIN_MANUAL",
                         finalScore: score ? Number(score) : 100,
                         grade: grade || "A+",
-                        pdfUrl: fileData || undefined,
-                        previewUrl: fileType?.startsWith("image/") ? fileData : undefined,
+                        pdfUrl: finalCloudinaryUrl || undefined,
+                        previewUrl: finalCloudinaryUrl || undefined,
                         verificationUrl: `/verify/${certId}`,
                         metadata: {
                             fileName: fileName || null,
                             fileType: fileType || null,
+                            fileData: finalCloudinaryUrl || null,
                             customUpload: true,
                             description: description || null,
                         },
@@ -918,17 +929,30 @@ router.post("/", async (req, res) => {
         const issueDateStr = cert.issueDate || new Date().toISOString().split("T")[0];
         const issueDateObj = new Date(issueDateStr);
         const certStatus = cert.status || "Approved";
+        // Direct Cloudinary Upload into respective user's folder
+        let finalCloudinaryUrl = cert.fileData;
+        if (cert.fileData && typeof cert.fileData === "string" && cert.fileData.startsWith("data:")) {
+            try {
+                const uploadResult = await (0, cloudinary_1.uploadCertificateToCloudinary)(cert.fileData, emailClean || studentName, certId);
+                finalCloudinaryUrl = uploadResult.secure_url;
+            }
+            catch (uploadErr) {
+                console.warn("Cloudinary certificate upload warning in POST /:", uploadErr);
+            }
+        }
         const updatedCert = {
             ...cert,
             id: certId,
             certificateId: certId,
             userEmail: emailClean,
+            recipientEmail: emailClean,
             studentName,
             recipientName: studentName,
             projectName,
             projectTitle: projectName,
             issueDate: issueDateStr,
             status: certStatus,
+            fileData: finalCloudinaryUrl || cert.fileData,
             updatedAt: new Date().toISOString(),
         };
         // 1. Write to local file
@@ -990,11 +1014,12 @@ router.post("/", async (req, res) => {
                         issueDate: issueDateObj,
                         completionDate: issueDateObj,
                         status: prismaStatus,
-                        pdfUrl: cert.fileData || undefined,
+                        pdfUrl: finalCloudinaryUrl || cert.fileData || undefined,
+                        previewUrl: finalCloudinaryUrl || cert.fileData || undefined,
                         metadata: {
                             fileName: cert.fileName || null,
                             fileType: cert.fileType || null,
-                            fileData: cert.fileData || null,
+                            fileData: finalCloudinaryUrl || cert.fileData || null,
                             description: cert.description || null,
                         },
                     },
@@ -1010,12 +1035,13 @@ router.post("/", async (req, res) => {
                         completionDate: issueDateObj,
                         status: prismaStatus,
                         issuanceMethod: "ADMIN_MANUAL",
-                        pdfUrl: cert.fileData || undefined,
+                        pdfUrl: finalCloudinaryUrl || cert.fileData || undefined,
+                        previewUrl: finalCloudinaryUrl || cert.fileData || undefined,
                         verificationUrl: `/verify/${certId}`,
                         metadata: {
                             fileName: cert.fileName || null,
                             fileType: cert.fileType || null,
-                            fileData: cert.fileData || null,
+                            fileData: finalCloudinaryUrl || cert.fileData || null,
                             description: cert.description || null,
                         },
                     },

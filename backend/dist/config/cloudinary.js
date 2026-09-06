@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.uploadToCloudinary = void 0;
+exports.uploadCertificateToCloudinary = exports.uploadToCloudinary = void 0;
 const cloudinary_1 = require("cloudinary");
 // Configure Cloudinary from environment variables
 cloudinary_1.v2.config({
@@ -31,4 +31,49 @@ const uploadToCloudinary = (fileBuffer, folder = "recodex") => {
     });
 };
 exports.uploadToCloudinary = uploadToCloudinary;
+/**
+ * Uploads a user's certificate document (PDF or Image) into a dedicated user folder in Cloudinary.
+ * Accepts base64 data URI string or Buffer.
+ *
+ * @param fileData - Base64 Data URL or Buffer
+ * @param userIdentifier - User email or name for folder routing
+ * @param certId - Certificate unique identifier
+ * @returns Promise resolving to secure Cloudinary URL and public_id
+ */
+const uploadCertificateToCloudinary = async (fileData, userIdentifier, certId) => {
+    const safeUserFolder = (userIdentifier || "general_user")
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9_.-]/g, "_");
+    const folder = `recodex/certificates/${safeUserFolder}`;
+    const safeCertId = (certId || `CERT-${Date.now()}`).replace(/[^a-zA-Z0-9_.-]/g, "_");
+    if (typeof fileData === "string" && fileData.startsWith("data:")) {
+        const result = await cloudinary_1.v2.uploader.upload(fileData, {
+            folder,
+            public_id: safeCertId,
+            resource_type: "auto",
+            overwrite: true,
+        });
+        return { secure_url: result.secure_url, public_id: result.public_id };
+    }
+    else if (Buffer.isBuffer(fileData)) {
+        const result = await (0, exports.uploadToCloudinary)(fileData, folder);
+        return { secure_url: result.secure_url, public_id: result.public_id };
+    }
+    else if (typeof fileData === "string" && (fileData.startsWith("http://") || fileData.startsWith("https://"))) {
+        // Already a remote URL (e.g. existing Cloudinary URL)
+        return { secure_url: fileData, public_id: safeCertId };
+    }
+    else if (typeof fileData === "string") {
+        const result = await cloudinary_1.v2.uploader.upload(fileData, {
+            folder,
+            public_id: safeCertId,
+            resource_type: "auto",
+            overwrite: true,
+        });
+        return { secure_url: result.secure_url, public_id: result.public_id };
+    }
+    throw new Error("Invalid file data format for certificate upload.");
+};
+exports.uploadCertificateToCloudinary = uploadCertificateToCloudinary;
 exports.default = cloudinary_1.v2;

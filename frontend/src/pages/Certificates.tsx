@@ -33,6 +33,7 @@ export default function Certificates() {
   const [selectedCert, setSelectedCert] = useState<Certificate | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<"ALL" | "Approved" | "Pending">("ALL");
+  const [certModalMode, setCertModalMode] = useState<"document" | "credential">("document");
   const [requestModalOpen, setRequestModalOpen] = useState(false);
   const [submittingRequest, setSubmittingRequest] = useState(false);
   const [requestSuccess, setRequestSuccess] = useState(false);
@@ -345,12 +346,28 @@ export default function Certificates() {
                   {/* Actions */}
                   <div className="flex items-center gap-2 pt-4 border-t border-black/5 dark:border-zinc-800/80">
                     <button
-                      onClick={() => setSelectedCert(cert)}
+                      onClick={() => {
+                        setSelectedCert(cert);
+                        setCertModalMode(cert.fileData ? "document" : "credential");
+                      }}
                       className="flex-1 py-2 px-3 rounded-xl bg-primary/10 hover:bg-primary text-primary hover:text-primary-foreground font-mono text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                     >
                       <Eye size={14} />
                       View Document
                     </button>
+
+                    {cert.fileData && (
+                      <a
+                        href={cert.fileData}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        download={cert.fileName || `Certificate_${cert.id}.pdf`}
+                        className="p-2 rounded-xl bg-black/5 dark:bg-zinc-900 hover:bg-emerald-500/20 text-zinc-600 dark:text-zinc-300 hover:text-emerald-400 transition-all cursor-pointer"
+                        title="Download / Open Cloudinary Certificate File"
+                      >
+                        <Download size={16} />
+                      </a>
+                    )}
 
                     <button
                       onClick={() => handleCopyLink(cert)}
@@ -370,117 +387,198 @@ export default function Certificates() {
       {/* DETAILED HIGH-RES CERTIFICATE DOCUMENT VIEWER MODAL */}
       {selectedCert && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200 select-text"
           onClick={() => setSelectedCert(null)}
         >
           <div
-            className="relative w-full max-w-4xl bg-[#080b12] text-white border border-cyan-500/30 rounded-3xl p-6 sm:p-10 shadow-[0_0_80px_rgba(0,209,255,0.25)] max-h-[92vh] overflow-y-auto"
+            className="relative w-full max-w-4xl bg-[#080b12] text-white border border-cyan-500/30 rounded-3xl p-6 sm:p-8 shadow-[0_0_80px_rgba(0,209,255,0.25)] max-h-[94vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
             ref={printRef}
           >
-            {/* Modal Controls Bar (Hidden during Print) */}
-            <div className="flex items-center justify-between pb-6 border-b border-zinc-800 print:hidden">
+            {/* Modal Header & View Mode Switcher */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-zinc-800 print:hidden">
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span className="text-xs font-mono uppercase tracking-widest text-zinc-400">Cryptographically Signed Document</span>
+                <span className="text-xs font-mono uppercase tracking-widest text-zinc-300 font-bold">
+                  {selectedCert.fileData ? "Cloudinary Verified Document" : "Cryptographically Signed Credential"}
+                </span>
               </div>
-              <div className="flex items-center gap-3">
+
+              <div className="flex items-center gap-2 flex-wrap">
+                {selectedCert.fileData && (
+                  <div className="flex p-1 bg-zinc-900 rounded-xl border border-zinc-800 text-xs font-mono">
+                    <button
+                      onClick={() => setCertModalMode("document")}
+                      className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
+                        certModalMode === "document"
+                          ? "bg-[#00d1ff] text-black font-extrabold shadow-sm"
+                          : "text-zinc-400 hover:text-white"
+                      }`}
+                    >
+                      Uploaded Document
+                    </button>
+                    <button
+                      onClick={() => setCertModalMode("credential")}
+                      className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
+                        certModalMode === "credential"
+                          ? "bg-[#00d1ff] text-black font-extrabold shadow-sm"
+                          : "text-zinc-400 hover:text-white"
+                      }`}
+                    >
+                      Digital Credential
+                    </button>
+                  </div>
+                )}
+
+                {selectedCert.fileData && (
+                  <a
+                    href={selectedCert.fileData}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-1.5 bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-500/30 text-xs font-mono font-bold rounded-xl flex items-center gap-1.5 text-cyan-300 transition-colors cursor-pointer"
+                  >
+                    <ExternalLink size={13} />
+                    <span>Open in Cloudinary</span>
+                  </a>
+                )}
+
                 <button
                   onClick={handlePrint}
-                  className="px-3.5 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-xs font-mono font-bold rounded-xl flex items-center gap-1.5 text-zinc-200 transition-colors cursor-pointer"
+                  className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-xs font-mono font-bold rounded-xl flex items-center gap-1.5 text-zinc-200 transition-colors cursor-pointer"
                 >
-                  <Printer size={14} />
-                  Print / Save PDF
+                  <Printer size={13} />
+                  <span>Print</span>
                 </button>
+
                 <button
                   onClick={() => setSelectedCert(null)}
                   className="p-1.5 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800 transition-colors cursor-pointer"
                 >
-                  <XCircle size={20} />
+                  <XCircle size={18} />
                 </button>
               </div>
             </div>
 
-            {/* HIGH-RES CERTIFICATE DOCUMENT CANVAS */}
-            <div className="relative mt-6 p-8 sm:p-14 border-4 border-cyan-500/40 rounded-2xl bg-gradient-to-b from-[#0a0f1d] to-[#040711] text-center shadow-inner overflow-hidden select-text">
-              {/* Guilloche / Watermark Security Background */}
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(0,209,255,0.06)_0%,transparent_70%)] pointer-events-none"></div>
-              <div className="absolute top-4 left-4 w-12 h-12 border-t-2 border-l-2 border-cyan-400/60"></div>
-              <div className="absolute top-4 right-4 w-12 h-12 border-t-2 border-r-2 border-cyan-400/60"></div>
-              <div className="absolute bottom-4 left-4 w-12 h-12 border-b-2 border-l-2 border-cyan-400/60"></div>
-              <div className="absolute bottom-4 right-4 w-12 h-12 border-b-2 border-r-2 border-cyan-400/60"></div>
-
-              {/* Certificate Header */}
-              <div className="flex justify-center items-center gap-3 mb-4">
-                <img src="/recodeXlogo.png" alt="RecodeX" className="h-10 w-auto object-contain" />
-              </div>
-              
-              <h2 className="text-xs sm:text-sm font-mono tracking-[0.3em] uppercase text-cyan-400 font-black mb-2">
-                Certificate of Technical Excellence
-              </h2>
-              <p className="text-[11px] font-mono text-zinc-400 uppercase tracking-widest mb-6">
-                RecodeX Engineering & Distributed Systems Protocol
-              </p>
-
-              {/* Presented To */}
-              <p className="text-xs text-zinc-400 uppercase tracking-wider mb-2">This is officially presented to</p>
-              <h1 className="text-2xl sm:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-white to-cyan-200 tracking-tight font-sans mb-4">
-                {selectedCert.studentName}
-              </h1>
-
-              {/* Certification Statement */}
-              <p className="text-xs sm:text-sm text-zinc-300 max-w-xl mx-auto leading-relaxed mb-6 font-sans">
-                For outstanding technical achievement, code verification, and successful engineering execution on the production system:
-              </p>
-
-              <div className="inline-block px-6 py-2.5 rounded-xl bg-cyan-950/60 border border-cyan-500/40 text-cyan-300 font-bold text-sm sm:text-lg mb-6 tracking-wide">
-                {selectedCert.projectName}
-              </div>
-
-              <p className="text-xs text-zinc-400 max-w-lg mx-auto leading-relaxed mb-8">
-                {selectedCert.description}
-              </p>
-
-              {/* Signatures & Seal Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 items-end pt-6 border-t border-zinc-800/80">
-                <div className="text-left font-mono text-[10px] text-zinc-400 space-y-1">
-                  <p className="text-zinc-500 uppercase">Issuance Date:</p>
-                  <p className="text-white font-bold">{selectedCert.issueDate}</p>
-                  <p className="text-zinc-500 uppercase pt-2">Credential ID:</p>
-                  <p className="text-cyan-400 font-bold">{selectedCert.credentialId || selectedCert.id}</p>
-                </div>
-
-                {/* Golden Official Seal */}
-                <div className="flex flex-col items-center">
-                  <div className="w-20 h-20 rounded-full border-2 border-cyan-400/80 bg-cyan-950/80 p-1 flex items-center justify-center shadow-[0_0_30px_rgba(0,209,255,0.4)]">
-                    <div className="w-full h-full rounded-full border border-dashed border-cyan-300/60 flex flex-col items-center justify-center text-center p-1">
-                      <ShieldCheck size={24} className="text-cyan-400" />
-                      <span className="text-[7px] font-mono font-black text-white uppercase tracking-tighter mt-0.5">VERIFIED</span>
+            {/* TAB 1: REAL CLOUDINARY UPLOADED DOCUMENT VIEW */}
+            {selectedCert.fileData && certModalMode === "document" ? (
+              <div className="mt-6 space-y-4">
+                <div className="p-2 sm:p-4 rounded-2xl bg-zinc-950 border border-zinc-800 overflow-hidden flex flex-col items-center justify-center min-h-[420px]">
+                  {selectedCert.fileData.toLowerCase().includes(".pdf") || selectedCert.fileType === "application/pdf" || selectedCert.fileData.startsWith("data:application/pdf") ? (
+                    <iframe
+                      src={selectedCert.fileData}
+                      title={`Certificate ${selectedCert.id}`}
+                      className="w-full h-[620px] rounded-xl border border-zinc-800 bg-white"
+                    />
+                  ) : (
+                    <div className="w-full flex flex-col items-center">
+                      <img
+                        src={selectedCert.fileData}
+                        alt={`Certificate for ${selectedCert.studentName}`}
+                        className="max-h-[640px] w-auto max-w-full rounded-xl object-contain shadow-2xl border border-zinc-800/80"
+                      />
                     </div>
-                  </div>
-                  <span className="text-[9px] font-mono text-cyan-400 font-bold uppercase tracking-widest mt-2">Official Seal</span>
+                  )}
                 </div>
 
-                <div className="text-right font-mono text-[10px] text-zinc-400 space-y-1">
-                  <div className="inline-block border-b border-zinc-600 pb-1 w-32 text-center text-cyan-300 font-serif italic text-sm">
-                    Veeresh H P
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 bg-zinc-900/60 rounded-2xl border border-zinc-800 text-xs font-mono">
+                  <div className="space-y-0.5 text-left">
+                    <p className="text-zinc-400">Target Student: <strong className="text-white">{selectedCert.studentName}</strong> ({selectedCert.userEmail})</p>
+                    <p className="text-zinc-500 text-[10px]">Project: {selectedCert.projectName} • Issued on: {selectedCert.issueDate}</p>
                   </div>
-                  <p className="text-zinc-500 uppercase">Lead Protocol Architect</p>
-                  <p className="text-zinc-500 uppercase pt-1">RecodeX Governance</p>
+                  <a
+                    href={selectedCert.fileData}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    download={selectedCert.fileName || `Certificate_${selectedCert.studentName.replace(/\s+/g, "_")}.pdf`}
+                    className="px-4 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 font-bold rounded-xl flex items-center gap-2 uppercase tracking-wider transition-all"
+                  >
+                    <Download size={14} />
+                    <span>Download Official Certificate</span>
+                  </a>
                 </div>
               </div>
+            ) : (
+              /* TAB 2: HIGH-RES DIGITAL CRYPTOGRAPHIC CERTIFICATE CANVAS */
+              <div className="relative mt-6 p-8 sm:p-14 border-4 border-cyan-500/40 rounded-2xl bg-gradient-to-b from-[#0a0f1d] to-[#040711] text-center shadow-inner overflow-hidden select-text">
+                {/* Guilloche / Watermark Security Background */}
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(0,209,255,0.06)_0%,transparent_70%)] pointer-events-none"></div>
+                <div className="absolute top-4 left-4 w-12 h-12 border-t-2 border-l-2 border-cyan-400/60"></div>
+                <div className="absolute top-4 right-4 w-12 h-12 border-t-2 border-r-2 border-cyan-400/60"></div>
+                <div className="absolute bottom-4 left-4 w-12 h-12 border-b-2 border-l-2 border-cyan-400/60"></div>
+                <div className="absolute bottom-4 right-4 w-12 h-12 border-b-2 border-r-2 border-cyan-400/60"></div>
 
-              {/* Cryptographic Verification Hash Footer */}
-              <div className="mt-8 pt-4 border-t border-zinc-800/50 flex flex-col sm:flex-row items-center justify-between text-[9px] font-mono text-zinc-500 gap-2">
-                <div className="flex items-center gap-1.5">
-                  <Lock size={11} className="text-emerald-400" />
-                  <span>SHA-256 Signature: {selectedCert.verificationHash || "0x8f4c9a12b6e789d034fe56aa7890bcde1234567890abcdef"}</span>
+                {/* Certificate Header */}
+                <div className="flex justify-center items-center gap-3 mb-4">
+                  <img src="/recodeXlogo.png" alt="RecodeX" className="h-10 w-auto object-contain" />
                 </div>
-                <div className="text-cyan-500 font-bold">
-                  verify.recodex.io/{selectedCert.id}
+                
+                <h2 className="text-xs sm:text-sm font-mono tracking-[0.3em] uppercase text-cyan-400 font-black mb-2">
+                  Certificate of Technical Excellence
+                </h2>
+                <p className="text-[11px] font-mono text-zinc-400 uppercase tracking-widest mb-6">
+                  RecodeX Engineering & Distributed Systems Protocol
+                </p>
+
+                {/* Presented To */}
+                <p className="text-xs text-zinc-400 uppercase tracking-wider mb-2">This is officially presented to</p>
+                <h1 className="text-2xl sm:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-white to-cyan-200 tracking-tight font-sans mb-4">
+                  {selectedCert.studentName}
+                </h1>
+
+                {/* Certification Statement */}
+                <p className="text-xs sm:text-sm text-zinc-300 max-w-xl mx-auto leading-relaxed mb-6 font-sans">
+                  For outstanding technical achievement, code verification, and successful engineering execution on the production system:
+                </p>
+
+                <div className="inline-block px-6 py-2.5 rounded-xl bg-cyan-950/60 border border-cyan-500/40 text-cyan-300 font-bold text-sm sm:text-lg mb-6 tracking-wide">
+                  {selectedCert.projectName}
+                </div>
+
+                <p className="text-xs text-zinc-400 max-w-lg mx-auto leading-relaxed mb-8">
+                  {selectedCert.description || "Official verification of project completion and cryptographic identity signature validation."}
+                </p>
+
+                {/* Signatures & Seal Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 items-end pt-6 border-t border-zinc-800/80">
+                  <div className="text-left font-mono text-[10px] text-zinc-400 space-y-1">
+                    <p className="text-zinc-500 uppercase">Issuance Date:</p>
+                    <p className="text-white font-bold">{selectedCert.issueDate}</p>
+                    <p className="text-zinc-500 uppercase pt-2">Credential ID:</p>
+                    <p className="text-cyan-400 font-bold">{selectedCert.credentialId || selectedCert.id}</p>
+                  </div>
+
+                  {/* Golden Official Seal */}
+                  <div className="flex flex-col items-center">
+                    <div className="w-20 h-20 rounded-full border-2 border-cyan-400/80 bg-cyan-950/80 p-1 flex items-center justify-center shadow-[0_0_30px_rgba(0,209,255,0.4)]">
+                      <div className="w-full h-full rounded-full border border-dashed border-cyan-300/60 flex flex-col items-center justify-center text-center p-1">
+                        <ShieldCheck size={24} className="text-cyan-400" />
+                        <span className="text-[7px] font-mono font-black text-white uppercase tracking-tighter mt-0.5">VERIFIED</span>
+                      </div>
+                    </div>
+                    <span className="text-[9px] font-mono text-cyan-400 font-bold uppercase tracking-widest mt-2">Official Seal</span>
+                  </div>
+
+                  <div className="text-right font-mono text-[10px] text-zinc-400 space-y-1">
+                    <div className="inline-block border-b border-zinc-600 pb-1 w-32 text-center text-cyan-300 font-serif italic text-sm">
+                      Veeresh H P
+                    </div>
+                    <p className="text-zinc-500 uppercase">Lead Protocol Architect</p>
+                    <p className="text-zinc-500 uppercase pt-1">RecodeX Governance</p>
+                  </div>
+                </div>
+
+                {/* Cryptographic Verification Hash Footer */}
+                <div className="mt-8 pt-4 border-t border-zinc-800/50 flex flex-col sm:flex-row items-center justify-between text-[9px] font-mono text-zinc-500 gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <Lock size={11} className="text-emerald-400" />
+                    <span>SHA-256 Signature: {selectedCert.verificationHash || "0x8f4c9a12b6e789d034fe56aa7890bcde1234567890abcdef"}</span>
+                  </div>
+                  <div className="text-cyan-500 font-bold">
+                    verify.recodex.io/{selectedCert.id}
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       )}

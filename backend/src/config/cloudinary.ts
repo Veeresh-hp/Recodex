@@ -36,4 +36,52 @@ export const uploadToCloudinary = (
   });
 };
 
+/**
+ * Uploads a user's certificate document (PDF or Image) into a dedicated user folder in Cloudinary.
+ * Accepts base64 data URI string or Buffer.
+ * 
+ * @param fileData - Base64 Data URL or Buffer
+ * @param userIdentifier - User email or name for folder routing
+ * @param certId - Certificate unique identifier
+ * @returns Promise resolving to secure Cloudinary URL and public_id
+ */
+export const uploadCertificateToCloudinary = async (
+  fileData: string | Buffer,
+  userIdentifier: string,
+  certId: string
+): Promise<{ secure_url: string; public_id: string }> => {
+  const safeUserFolder = (userIdentifier || "general_user")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9_.-]/g, "_");
+  const folder = `recodex/certificates/${safeUserFolder}`;
+  const safeCertId = (certId || `CERT-${Date.now()}`).replace(/[^a-zA-Z0-9_.-]/g, "_");
+
+  if (typeof fileData === "string" && fileData.startsWith("data:")) {
+    const result = await cloudinary.uploader.upload(fileData, {
+      folder,
+      public_id: safeCertId,
+      resource_type: "auto",
+      overwrite: true,
+    });
+    return { secure_url: result.secure_url, public_id: result.public_id };
+  } else if (Buffer.isBuffer(fileData)) {
+    const result = await uploadToCloudinary(fileData, folder);
+    return { secure_url: result.secure_url, public_id: result.public_id };
+  } else if (typeof fileData === "string" && (fileData.startsWith("http://") || fileData.startsWith("https://"))) {
+    // Already a remote URL (e.g. existing Cloudinary URL)
+    return { secure_url: fileData, public_id: safeCertId };
+  } else if (typeof fileData === "string") {
+    const result = await cloudinary.uploader.upload(fileData, {
+      folder,
+      public_id: safeCertId,
+      resource_type: "auto",
+      overwrite: true,
+    });
+    return { secure_url: result.secure_url, public_id: result.public_id };
+  }
+
+  throw new Error("Invalid file data format for certificate upload.");
+};
+
 export default cloudinary;
