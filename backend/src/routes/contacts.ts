@@ -104,56 +104,6 @@ router.get("/", async (req: Request, res: Response) => {
       orderBy: { createdAt: "desc" },
     });
 
-    // Backfill any inquiries from Google Sheets that are not yet in MongoDB
-    try {
-      const webhookUrl = process.env.GOOGLE_SHEET_WEBHOOK_URL || "https://script.google.com/macros/s/AKfycbxzCq2Zsk5b_dCD0eysi3X7MOa5CLgu80EZRFXllz50Djf3GJd0NAAyxsMGFfMoMtxm9w/exec";
-      const sheetRes = await fetch(webhookUrl, { method: "GET" }).catch(() => null);
-      if (sheetRes && sheetRes.ok) {
-        const sheetData = await sheetRes.json();
-        if (Array.isArray(sheetData)) {
-          let hasNew = false;
-          for (const item of sheetData) {
-            if (!item || !item.email || !item.message) continue;
-            const tId = item.id || item.ticketId;
-            const orConditions: any[] = [];
-            if (tId) orConditions.push({ ticketId: tId });
-            if (item.email && item.message) {
-              orConditions.push({ email: item.email.toLowerCase().trim(), message: item.message.trim() });
-            }
-            if (orConditions.length === 0) continue;
-
-            const existingInq = await prisma.inquiry.findFirst({
-              where: { OR: orConditions }
-            }).catch(() => null);
-
-            if (!existingInq) {
-              hasNew = true;
-              await prisma.inquiry.create({
-                data: {
-                  ticketId: tId || `inq-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-                  name: item.name || "Client",
-                  email: item.email.toLowerCase().trim(),
-                  phone: item.phone || "",
-                  type: item.type || "General Inquiry",
-                  message: item.message,
-                  reply: item.reply || null,
-                  status: item.status || (item.reply ? "Resolved" : "Pending"),
-                  createdAt: item.createdAt ? new Date(item.createdAt) : new Date(),
-                }
-              }).catch(() => null);
-            }
-          }
-          if (hasNew) {
-            inquiries = await prisma.inquiry.findMany({
-              where,
-              orderBy: { createdAt: "desc" },
-            });
-          }
-        }
-      }
-    } catch (syncErr) {
-      console.warn("[CONTACTS] Google sheet sync warning:", syncErr);
-    }
 
     const formatted = inquiries.map((inq: any) => ({
       ...inq,
@@ -187,32 +137,6 @@ router.get("/:id", async (req: Request, res: Response) => {
       inquiry = await prisma.inquiry.findFirst({ where: { ticketId: id } }).catch(() => null);
     }
 
-    // If not found in database, check Google Sheets fallback
-    if (!inquiry) {
-      const webhookUrl = process.env.GOOGLE_SHEET_WEBHOOK_URL || "https://script.google.com/macros/s/AKfycbxzCq2Zsk5b_dCD0eysi3X7MOa5CLgu80EZRFXllz50Djf3GJd0NAAyxsMGFfMoMtxm9w/exec";
-      const sheetRes = await fetch(webhookUrl, { method: "GET" }).catch(() => null);
-      if (sheetRes && sheetRes.ok) {
-        const sheetData = await sheetRes.json();
-        if (Array.isArray(sheetData)) {
-          const match = sheetData.find((item: any) => item.id === id || item.ticketId === id);
-          if (match) {
-            inquiry = await prisma.inquiry.create({
-              data: {
-                ticketId: match.id || id,
-                name: match.name || "Client",
-                email: (match.email || "").toLowerCase().trim(),
-                phone: match.phone || "",
-                type: match.type || "General Inquiry",
-                message: match.message,
-                reply: match.reply || null,
-                status: match.status || (match.reply ? "Resolved" : "Pending"),
-                createdAt: match.createdAt ? new Date(match.createdAt) : new Date(),
-              }
-            }).catch(() => null);
-          }
-        }
-      }
-    }
 
     if (!inquiry) {
       return res.status(404).json({ error: "Inquiry ticket not found" });

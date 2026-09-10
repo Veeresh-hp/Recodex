@@ -613,11 +613,15 @@ export default function Dashboard() {
     }
     try {
       const data = await getInquiries();
-      if (Array.isArray(data) && data.length > 0) {
+      if (Array.isArray(data)) {
         setInquiries((prev) => {
           if (JSON.stringify(prev) === JSON.stringify(data)) return prev;
           return data;
         });
+        if (data.length === 0) {
+          setActiveInquiryMessages([]);
+          setSelectedInquiryId(null);
+        }
       }
     } catch (err) {
       console.log("[RECODEX ERROR] Backend inquiries fetch failed:", err);

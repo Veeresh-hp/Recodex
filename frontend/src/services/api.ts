@@ -801,19 +801,13 @@ export async function getInquiries(token?: string, email?: string): Promise<any[
   } catch (error) {
     console.warn("[RECODEX API] Fetch backend inquiries warning:", error);
   }
-
-  // Fetch inquiries from Google Apps Script Webapp GET endpoint if available
-  let sheetInquiries: any[] = [];
-  try {
-    const sheetRes = await fetch(GOOGLE_SCRIPT_WEBHOOK_URL, { method: "GET" });
-    if (sheetRes.ok) {
-      const data = await sheetRes.json();
-      if (Array.isArray(data)) {
-        sheetInquiries = data;
+  if (backendFetchSuccess && backendInquiries.length === 0) {
+    try {
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("recodex_submitted_inquiries");
       }
-    }
-  } catch (sheetErr) {
-    console.warn("[RECODEX API] Google Sheet GET sync warning:", sheetErr);
+    } catch (e) {}
+    return [];
   }
 
   let localInquiries: any[] = [];
@@ -923,7 +917,6 @@ export async function getInquiries(token?: string, email?: string): Promise<any[
   };
 
   backendInquiries.forEach(processInquiry);
-  sheetInquiries.forEach(processInquiry);
   if (!backendFetchSuccess) {
     localInquiries.forEach(processInquiry);
   }
@@ -1004,20 +997,24 @@ export async function deleteInquiry(id: string, token: string): Promise<any> {
     console.warn("Local storage inquiry delete warning:", e);
   }
 
-  // 2. Call backend DELETE endpoint
+  // 2. Call backend DELETE endpoints
   try {
-    const response = await fetch(`${API_BASE_URL}/contacts/${id}`, {
+    await fetch(`${API_BASE_URL}/queries/${id}`, {
       method: "DELETE",
       headers: {
         "Authorization": `Bearer ${token || "admin-bypass-token"}`,
         "Accept": "application/json",
       },
-    });
+    }).catch(() => {});
 
-    if (!response.ok) {
-      const errData = await response.json().catch(() => ({}));
-      console.warn("[RECODEX API] Backend delete returned non-ok, handled gracefully:", errData);
-    }
+    await fetch(`${API_BASE_URL}/contacts/${id}`, {
+      method: "DELETE",
+      headers: {
+        "Authorization": `Bearer ${token || "admin-bypass-token"}`,
+        "Accept": "application/json",
+      },
+    }).catch(() => {});
+
     return { success: true };
   } catch (error) {
     console.warn("[RECODEX API] Backend endpoint unreachable, deleted locally:", error);

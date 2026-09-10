@@ -38,56 +38,7 @@ const MOCK_PROJECT_DEVS: any[] = [
   { projectId: "recodex-live-demo-project", userId: "sandbox-dev-002" }
 ];
 
-const MOCK_INQUIRIES: any[] = [
-  {
-    id: "6a9d3bc99bc3e19a785b4387",
-    ticketId: "inq-1788688247250-o21z6",
-    name: "VEERESH H P",
-    email: "veereshhp04@gmail.com",
-    phone: "",
-    type: "Certificate Request",
-    message: `[CERTIFICATE REQUEST] Project: "lkl;kl". Deliverables / Message to Admin: ;kk. User: VEERESH H P (veereshhp04@gmail.com).`,
-    reply: "ok",
-    status: "Resolved",
-    createdAt: new Date("2026-09-06T09:50:47.000Z"),
-  },
-  {
-    id: "6a9d2de5c96600486b9e7bf6",
-    ticketId: "inq-1788680500901-vfcu0",
-    name: "VEERESH H P",
-    email: "veereshhp04@gmail.com",
-    phone: "",
-    type: "Certificate Request",
-    message: `[CERTIFICATE REQUEST] Project: "certificate". Deliverables / Message to Admin: ai workflow. User: VEERESH H P (veereshhp04@gmail.com).`,
-    reply: "ok solved",
-    status: "Resolved",
-    createdAt: new Date("2026-09-06T07:41:40.000Z"),
-  },
-  {
-    id: "6a9d2de5c96600486b9e7bf5",
-    ticketId: "inq-1788678153742",
-    name: "VEERESH H P",
-    email: "veereshhp04@gmail.com",
-    phone: "",
-    type: "Certificate Request",
-    message: `[CERTIFICATE REQUEST] Project: "ai workflow". Deliverables / Message to Admin: provide certificate to me please. User: VEERESH H P (veereshhp04@gmail.com).`,
-    reply: null,
-    status: "Pending",
-    createdAt: new Date("2026-09-06T07:02:33.000Z"),
-  },
-  {
-    id: "6a9d2de4c96600486b9e7bf4",
-    ticketId: "inq-1787756253654",
-    name: "Vinayaka P S",
-    email: "vinayakaps04@gmail.com",
-    phone: "6366350722",
-    type: "mini",
-    message: "Railway sector",
-    reply: null,
-    status: "Pending",
-    createdAt: new Date("2026-08-26T14:57:33.000Z"),
-  },
-];
+const MOCK_INQUIRIES: any[] = [];
 
 const MOCK_QUERY_MESSAGES: any[] = [];
 

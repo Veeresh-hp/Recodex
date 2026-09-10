@@ -115,7 +115,9 @@ export default function Queries() {
             localStorage.removeItem("recodex_submitted_inquiries");
             localStorage.removeItem("recodex_inquiry_replies");
             localStorage.removeItem("recodex_inquiry_statuses");
+            localStorage.removeItem("recodex_deleted_inquiries");
           } catch (e) {}
+          setMessagesMap({});
         }
       }
 
