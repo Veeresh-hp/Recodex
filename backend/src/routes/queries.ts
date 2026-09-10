@@ -60,8 +60,16 @@ async function findInquiryByIdOrTicket(idOrTicketId: string) {
 
 router.get("/db-check", async (_req: Request, res: Response) => {
   try {
-    const { realPrisma } = await import("../config/db");
-    const count = await realPrisma.inquiry.count();
+    const { PrismaClient } = require("@prisma/client");
+    const testPrisma = new PrismaClient({
+      datasources: {
+        db: {
+          url: process.env.DATABASE_URL || "mongodb+srv://Recodex:Recodex2004@recodex.wahwbbo.mongodb.net/recodex?appName=Recodex",
+        },
+      },
+    });
+    const count = await testPrisma.inquiry.count();
+    await testPrisma.$disconnect();
     return res.json({ ok: true, count, env: process.env.DATABASE_URL ? "URL_SET" : "URL_MISSING" });
   } catch (err: any) {
     return res.status(500).json({
