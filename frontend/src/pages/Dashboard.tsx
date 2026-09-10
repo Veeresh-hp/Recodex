@@ -17,8 +17,10 @@ import {
   deleteInquiry, replyToInquiry, resolveInquiryApi, getUserProfile,
   getCertificatesApi, saveCertificateApi, deleteCertificateApi, approveCertificateApi,
   getPromotedAdminsApi, getAuditLogsApi, logAdminActivityApi,
+  getQueryDetailsApi, sendQueryMessageApi, updateQueryStatusApi, QueryMessageItem,
   AuditLogEntry
 } from "../services/api";
+import { subscribeToQuery } from "../services/realtime";
 import { useTheme } from "../context/ThemeContext";
 
 interface Deployment {
@@ -272,6 +274,8 @@ export default function Dashboard() {
   const [submittingReply, setSubmittingReply] = useState(false);
   const [selectedInquiryId, setSelectedInquiryId] = useState<string | null>(null);
   const [inquiryStatusFilter, setInquiryStatusFilter] = useState<"All" | "Pending" | "Resolved">("All");
+  const [activeInquiryMessages, setActiveInquiryMessages] = useState<QueryMessageItem[]>([]);
+  const [loadingMessages, setLoadingMessages] = useState(false);
 
   // User edit and reset password states
   const [userMenuAnchor, setUserMenuAnchor] = useState<{ id: string; top: number; right: number; openUp: boolean } | null>(null);
@@ -692,6 +696,100 @@ export default function Dashboard() {
     }
   }, [inquiries]);
 
+  // Current active inquiry reference for messages
+  const currentActiveInquiry = inquiries.find((i) => i.id === selectedInquiryId) || inquiries[0] || null;
+
+  // Realtime subscription and thread loading for active inquiry
+  useEffect(() => {
+    if (!currentActiveInquiry) {
+      setActiveInquiryMessages([]);
+      return;
+    }
+
+    const activeKey = currentActiveInquiry.ticketId || currentActiveInquiry.id;
+    let isSubscribed = true;
+    setLoadingMessages(true);
+
+    getAuthToken()
+      .then((token) => getQueryDetailsApi(activeKey, token))
+      .then((res) => {
+        if (!isSubscribed) return;
+        if (res && Array.isArray(res.messages) && res.messages.length > 0) {
+          setActiveInquiryMessages(res.messages);
+        } else {
+          const fallbackList: QueryMessageItem[] = [];
+          if (currentActiveInquiry.message) {
+            fallbackList.push({
+              id: `init-${activeKey}`,
+              queryId: activeKey,
+              senderId: currentActiveInquiry.customerId || "customer",
+              senderRole: "CUSTOMER",
+              senderName: currentActiveInquiry.name || "Client",
+              senderEmail: currentActiveInquiry.email,
+              message: currentActiveInquiry.message,
+              createdAt: currentActiveInquiry.createdAt || currentActiveInquiry.timestamp || new Date().toISOString(),
+            });
+          }
+          if (currentActiveInquiry.reply) {
+            fallbackList.push({
+              id: `reply-${activeKey}`,
+              queryId: activeKey,
+              senderId: "admin",
+              senderRole: "ADMIN",
+              senderName: "RecodeX Admin",
+              senderEmail: "support@recodex.in",
+              message: currentActiveInquiry.reply,
+              createdAt: currentActiveInquiry.resolvedAt || currentActiveInquiry.updatedAt || new Date().toISOString(),
+            });
+          }
+          setActiveInquiryMessages(fallbackList);
+        }
+      })
+      .catch((err) => {
+        console.warn("Failed to load inquiry thread:", err);
+      })
+      .finally(() => {
+        if (isSubscribed) setLoadingMessages(false);
+      });
+
+    // Realtime Supabase Broadcast Channel listener
+    const unsubscribe = subscribeToQuery(activeKey, {
+      onMessage: (newMsg) => {
+        if (!isSubscribed) return;
+        setActiveInquiryMessages((prev) => {
+          if (prev.some((m) => m.id === newMsg.id || (m.message === newMsg.message && m.senderRole === newMsg.senderRole))) {
+            return prev;
+          }
+          return [...prev, newMsg];
+        });
+        if (newMsg.senderRole === "CUSTOMER" || newMsg.senderRole === "USER") {
+          setInquiries((prev) =>
+            prev.map((i) =>
+              i.id === currentActiveInquiry.id || (currentActiveInquiry.ticketId && i.id === currentActiveInquiry.ticketId) || i.id === activeKey
+                ? { ...i, status: "Pending" }
+                : i
+            )
+          );
+        }
+      },
+      onStatusChange: (newStatus) => {
+        if (!isSubscribed) return;
+        setInquiries((prev) =>
+          prev.map((i) =>
+            i.id === currentActiveInquiry.id || (currentActiveInquiry.ticketId && i.id === currentActiveInquiry.ticketId) || i.id === activeKey
+              ? { ...i, status: newStatus }
+              : i
+          )
+        );
+      },
+    });
+
+    return () => {
+      isSubscribed = false;
+      unsubscribe();
+    };
+  }, [selectedInquiryId, currentActiveInquiry?.id]);
+
   // Re-fetch when sidebar tab changes
   useEffect(() => {
     if (activeSidebarTab === "Users") fetchUsers();
@@ -1011,6 +1109,81 @@ export default function Dashboard() {
     }
   };
 
+  const handleSendAdminReply = async (isResolve: boolean) => {
+    const targetInq = inquiries.find((i) => i.id === selectedInquiryId) || inquiries[0];
+    if (!targetInq || !replyText.trim()) return;
+
+    setSubmittingReply(true);
+    const text = replyText.trim();
+    const activeKey = targetInq.ticketId || targetInq.id;
+
+    try {
+      const token = await getAuthToken();
+      // 1. Send query message via primary API (persists in DB, creates QueryMessage, updates status, broadcasts Supabase Realtime)
+      const newMsg = await sendQueryMessageApi(activeKey, text, isResolve, token);
+
+      // Also call legacy replyToInquiry to ensure local storage caches / Google sheets webhook receive it
+      if (isResolve) {
+        replyToInquiry(targetInq.id, text, token, targetInq).catch(() => {});
+      }
+
+      // 2. Add message to local conversation thread state immediately
+      if (newMsg) {
+        setActiveInquiryMessages((prev) => {
+          if (prev.some((m) => m.id === newMsg.id)) return prev;
+          return [...prev, newMsg];
+        });
+      } else {
+        setActiveInquiryMessages((prev) => [
+          ...prev,
+          {
+            id: `msg-${Date.now()}`,
+            queryId: activeKey,
+            senderId: "admin",
+            senderRole: "ADMIN",
+            senderName: "RecodeX Admin",
+            senderEmail: "support@recodex.in",
+            message: text,
+            createdAt: new Date().toISOString(),
+          },
+        ]);
+      }
+
+      // 3. Update inquiries list in state
+      setInquiries((prev) =>
+        prev.map((inq) =>
+          inq.id === targetInq.id || (targetInq.ticketId && inq.id === targetInq.ticketId)
+            ? {
+                ...inq,
+                reply: text,
+                status: isResolve ? "Resolved" : (inq.status || "Pending"),
+              }
+            : inq
+        )
+      );
+
+      logAdminActivityApi({
+        adminName: adminName || user?.fullName || "Admin",
+        adminEmail: adminEmail || user?.primaryEmailAddress?.emailAddress || "",
+        action: "REPLIED TO INQUIRY",
+        target: `${targetInq.name} (${targetInq.email})`,
+        details: `Sent reply for inquiry [${activeKey}] (Resolved: ${isResolve})`,
+      });
+      fetchAuditLogs();
+
+      setToast({
+        message: isResolve ? "Reply sent and conversation marked as Resolved." : "Reply sent successfully. Chat remains open.",
+        type: "success",
+      });
+      setReplyText("");
+    } catch (err: any) {
+      console.error("Failed to send admin reply:", err);
+      setToast({ message: err.message || "Failed to send reply.", type: "error" });
+    } finally {
+      setSubmittingReply(false);
+    }
+  };
+
   const handlePostAnnouncement = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newAnnTitle || !newAnnMessage) return;
@@ -1316,9 +1489,14 @@ export default function Dashboard() {
     if (!inq) return;
     const isCurrentlyResolved = (inq.status || "").toLowerCase() === "resolved" || (!!inq.reply && inq.status !== "Pending");
     const targetStatus = isCurrentlyResolved ? "Pending" : "Resolved";
+    const activeKey = inq.ticketId || inq.id;
     try {
       const token = await getAuthToken();
+      // Primary DB update & realtime broadcast
+      await updateQueryStatusApi(activeKey, targetStatus === "Resolved" ? "RESOLVED" : "OPEN", token).catch(() => {});
+      // Legacy backward-compatibility sync
       await resolveInquiryApi(inq.id, targetStatus as any, token, inq);
+      
       setInquiries((prev) =>
         prev.map((i) => (i.id === inq.id || (inq.ticketId && i.id === inq.ticketId) ? { ...i, status: targetStatus } : i))
       );
@@ -1335,6 +1513,7 @@ export default function Dashboard() {
       });
       fetchAuditLogs();
     } catch (err: any) {
+      console.error("Failed to toggle resolve status:", err);
       setToast({ message: "Failed to update inquiry status.", type: "error" });
     }
   };
@@ -2886,46 +3065,97 @@ export default function Dashboard() {
                           </span>
                         </div>
 
-                        {/* 1. Client / Candidate Message Bubble (Left) */}
-                        <div className="flex flex-col items-start max-w-[90%] sm:max-w-[85%] mr-auto">
-                          <div className="flex items-center gap-1.5 mb-1 px-1">
-                            <span className="text-[10px] font-mono font-bold text-cyan-500 dark:text-[#00d1ff]">{activeInquiry.name}</span>
-                            <span className="text-[9px] font-mono text-zinc-500">• User Inquiry</span>
+                        {/* Thread Messages */}
+                        {loadingMessages && activeInquiryMessages.length === 0 ? (
+                          <div className="flex justify-center py-6">
+                            <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
                           </div>
-                          <div className="p-4 rounded-2xl rounded-tl-sm bg-white dark:bg-[#121b22] border border-black/10 dark:border-cyan-500/20 text-foreground dark:text-white shadow-sm text-xs space-y-2 w-full">
-                            {renderFormattedInquiryMessage(activeInquiry.message)}
-                            <div className="flex justify-end items-center gap-1 text-[9px] font-mono text-zinc-400 pt-1 border-t border-black/5 dark:border-white/5">
-                              <span>{new Date(activeInquiry.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                              <span className="text-cyan-500 dark:text-[#00d1ff] font-bold">✓✓</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* 2. Admin Official Response Bubble (Right) */}
-                        {activeInquiry.reply ? (
-                          <div className="flex flex-col items-end max-w-[90%] sm:max-w-[85%] ml-auto">
-                            <div className="flex items-center gap-1.5 mb-1 px-1">
-                              <ShieldCheck size={12} className="text-emerald-500" />
-                              <span className="text-[10px] font-mono font-bold text-emerald-500">RecodeX Admin</span>
-                              <span className="text-[9px] font-mono text-zinc-500">• Official Reply</span>
-                            </div>
-                            <div className="p-4 rounded-2xl rounded-tr-sm bg-emerald-500/10 dark:bg-[#005c4b]/30 border border-emerald-500/25 text-foreground dark:text-emerald-50 shadow-sm text-xs space-y-2 w-full">
-                              <p className="leading-relaxed whitespace-pre-wrap font-sans text-xs">
-                                {activeInquiry.reply}
-                              </p>
-                              <div className="flex justify-end items-center gap-1 text-[9px] font-mono text-emerald-500 pt-1 border-t border-emerald-500/10">
-                                <span>Delivered</span>
-                                <span className="font-bold">✓✓</span>
+                        ) : activeInquiryMessages.length > 0 ? (
+                          activeInquiryMessages.map((msgItem) => {
+                            const isCustomer = msgItem.senderRole === "CUSTOMER" || msgItem.senderRole === "USER";
+                            if (isCustomer) {
+                              return (
+                                <div key={msgItem.id} className="flex flex-col items-start max-w-[90%] sm:max-w-[85%] mr-auto">
+                                  <div className="flex items-center gap-1.5 mb-1 px-1">
+                                    <span className="text-[10px] font-mono font-bold text-cyan-500 dark:text-[#00d1ff]">
+                                      {msgItem.senderName || activeInquiry.name}
+                                    </span>
+                                    <span className="text-[9px] font-mono text-zinc-500">• User Inquiry</span>
+                                  </div>
+                                  <div className="p-4 rounded-2xl rounded-tl-sm bg-white dark:bg-[#121b22] border border-black/10 dark:border-cyan-500/20 text-foreground dark:text-white shadow-sm text-xs space-y-2 w-full">
+                                    {renderFormattedInquiryMessage(msgItem.message)}
+                                    <div className="flex justify-end items-center gap-1 text-[9px] font-mono text-zinc-400 pt-1 border-t border-black/5 dark:border-white/5">
+                                      <span>{new Date(msgItem.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                      <span className="text-cyan-500 dark:text-[#00d1ff] font-bold">✓✓</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            } else {
+                              return (
+                                <div key={msgItem.id} className="flex flex-col items-end max-w-[90%] sm:max-w-[85%] ml-auto">
+                                  <div className="flex items-center gap-1.5 mb-1 px-1">
+                                    <ShieldCheck size={12} className="text-emerald-500" />
+                                    <span className="text-[10px] font-mono font-bold text-emerald-500">RecodeX Admin</span>
+                                    <span className="text-[9px] font-mono text-zinc-500">• Official Reply</span>
+                                  </div>
+                                  <div className="p-4 rounded-2xl rounded-tr-sm bg-emerald-500/10 dark:bg-[#005c4b]/30 border border-emerald-500/25 text-foreground dark:text-emerald-50 shadow-sm text-xs space-y-2 w-full">
+                                    <p className="leading-relaxed whitespace-pre-wrap font-sans text-xs">
+                                      {msgItem.message}
+                                    </p>
+                                    <div className="flex justify-end items-center gap-1 text-[9px] font-mono text-emerald-500 pt-1 border-t border-emerald-500/10">
+                                      <span>{new Date(msgItem.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                      <span className="font-bold">✓✓</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            }
+                          })
+                        ) : (
+                          <>
+                            {/* Fallback 1. Client Message Bubble */}
+                            <div className="flex flex-col items-start max-w-[90%] sm:max-w-[85%] mr-auto">
+                              <div className="flex items-center gap-1.5 mb-1 px-1">
+                                <span className="text-[10px] font-mono font-bold text-cyan-500 dark:text-[#00d1ff]">{activeInquiry.name}</span>
+                                <span className="text-[9px] font-mono text-zinc-500">• User Inquiry</span>
+                              </div>
+                              <div className="p-4 rounded-2xl rounded-tl-sm bg-white dark:bg-[#121b22] border border-black/10 dark:border-cyan-500/20 text-foreground dark:text-white shadow-sm text-xs space-y-2 w-full">
+                                {renderFormattedInquiryMessage(activeInquiry.message)}
+                                <div className="flex justify-end items-center gap-1 text-[9px] font-mono text-zinc-400 pt-1 border-t border-black/5 dark:border-white/5">
+                                  <span>{new Date(activeInquiry.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                  <span className="text-cyan-500 dark:text-[#00d1ff] font-bold">✓✓</span>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        ) : (
-                          <div className="flex justify-center py-2">
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-mono bg-amber-500/10 text-amber-500 border border-amber-500/20">
-                              <Clock size={11} className="animate-spin" />
-                              Awaiting admin response...
-                            </span>
-                          </div>
+
+                            {/* Fallback 2. Admin Response Bubble */}
+                            {activeInquiry.reply ? (
+                              <div className="flex flex-col items-end max-w-[90%] sm:max-w-[85%] ml-auto">
+                                <div className="flex items-center gap-1.5 mb-1 px-1">
+                                  <ShieldCheck size={12} className="text-emerald-500" />
+                                  <span className="text-[10px] font-mono font-bold text-emerald-500">RecodeX Admin</span>
+                                  <span className="text-[9px] font-mono text-zinc-500">• Official Reply</span>
+                                </div>
+                                <div className="p-4 rounded-2xl rounded-tr-sm bg-emerald-500/10 dark:bg-[#005c4b]/30 border border-emerald-500/25 text-foreground dark:text-emerald-50 shadow-sm text-xs space-y-2 w-full">
+                                  <p className="leading-relaxed whitespace-pre-wrap font-sans text-xs">
+                                    {activeInquiry.reply}
+                                  </p>
+                                  <div className="flex justify-end items-center gap-1 text-[9px] font-mono text-emerald-500 pt-1 border-t border-emerald-500/10">
+                                    <span>Delivered</span>
+                                    <span className="font-bold">✓✓</span>
+                                  </div>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex justify-center py-2">
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-mono bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                                  <Clock size={11} className="animate-spin" />
+                                  Awaiting admin response...
+                                </span>
+                              </div>
+                            )}
+                          </>
                         )}
 
                         {/* 3. Resolution Status Banner in Chat */}
@@ -2964,32 +3194,7 @@ export default function Dashboard() {
                             onSubmit={async (e) => {
                               e.preventDefault();
                               if (!replyText.trim()) return;
-                              setSubmittingReply(true);
-                              try {
-                                const token = await getAuthToken();
-                                const updated = await replyToInquiry(activeInquiry.id, replyText.trim(), token, activeInquiry);
-                                setInquiries((prev) =>
-                                  prev.map((inq) =>
-                                    inq.id === activeInquiry.id || (activeInquiry.ticketId && inq.id === activeInquiry.ticketId)
-                                      ? { ...inq, reply: updated.reply || replyText.trim(), status: "Resolved" }
-                                      : inq
-                                  )
-                                );
-                                setToast({ message: "Reply sent and conversation marked as Resolved.", type: "success" });
-                                setReplyText("");
-                                logAdminActivityApi({
-                                  adminName: adminName || user?.fullName || "Admin",
-                                  adminEmail: adminEmail || user?.primaryEmailAddress?.emailAddress || "",
-                                  action: "REPLIED TO INQUIRY",
-                                  target: `${activeInquiry.name} (${activeInquiry.email})`,
-                                  details: `Sent reply for inquiry [${activeInquiry.id}]`,
-                                });
-                                fetchAuditLogs();
-                              } catch (err: any) {
-                                setToast({ message: err.message || "Failed to send reply.", type: "error" });
-                              } finally {
-                                setSubmittingReply(false);
-                              }
+                              await handleSendAdminReply(true);
                             }} 
                             className="space-y-3"
                           >
@@ -3005,7 +3210,7 @@ export default function Dashboard() {
                               placeholder="Type your official response details here..."
                               className="w-full p-3 bg-surface-container-low border border-outline-variant/40 rounded-xl text-xs font-sans text-foreground dark:text-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30"
                             />
-                            <div className="flex justify-between items-center gap-3">
+                            <div className="flex flex-wrap justify-between items-center gap-3">
                               <button 
                                 type="button"
                                 onClick={() => handleToggleResolveInquiry(activeInquiry)}
@@ -3013,23 +3218,37 @@ export default function Dashboard() {
                               >
                                 Mark as Resolved (No Reply)
                               </button>
-                              <button
-                                type="submit"
-                                disabled={submittingReply || !replyText.trim()}
-                                className="px-5 py-2.5 bg-primary dark:bg-[#00d1ff] text-on-primary dark:text-black font-extrabold rounded-lg text-[10px] flex items-center justify-center gap-1.5 uppercase hover:brightness-110 active:scale-95 transition-all disabled:opacity-50 cursor-pointer shadow-sm"
-                              >
-                                {submittingReply ? (
-                                  <>
-                                    <div className="w-3 h-3 border-2 border-on-primary dark:border-black border-t-transparent rounded-full animate-spin"></div>
-                                    Sending...
-                                  </>
-                                ) : (
-                                  <>
-                                    <Send size={11} />
-                                    Send & Resolve (Close)
-                                  </>
-                                )}
-                              </button>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  disabled={submittingReply || !replyText.trim()}
+                                  onClick={() => handleSendAdminReply(false)}
+                                  className="px-4 py-2.5 bg-black/5 hover:bg-black/10 dark:bg-white/10 dark:hover:bg-white/15 border border-black/10 dark:border-white/10 text-foreground dark:text-white font-extrabold rounded-lg text-[10px] flex items-center justify-center gap-1.5 uppercase transition-all disabled:opacity-50 cursor-pointer shadow-sm"
+                                  title="Send reply and keep inquiry open for conversation"
+                                >
+                                  <Send size={11} />
+                                  Send Reply (Keep Open)
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={submittingReply || !replyText.trim()}
+                                  onClick={() => handleSendAdminReply(true)}
+                                  className="px-5 py-2.5 bg-primary dark:bg-[#00d1ff] text-on-primary dark:text-black font-extrabold rounded-lg text-[10px] flex items-center justify-center gap-1.5 uppercase hover:brightness-110 active:scale-95 transition-all disabled:opacity-50 cursor-pointer shadow-sm"
+                                  title="Send reply and close inquiry as resolved"
+                                >
+                                  {submittingReply ? (
+                                    <>
+                                      <div className="w-3 h-3 border-2 border-on-primary dark:border-black border-t-transparent rounded-full animate-spin"></div>
+                                      Sending...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <CheckCircle2 size={11} />
+                                      Send & Resolve (Close)
+                                    </>
+                                  )}
+                                </button>
+                              </div>
                             </div>
                           </form>
                         )}

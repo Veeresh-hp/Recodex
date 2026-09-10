@@ -235,16 +235,42 @@ model CertificateAuditLog {
 }
 
 model Inquiry {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  ticketId  String?
-  name      String
-  email     String
-  phone     String   @default("")
-  type      String
-  message   String
-  reply     String?
-  status    String   @default("Pending")
-  createdAt DateTime @default(now()) @map("created_at")
+  id         String         @id @default(auto()) @map("_id") @db.ObjectId
+  ticketId   String?
+  customerId String?        @map("customer_id")
+  name       String
+  email      String
+  phone      String         @default("")
+  type       String         @default("General Inquiry")
+  subject    String?
+  priority   String         @default("Normal")
+  message    String
+  reply      String?
+  status     String         @default("OPEN")
+  createdAt  DateTime?      @default(now()) @map("created_at")
+  updatedAt  DateTime?      @updatedAt @map("updated_at")
+  resolvedAt DateTime?      @map("resolved_at")
+  messages   QueryMessage[]
 
   @@map("inquiries")
 }
+
+model QueryMessage {
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  queryId     String    @map("query_id") @db.ObjectId
+  ticketId    String?   @map("ticket_id")
+  senderId    String    @map("sender_id")
+  senderRole  String    @map("sender_role") // "CUSTOMER" | "ADMIN"
+  senderName  String    @default("User") @map("sender_name")
+  senderEmail String    @default("") @map("sender_email")
+  message     String
+  readAt      DateTime? @map("read_at")
+  createdAt   DateTime? @default(now()) @map("created_at")
+  updatedAt   DateTime? @updatedAt @map("updated_at")
+
+  inquiry     Inquiry   @relation(fields: [queryId], references: [id], onDelete: Cascade)
+
+  @@index([queryId, createdAt])
+  @@map("query_messages")
+}
+

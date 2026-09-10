@@ -1,28 +1,23 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useAuth, useUser } from "@clerk/clerk-react";
-import { getInquiries, getInquiryById, deleteInquiry } from "../services/api";
+import {
+  getQueriesApi,
+  getQueryDetailsApi,
+  createQueryApi,
+  sendQueryMessageApi,
+  updateQueryStatusApi,
+  deleteInquiry,
+  QueryItem,
+  QueryMessageItem,
+} from "../services/api";
+import { subscribeToQuery, RealtimeMessage, RealtimeStatusChange } from "../services/realtime";
 import {
   MessageSquare, ShieldCheck, Clock, CheckCircle2, ArrowLeft,
   Search, Filter, Plus, Send, AlertCircle, ChevronRight,
   User, Check, Sparkles, RefreshCw, HelpCircle, FileText, Trash2,
-  Share2, ExternalLink, Copy
+  Share2, ExternalLink, Copy, Lock, MessageCircle
 } from "lucide-react";
-
-interface Inquiry {
-  id: string;
-  ticketId?: string;
-  name: string;
-  email: string;
-  subject?: string;
-  message: string;
-  createdAt: string;
-  reply?: string;
-  repliedAt?: string;
-  status?: "Pending" | "In Review" | "Resolved";
-  category?: string;
-  priority?: "Normal" | "High" | "Critical";
-}
 
 const renderFormattedInquiryMessage = (msg: string) => {
   if (!msg) return null;
@@ -83,14 +78,19 @@ export default function Queries() {
   const { id: queryParamId } = useParams();
   const { isLoaded, userId, getToken } = useAuth();
   const { user } = useUser();
-  const [inquiries, setInquiries] = useState<Inquiry[]>([]);
+  const [inquiries, setInquiries] = useState<QueryItem[]>([]);
+  const [messagesMap, setMessagesMap] = useState<Record<string, QueryMessageItem[]>>({});
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState(queryParamId || "");
   const [statusFilter, setStatusFilter] = useState<"ALL" | "Pending" | "Resolved">("ALL");
-  const [selectedInquiry, setSelectedInquiry] = useState<Inquiry | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  // New ticket state
+  // Per-ticket customer reply text state
+  const [customerReplies, setCustomerReplies] = useState<Record<string, string>>({});
+  const [sendingReplies, setSendingReplies] = useState<Record<string, boolean>>({});
+  const [reopeningTickets, setReopeningTickets] = useState<Record<string, boolean>>({});
+
+  // New ticket modal state
   const [newTicketModalOpen, setNewTicketModalOpen] = useState(false);
   const [ticketSubject, setTicketSubject] = useState("");
   const [ticketCategory, setTicketCategory] = useState("Technical Support");
@@ -98,218 +98,248 @@ export default function Queries() {
   const [ticketMessage, setTicketMessage] = useState("");
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const userEmail = (user?.primaryEmailAddress?.emailAddress || "").toLowerCase().trim();
   const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(" ") || user?.fullName || user?.username || "RecodeX Member";
 
   const fetchUserInquiries = async () => {
-    setLoading(true);
     try {
-      // Clean previous invalid test query from local cache
-      try {
-        const rawLocal = localStorage.getItem("recodex_submitted_inquiries");
-        if (rawLocal) {
-          const parsed = JSON.parse(rawLocal).filter((i: any) => 
-            i.id !== "inq-1787642424751" && (i.message || "").trim() !== "sdsadas"
-          );
-          localStorage.setItem("recodex_submitted_inquiries", JSON.stringify(parsed));
-        }
+      const token = await getToken();
+      const queries = await getQueriesApi(token || undefined);
+      setInquiries(queries);
 
-        const rawDeleted = localStorage.getItem("recodex_deleted_inquiries");
-        const deletedList: string[] = rawDeleted ? JSON.parse(rawDeleted) : [];
-        if (!deletedList.includes("inq-1787642424751")) {
-          deletedList.push("inq-1787642424751");
-          localStorage.setItem("recodex_deleted_inquiries", JSON.stringify(deletedList));
-        }
-      } catch (e) {}
-
-      const all: any[] = await getInquiries("", userEmail);
-      const localRepliesRaw = localStorage.getItem("recodex_inquiry_replies");
-      const repliesMap = localRepliesRaw ? JSON.parse(localRepliesRaw) : {};
-
-      const localStatusesRaw = localStorage.getItem("recodex_inquiry_statuses");
-      const statusesMap = localStatusesRaw ? JSON.parse(localStatusesRaw) : {};
-
-      const localInquiriesRaw = localStorage.getItem("recodex_submitted_inquiries");
-      const localInquiries: any[] = localInquiriesRaw ? JSON.parse(localInquiriesRaw) : [];
-
-      const map = new Map<string, any>();
-
-      const processItem = (inq: any) => {
-        if (!inq) return;
-        if (inq.id === "inq-1787642424751" || (inq.message || "").trim() === "sdsadas") return;
-        if (inq.subject === "Account Onboarding & Security Clearance") return;
-
-        const inqId = inq.ticketId || inq.id || "";
-        const inqEmail = (inq.email || "").toLowerCase().trim();
-        const inqMsg = (inq.message || "").trim();
-        const emailMsgKey = `${inqEmail}-${inqMsg}`;
-        const key = inqId || emailMsgKey;
-
-        const existing = map.get(key) || (inqId ? map.get(inqId) : undefined) || map.get(emailMsgKey) ||
-          Array.from(map.values()).find((x: any) =>
-            (x.ticketId && inq.ticketId && x.ticketId === inq.ticketId) ||
-            (x.id && inq.id && x.id === inq.id) ||
-            (x.email && inqEmail && x.email.toLowerCase().trim() === inqEmail && x.message && inqMsg && x.message.trim() === inqMsg)
-          );
-
-        const r = inq.reply || existing?.reply || repliesMap[inqId] || repliesMap[key] || repliesMap[emailMsgKey] || (inq.ticketId ? repliesMap[inq.ticketId] : undefined);
-        const isResolved =
-          (existing?.status || "").toLowerCase() === "resolved" ||
-          (inq.status || "").toLowerCase() === "resolved" ||
-          (statusesMap[inqId] || "").toLowerCase() === "resolved" ||
-          (statusesMap[key] || "").toLowerCase() === "resolved" ||
-          !!r;
-        const finalStatus: "Resolved" | "Pending" = isResolved ? "Resolved" : "Pending";
-
-        const normalized = {
-          ...existing,
-          ...inq,
-          id: inqId || existing?.id || key,
-          ticketId: inq.ticketId || existing?.ticketId || inqId || key,
-          reply: r || undefined,
-          status: finalStatus,
-          category: inq.category || existing?.category || "Technical Query",
-          priority: inq.priority || existing?.priority || "Normal",
-          createdAt: inq.createdAt || existing?.createdAt || inq.timestamp || new Date().toISOString(),
-        };
-
-        map.set(key, normalized);
-        map.set(emailMsgKey, normalized);
-        if (inqId) map.set(inqId, normalized);
-      };
-
-      all.forEach(processItem);
-      localInquiries.forEach(processItem);
-
-      // Return unique inquiries for this user
-      const uniqueList: any[] = [];
-      const seenIds = new Set<string>();
-
-      const clerkEmails = (user?.emailAddresses || []).map((e) => e.emailAddress.toLowerCase().trim());
-      if (userEmail && !clerkEmails.includes(userEmail)) {
-        clerkEmails.push(userEmail);
-      }
-
-      Array.from(map.values()).forEach((item) => {
-        const itemEmail = (item.email || "").toLowerCase().trim();
-        const matchesUser =
-          clerkEmails.length === 0 ||
-          clerkEmails.includes(itemEmail) ||
-          (userEmail && itemEmail === userEmail);
-
-        if (matchesUser) {
-          const uniqueKey = item.ticketId || item.id || `${item.email}-${item.message}`;
-          if (!seenIds.has(uniqueKey)) {
-            seenIds.add(uniqueKey);
-            uniqueList.push(item);
-          }
-        }
-      });
-
-      // If direct ticket ID is requested via URL (/queries/:id), load and prioritize it
-      if (queryParamId) {
+      // Eagerly pre-load conversation messages for each query
+      queries.forEach(async (q) => {
+        const qId = q.ticketId || q.id;
         try {
-          const directMatch = await getInquiryById(queryParamId);
-          if (directMatch) {
-            processItem(directMatch);
-            const uKey = directMatch.ticketId || directMatch.id;
-            const existingIdx = uniqueList.findIndex((x) => x.id === uKey || x.ticketId === uKey);
-            if (existingIdx >= 0) {
-              uniqueList.splice(existingIdx, 1);
-            }
-            const resolvedDirect = map.get(uKey) || directMatch;
-            uniqueList.unshift(resolvedDirect);
+          const details = await getQueryDetailsApi(qId, token || undefined);
+          if (details && details.messages) {
+            setMessagesMap((prev) => ({
+              ...prev,
+              [qId]: details.messages,
+            }));
           }
-        } catch (dirErr) {
-          console.warn("Direct ticket lookup error:", dirErr);
-        }
-      }
-
-      uniqueList.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
-
-      setInquiries(uniqueList);
+        } catch (e) {}
+      });
     } catch (e) {
-      console.warn("Failed to load inquiries:", e);
+      console.warn("[QUERIES] Failed to load queries:", e);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDeleteTicket = async (id: string) => {
-    try {
-      const token = await getToken();
-      await deleteInquiry(id, token || "");
-      const updated = inquiries.filter((i) => i.id !== id && i.ticketId !== id);
-      setInquiries(updated);
-    } catch (e) {
-      console.warn("Failed to delete ticket:", e);
-      const updated = inquiries.filter((i) => i.id !== id && i.ticketId !== id);
-      setInquiries(updated);
-    }
-  };
-
+  // Initial load and periodic safety polling
   useEffect(() => {
     if (isLoaded) {
       fetchUserInquiries();
+      // Periodic background polling fallback (every 8s) to ensure absolute sync with database
+      const pollInterval = setInterval(() => {
+        fetchUserInquiries();
+      }, 8000);
+      return () => clearInterval(pollInterval);
     }
-    const handleSync = () => fetchUserInquiries();
-    window.addEventListener("recodex-inquiry-replied", handleSync);
-    window.addEventListener("recodex-inquiry-status-updated", handleSync);
-    window.addEventListener("recodex-inquiry-submitted", handleSync);
-    window.addEventListener("recodex-inquiry-deleted", handleSync);
-    return () => {
-      window.removeEventListener("recodex-inquiry-replied", handleSync);
-      window.removeEventListener("recodex-inquiry-status-updated", handleSync);
-      window.removeEventListener("recodex-inquiry-submitted", handleSync);
-      window.removeEventListener("recodex-inquiry-deleted", handleSync);
-    };
   }, [isLoaded, userEmail, queryParamId]);
 
+  // Realtime subscription for all active inquiries
+  useEffect(() => {
+    if (inquiries.length === 0) return;
+
+    const unsubscribers: (() => void)[] = [];
+
+    inquiries.forEach((inq) => {
+      const qKey = inq.ticketId || inq.id;
+      const unsub = subscribeToQuery(qKey, {
+        onMessage: (newMsg: RealtimeMessage) => {
+          console.log(`[REALTIME CUSTOMER] Received new message for ${qKey}:`, newMsg);
+
+          // Update messages thread for this ticket
+          setMessagesMap((prev) => {
+            const existing = prev[qKey] || [];
+            if (existing.some((m) => m.id === newMsg.id || (m.createdAt === newMsg.createdAt && m.message === newMsg.message))) {
+              return prev;
+            }
+            return {
+              ...prev,
+              [qKey]: [...existing, newMsg],
+            };
+          });
+
+          // Also update parent inquiry reply preview and status
+          setInquiries((prev) =>
+            prev.map((item) => {
+              if (item.ticketId === qKey || item.id === qKey) {
+                return {
+                  ...item,
+                  reply: newMsg.senderRole === "ADMIN" ? newMsg.message : item.reply,
+                  updatedAt: newMsg.createdAt,
+                };
+              }
+              return item;
+            })
+          );
+        },
+        onStatusChange: (statusData: RealtimeStatusChange) => {
+          console.log(`[REALTIME CUSTOMER] Received status change for ${qKey}:`, statusData);
+          setInquiries((prev) =>
+            prev.map((item) => {
+              if (item.ticketId === qKey || item.id === qKey) {
+                return {
+                  ...item,
+                  status: statusData.status,
+                  resolvedAt: statusData.resolvedAt || item.resolvedAt,
+                };
+              }
+              return item;
+            })
+          );
+        },
+      });
+
+      unsubscribers.push(unsub);
+    });
+
+    return () => {
+      unsubscribers.forEach((fn) => fn());
+    };
+  }, [inquiries]);
+
+  // Handle customer sending reply to administrator
+  const handleSendCustomerReply = async (inq: QueryItem) => {
+    const qKey = inq.ticketId || inq.id;
+    const text = (customerReplies[qKey] || "").trim();
+    if (!text) return;
+
+    setSendingReplies((prev) => ({ ...prev, [qKey]: true }));
+    try {
+      const token = await getToken();
+      const res = await sendQueryMessageApi(qKey, text, false, token || undefined);
+
+      // Optimistically append customer message
+      if (res && res.message) {
+        setMessagesMap((prev) => {
+          const current = prev[qKey] || [];
+          if (current.some((m) => m.id === res.message.id)) return prev;
+          return {
+            ...prev,
+            [qKey]: [...current, res.message],
+          };
+        });
+      }
+
+      // Clear input
+      setCustomerReplies((prev) => ({ ...prev, [qKey]: "" }));
+    } catch (err: any) {
+      console.error("Failed to send customer message:", err);
+      alert(err.message || "Failed to deliver message. Please try again.");
+    } finally {
+      setSendingReplies((prev) => ({ ...prev, [qKey]: false }));
+    }
+  };
+
+  // Handle customer reopening a resolved ticket
+  const handleCustomerReopen = async (inq: QueryItem) => {
+    const qKey = inq.ticketId || inq.id;
+    setReopeningTickets((prev) => ({ ...prev, [qKey]: true }));
+    try {
+      const token = await getToken();
+      await updateQueryStatusApi(qKey, "OPEN", token || undefined);
+
+      setInquiries((prev) =>
+        prev.map((item) => {
+          if (item.ticketId === qKey || item.id === qKey) {
+            return { ...item, status: "OPEN" };
+          }
+          return item;
+        })
+      );
+    } catch (err: any) {
+      console.error("Failed to reopen ticket:", err);
+      alert(err.message || "Failed to reopen ticket. Please try again.");
+    } finally {
+      setReopeningTickets((prev) => ({ ...prev, [qKey]: false }));
+    }
+  };
+
+  // Handle deleting a ticket
+  const handleDeleteTicket = async (id: string) => {
+    if (!window.confirm("Are you sure you want to delete this query?")) return;
+    try {
+      const token = await getToken();
+      await deleteInquiry(id, token || "");
+      setInquiries((prev) => prev.filter((i) => i.id !== id && i.ticketId !== id));
+    } catch (e) {
+      console.warn("Delete ticket error:", e);
+      setInquiries((prev) => prev.filter((i) => i.id !== id && i.ticketId !== id));
+    }
+  };
+
+  // Handle creating a new support ticket via POST /api/queries
   const handleCreateTicket = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!ticketSubject.trim() || !ticketMessage.trim()) return;
 
     setSubmitting(true);
-    const newInquiry: Inquiry = {
-      id: `TKT-${Date.now().toString().slice(-6)}`,
-      name: fullName,
-      email: userEmail,
-      subject: ticketSubject,
-      message: ticketMessage,
-      category: ticketCategory,
-      priority: ticketPriority,
-      createdAt: new Date().toISOString(),
-      status: "Pending"
-    };
+    setSubmitError(null);
 
-    const updated = [newInquiry, ...inquiries];
-    setInquiries(updated);
+    try {
+      const token = await getToken();
+      const result = await createQueryApi(
+        {
+          subject: ticketSubject.trim(),
+          category: ticketCategory,
+          priority: ticketPriority,
+          message: ticketMessage.trim(),
+          name: fullName,
+          email: userEmail,
+        },
+        token || undefined
+      );
 
-    // Persist to localStorage
-    const localRaw = localStorage.getItem("recodex_submitted_inquiries");
-    const localList: any[] = localRaw ? JSON.parse(localRaw) : [];
-    localStorage.setItem("recodex_submitted_inquiries", JSON.stringify([newInquiry, ...localList]));
-    window.dispatchEvent(new Event("recodex-inquiry-submitted"));
+      if (result && result.query) {
+        setInquiries((prev) => [result.query, ...prev]);
+        if (result.message) {
+          const qId = result.query.ticketId || result.query.id;
+          setMessagesMap((prev) => ({
+            ...prev,
+            [qId]: [result.message],
+          }));
+        }
+      }
 
-    setSubmitting(false);
-    setSubmitSuccess(true);
-    setTimeout(() => {
-      setSubmitSuccess(false);
-      setNewTicketModalOpen(false);
-      setTicketSubject("");
-      setTicketMessage("");
-    }, 2000);
+      setSubmitSuccess(true);
+      setTimeout(() => {
+        setSubmitSuccess(false);
+        setNewTicketModalOpen(false);
+        setTicketSubject("");
+        setTicketMessage("");
+        fetchUserInquiries();
+      }, 1500);
+    } catch (err: any) {
+      console.error("Failed to submit new ticket:", err);
+      setSubmitError(err.message || "Failed to submit ticket. Please check your network.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const isResolvedStatus = (status?: string) => {
+    const s = (status || "").toLowerCase();
+    return s === "resolved" || s === "closed";
   };
 
   const filteredInquiries = inquiries.filter((inq) => {
     const matchesSearch =
       (inq.subject && inq.subject.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      inq.message.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      inq.id.toLowerCase().includes(searchQuery.toLowerCase());
+      (inq.message && inq.message.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (inq.id && inq.id.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (inq.ticketId && inq.ticketId.toLowerCase().includes(searchQuery.toLowerCase()));
 
     if (statusFilter === "ALL") return matchesSearch;
-    return matchesSearch && (inq.status || "Pending") === statusFilter;
+    const resolved = isResolvedStatus(inq.status);
+    if (statusFilter === "Resolved") return matchesSearch && resolved;
+    if (statusFilter === "Pending") return matchesSearch && !resolved;
+    return matchesSearch;
   });
 
   return (
@@ -332,7 +362,7 @@ export default function Queries() {
           <div className="flex items-center gap-2">
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-bold bg-amber-500/10 text-amber-500 border border-amber-500/25">
               <ShieldCheck size={14} />
-              24/7 SLA Support Desk
+              24/7 Realtime SLA Support Desk
             </span>
           </div>
         </div>
@@ -348,215 +378,140 @@ export default function Queries() {
               Support Queries & Resolution
             </h1>
             <p className="text-zinc-500 text-sm mt-2 max-w-xl">
-              Track your service inquiries, support tickets, and direct verified admin resolutions in real-time.
+              Track your service requests, certificate approvals, and communicate directly with the verified engineering administrative desk in real-time.
             </p>
           </div>
 
-          <button
-            onClick={() => setNewTicketModalOpen(true)}
-            className="px-5 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-mono font-bold text-xs uppercase tracking-wider flex items-center gap-2 shadow-[0_0_20px_rgba(245,158,11,0.2)] hover:shadow-[0_0_30px_rgba(245,158,11,0.4)] transition-all cursor-pointer shrink-0"
-          >
-            <Plus size={16} />
-            <span>Open Support Query</span>
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => fetchUserInquiries()}
+              disabled={loading}
+              className="p-2.5 rounded-xl border border-black/10 dark:border-zinc-800 bg-white/50 dark:bg-zinc-900/50 hover:bg-black/5 dark:hover:bg-zinc-800 text-zinc-500 hover:text-foreground transition-all cursor-pointer"
+              title="Refresh Queries"
+            >
+              <RefreshCw size={16} className={loading ? "animate-spin text-amber-500" : ""} />
+            </button>
+            <button
+              onClick={() => setNewTicketModalOpen(true)}
+              className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-extrabold text-xs font-mono uppercase tracking-wider flex items-center gap-2 transition-all shadow-lg hover:shadow-amber-500/20 cursor-pointer"
+            >
+              <Plus size={16} />
+              <span>Open Support Ticket</span>
+            </button>
+          </div>
         </div>
 
-        {/* Filter Controls */}
-        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 mb-8">
-          {/* Search */}
-          <div className="relative flex-1 max-w-md">
-            <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" />
+        {/* Search & Filter Bar */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-8">
+          <div className="relative w-full sm:w-80">
+            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none" />
             <input
               type="text"
+              placeholder="Search tickets by ID, message, or subject..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by ticket ID, subject, or message..."
-              className="w-full pl-11 pr-4 py-2.5 rounded-xl bg-white/50 dark:bg-zinc-900/50 border border-black/10 dark:border-zinc-800 focus:outline-none focus:border-amber-500 text-xs font-mono transition-all"
+              className="w-full pl-10 pr-4 py-2 rounded-xl bg-black/5 dark:bg-zinc-900/60 border border-black/10 dark:border-zinc-800 text-xs text-foreground dark:text-white placeholder:text-zinc-500 focus:outline-none focus:border-amber-500 transition-colors font-sans"
             />
           </div>
 
-          {/* Status Filter Tabs */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0">
-            <div className="bg-black/5 dark:bg-zinc-900/80 p-1 rounded-xl border border-black/5 dark:border-zinc-800 flex items-center gap-1">
-              {(["ALL", "Pending", "Resolved"] as const).map((status) => (
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <Filter size={14} className="text-zinc-500" />
+            <div className="flex items-center p-1 rounded-xl bg-black/5 dark:bg-zinc-900/60 border border-black/10 dark:border-zinc-800 text-xs font-mono">
+              {(["ALL", "Pending", "Resolved"] as const).map((tab) => (
                 <button
-                  key={status}
-                  onClick={() => setStatusFilter(status)}
-                  className={`px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
-                    statusFilter === status
-                      ? status === "Resolved"
-                        ? "bg-emerald-500/15 text-emerald-500 border border-emerald-500/30 shadow-sm"
-                        : status === "Pending"
-                        ? "bg-amber-500/15 text-amber-500 border border-amber-500/30 shadow-sm"
-                        : "bg-white dark:bg-zinc-800 text-foreground dark:text-white shadow-sm border border-black/5 dark:border-zinc-700"
-                      : "text-zinc-500 hover:text-foreground dark:hover:text-zinc-200"
+                  key={tab}
+                  onClick={() => setStatusFilter(tab)}
+                  className={`px-3 py-1 rounded-lg transition-all cursor-pointer font-bold ${
+                    statusFilter === tab
+                      ? "bg-amber-500 text-black shadow-sm"
+                      : "text-zinc-500 hover:text-foreground dark:hover:text-white"
                   }`}
                 >
-                  {status === "ALL" ? "All Inquiries" : status}
+                  {tab === "ALL" ? "All Tickets" : tab}
                 </button>
               ))}
             </div>
           </div>
         </div>
 
-        {/* Direct Query Focus Banner when accessing /queries/:id */}
-        {queryParamId && (
-          <div className="mb-6 p-4 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex flex-col sm:flex-row items-center justify-between gap-3 animate-fade-in shadow-[0_0_25px_rgba(0,209,255,0.1)]">
-            <div className="flex items-center gap-2.5 text-cyan-400 text-xs font-mono">
-              <Sparkles size={16} className="shrink-0 animate-pulse text-cyan-400" />
-              <span>Viewing Direct Ticket: <strong className="text-foreground dark:text-white underline">{queryParamId}</strong></span>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => {
-                  const directUrl = `${window.location.origin}/queries/${queryParamId}`;
-                  navigator.clipboard.writeText(directUrl);
-                  setCopiedId(queryParamId);
-                  setTimeout(() => setCopiedId(null), 2500);
-                }}
-                className="px-3 py-1.5 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-400 text-xs font-mono font-bold flex items-center gap-1.5 transition-all cursor-pointer border border-cyan-500/30"
-              >
-                {copiedId === queryParamId ? (
-                  <>
-                    <Check size={13} className="text-emerald-400" />
-                    <span className="text-emerald-400">Link Copied!</span>
-                  </>
-                ) : (
-                  <>
-                    <Share2 size={13} />
-                    <span>Copy Ticket URL</span>
-                  </>
-                )}
-              </button>
-              <Link
-                to="/queries"
-                onClick={() => setSearchQuery("")}
-                className="px-3 py-1.5 rounded-lg bg-black/10 hover:bg-black/20 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-xs font-mono font-bold text-zinc-600 dark:text-zinc-300 transition-all border border-black/5 dark:border-zinc-700"
-              >
-                View All Queries
-              </Link>
-            </div>
-          </div>
-        )}
-
-        {/* Tickets Stream */}
-        {loading ? (
-          <div className="flex flex-col items-center justify-center py-20 bg-white/40 dark:bg-zinc-900/40 rounded-2xl border border-black/5 dark:border-zinc-800">
-            <div className="w-10 h-10 border-3 border-amber-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-            <p className="text-xs font-mono text-zinc-500 uppercase tracking-widest">Loading Support Tickets...</p>
+        {/* Content Body */}
+        {loading && inquiries.length === 0 ? (
+          <div className="py-24 flex flex-col items-center justify-center gap-3">
+            <div className="w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
+            <span className="text-xs font-mono text-zinc-500 uppercase tracking-widest animate-pulse">
+              Retrieving Authenticated Telemetry...
+            </span>
           </div>
         ) : filteredInquiries.length === 0 ? (
-          <div className="text-center py-20 bg-white/40 dark:bg-zinc-900/40 rounded-2xl border border-dashed border-black/10 dark:border-zinc-800 p-8">
-            <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center mx-auto mb-4 border border-amber-500/20">
-              <MessageSquare size={22} />
+          <div className="py-20 text-center border border-dashed border-black/10 dark:border-zinc-800 rounded-2xl p-8 space-y-4">
+            <div className="w-12 h-12 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center mx-auto">
+              <MessageSquare size={20} />
             </div>
-            <h3 className="text-base font-bold text-foreground dark:text-white">No Tickets Found</h3>
-            <p className="text-xs text-zinc-500 mt-1 max-w-sm mx-auto">
-              You haven't opened any support queries matching this filter. Need assistance? Submit a direct ticket to our team.
+            <h3 className="text-sm font-bold text-foreground dark:text-white font-sans">No Support Inquiries Found</h3>
+            <p className="text-xs text-zinc-500 max-w-sm mx-auto">
+              {statusFilter !== "ALL"
+                ? `You have no ${statusFilter.toLowerCase()} queries matching your filter.`
+                : "Need technical guidance or certificate issuance? Click Open Support Ticket above."}
             </p>
-            <button
-              onClick={() => setNewTicketModalOpen(true)}
-              className="mt-5 px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-mono font-bold uppercase tracking-wider transition-all shadow-md cursor-pointer inline-flex items-center gap-2"
-            >
-              <Plus size={14} />
-              <span>Open New Query</span>
-            </button>
           </div>
         ) : (
           <div className="space-y-6">
             {filteredInquiries.map((inq) => {
-              const isResolved = (inq.status || "").toLowerCase() === "resolved" || !!inq.reply;
+              const qKey = inq.ticketId || inq.id;
+              const resolved = isResolvedStatus(inq.status);
+              const threadMessages = messagesMap[qKey] || [];
+              const replyText = customerReplies[qKey] || "";
+              const isSending = sendingReplies[qKey] || false;
+              const isReopening = reopeningTickets[qKey] || false;
 
               return (
                 <div
-                  key={inq.id}
-                  className={`bg-white/80 dark:bg-[#090d14] backdrop-blur-xl border rounded-2xl overflow-hidden transition-all duration-200 shadow-sm ${
-                    isResolved
-                      ? "border-emerald-500/30 hover:border-emerald-500/50 shadow-[0_4px_20px_rgba(16,185,129,0.05)]"
-                      : "border-amber-500/30 hover:border-amber-500/50 shadow-[0_4px_20px_rgba(245,158,11,0.05)]"
-                  }`}
+                  key={qKey}
+                  className="rounded-2xl border border-black/10 dark:border-zinc-800/80 bg-white dark:bg-[#07090e] shadow-sm hover:border-black/20 dark:hover:border-zinc-700 transition-all overflow-hidden"
                 >
-                  {/* Professional Ticket Header Bar */}
-                  <div className="px-6 py-4 bg-black/[0.02] dark:bg-zinc-900/60 border-b border-black/5 dark:border-zinc-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div className="flex items-center gap-2.5 flex-wrap">
-                      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-mono font-bold uppercase tracking-wider border ${
-                        isResolved
-                          ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/30"
-                          : "bg-amber-500/10 text-amber-500 border-amber-500/30"
-                      }`}>
-                        {isResolved ? (
-                          <>
-                            <CheckCircle2 size={13} className="text-emerald-500" />
-                            Resolved & Closed
-                          </>
-                        ) : (
-                          <>
-                            <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping"></span>
-                            In Review / Open
-                          </>
-                        )}
+                  {/* Card Header Bar */}
+                  <div className="px-6 py-4 bg-black/[0.02] dark:bg-zinc-900/40 border-b border-black/5 dark:border-zinc-800/80 flex flex-wrap items-center justify-between gap-4">
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <span
+                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-bold uppercase tracking-wider ${
+                          resolved
+                            ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25"
+                            : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/25 animate-pulse"
+                        }`}
+                      >
+                        {resolved ? <CheckCircle2 size={13} /> : <Clock size={13} />}
+                        {resolved ? "RESOLVED & CLOSED" : "ACTIVE / OPEN"}
                       </span>
 
                       <span className="px-2.5 py-1 rounded-md bg-black/5 dark:bg-zinc-800/80 border border-black/5 dark:border-zinc-700 text-[11px] font-mono font-semibold text-zinc-600 dark:text-zinc-300">
-                        {inq.category || "Support Inquiry"}
+                        {inq.type || "Support Inquiry"}
                       </span>
 
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-mono text-zinc-500 font-semibold">
-                          ID: <span className="text-foreground dark:text-zinc-200 font-bold">{inq.ticketId || inq.id}</span>
+                          ID: <span className="text-foreground dark:text-zinc-200 font-bold">{qKey}</span>
                         </span>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            const tid = inq.ticketId || inq.id;
-                            const directUrl = `${window.location.origin}/queries/${tid}`;
+                            const directUrl = `${window.location.origin}/queries/${qKey}`;
                             navigator.clipboard.writeText(directUrl);
-                            setCopiedId(tid);
+                            setCopiedId(qKey);
                             setTimeout(() => setCopiedId(null), 2500);
                           }}
                           className="p-1 rounded text-zinc-400 hover:text-cyan-400 hover:bg-cyan-500/10 transition-colors cursor-pointer"
-                          title="Copy direct ticket URL (https://www.recodex.in/queries/...)"
+                          title="Copy direct ticket URL"
                         >
-                          {copiedId === (inq.ticketId || inq.id) ? (
+                          {copiedId === qKey ? (
                             <Check size={13} className="text-emerald-400" />
                           ) : (
                             <Copy size={13} />
                           )}
                         </button>
-                        <Link
-                          to={`/queries/${inq.ticketId || inq.id}`}
-                          className="p-1 rounded text-zinc-400 hover:text-cyan-400 hover:bg-cyan-500/10 transition-colors cursor-pointer"
-                          title="Open dedicated ticket view"
-                        >
-                          <ExternalLink size={13} />
-                        </Link>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-3">
-                      <button
-                        onClick={() => {
-                          const tid = inq.ticketId || inq.id;
-                          const directUrl = `${window.location.origin}/queries/${tid}`;
-                          navigator.clipboard.writeText(directUrl);
-                          setCopiedId(tid);
-                          setTimeout(() => setCopiedId(null), 2500);
-                        }}
-                        className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-black/5 dark:bg-zinc-800 text-[11px] font-mono text-zinc-400 hover:text-cyan-400 border border-black/5 dark:border-zinc-700 transition-colors cursor-pointer"
-                        title="Share Ticket Link"
-                      >
-                        {copiedId === (inq.ticketId || inq.id) ? (
-                          <>
-                            <Check size={12} className="text-emerald-400" />
-                            <span className="text-emerald-400">Link Copied!</span>
-                          </>
-                        ) : (
-                          <>
-                            <Share2 size={12} />
-                            <span>Share</span>
-                          </>
-                        )}
-                      </button>
                       <div className="flex items-center gap-1.5 text-xs font-mono text-zinc-500">
                         <Clock size={13} />
                         <span>
@@ -566,7 +521,7 @@ export default function Queries() {
                                 day: "numeric",
                                 year: "numeric",
                                 hour: "2-digit",
-                                minute: "2-digit"
+                                minute: "2-digit",
                               })
                             : "Recently Submitted"}
                         </span>
@@ -581,67 +536,174 @@ export default function Queries() {
                     </div>
                   </div>
 
-                  {/* Body Content */}
+                  {/* Body: Two-Way Conversation Message Stream */}
                   <div className="p-6 space-y-6">
-                    {/* User Inquiry Details Section */}
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-mono uppercase tracking-wider text-zinc-500 font-bold flex items-center gap-1.5">
-                          <User size={13} className="text-cyan-500" />
-                          Inquiry Submission Details
+                    {/* Inquiry Subject */}
+                    {inq.subject && (
+                      <div className="pb-3 border-b border-black/5 dark:border-zinc-800/80 flex items-center justify-between">
+                        <span className="text-sm font-bold text-foreground dark:text-zinc-100 font-sans">
+                          Subject: {inq.subject}
                         </span>
-                        {inq.subject && (
-                          <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                            {inq.subject}
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="p-4 rounded-xl bg-black/[0.02] dark:bg-zinc-900/40 border border-black/5 dark:border-zinc-800/80">
-                        {renderFormattedInquiryMessage(inq.message)}
-                      </div>
-                    </div>
-
-                    {/* Official Admin Resolution Response Section */}
-                    {inq.reply ? (
-                      <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/[0.03] dark:bg-emerald-950/10 overflow-hidden">
-                        <div className="px-4 py-2.5 bg-emerald-500/10 border-b border-emerald-500/20 flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <ShieldCheck size={16} className="text-emerald-500" />
-                            <span className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">
-                              Official Admin Resolution
-                            </span>
-                          </div>
-                          <span className="text-[10px] font-mono text-emerald-600/80 dark:text-emerald-400/80 font-semibold">
-                            Verified Desk Reply
-                          </span>
-                        </div>
-                        <div className="p-4 space-y-2">
-                          <p className="text-xs md:text-sm text-foreground dark:text-zinc-100 font-sans leading-relaxed whitespace-pre-wrap">
-                            {inq.reply}
-                          </p>
-                          <div className="pt-2 border-t border-emerald-500/15 flex items-center justify-between text-[10px] font-mono text-zinc-500">
-                            <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
-                              <CheckCircle2 size={12} />
-                              Resolution Delivered & Synchronized
-                            </span>
-                            <span>Case Closed</span>
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="p-4 rounded-xl bg-amber-500/5 border border-amber-500/20 flex items-start gap-3 text-xs">
-                        <Clock size={16} className="text-amber-500 mt-0.5 shrink-0 animate-spin" />
-                        <div className="space-y-1">
-                          <p className="font-mono font-bold text-amber-500 uppercase tracking-wide text-[11px]">
-                            Ticket In Active SLA Review
-                          </p>
-                          <p className="text-zinc-600 dark:text-zinc-400 text-xs leading-relaxed">
-                            Our team is reviewing your query. You will receive the verified resolution here as soon as an administrator responds.
-                          </p>
-                        </div>
                       </div>
                     )}
+
+                    {/* Chronological Conversation Thread */}
+                    <div className="space-y-4">
+                      {/* Initial Ticket Submission Message */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-mono uppercase tracking-wider text-zinc-500 font-bold flex items-center gap-1.5">
+                            <User size={13} className="text-cyan-500" />
+                            {inq.name || "You"} (Client Inquiry)
+                          </span>
+                          <span className="text-[10px] font-mono text-zinc-500">
+                            {new Date(inq.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                          </span>
+                        </div>
+                        <div className="p-4 rounded-xl bg-black/[0.02] dark:bg-zinc-900/40 border border-black/5 dark:border-zinc-800/80">
+                          {renderFormattedInquiryMessage(inq.message)}
+                        </div>
+                      </div>
+
+                      {/* Follow-up Messages from the Thread */}
+                      {threadMessages
+                        .filter((m) => m.message !== inq.message) // Don't duplicate initial message
+                        .map((msg, idx) => {
+                          const isAdmin = msg.senderRole === "ADMIN";
+
+                          return (
+                            <div
+                              key={msg.id || idx}
+                              className={`rounded-xl border overflow-hidden ${
+                                isAdmin
+                                  ? "border-emerald-500/30 bg-emerald-500/[0.03] dark:bg-emerald-950/10"
+                                  : "border-black/10 dark:border-zinc-800 bg-black/[0.02] dark:bg-zinc-900/30"
+                              }`}
+                            >
+                              <div
+                                className={`px-4 py-2 border-b flex items-center justify-between ${
+                                  isAdmin
+                                    ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400"
+                                    : "bg-black/5 dark:bg-zinc-800/60 border-black/5 dark:border-zinc-800 text-zinc-600 dark:text-zinc-300"
+                                }`}
+                              >
+                                <div className="flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wide">
+                                  {isAdmin ? (
+                                    <>
+                                      <ShieldCheck size={15} className="text-emerald-500" />
+                                      <span>Official Admin Resolution</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <User size={13} className="text-cyan-500" />
+                                      <span>{msg.senderName || "You"} (Follow-up Message)</span>
+                                    </>
+                                  )}
+                                </div>
+                                <span className="text-[10px] font-mono text-zinc-500">
+                                  {new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                </span>
+                              </div>
+                              <div className="p-4 space-y-1">
+                                <p className="text-xs md:text-sm text-foreground dark:text-zinc-100 font-sans leading-relaxed whitespace-pre-wrap">
+                                  {msg.message}
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        })}
+
+                      {/* If legacy query has reply not yet loaded in thread messages */}
+                      {inq.reply && threadMessages.length <= 1 && (
+                        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/[0.03] dark:bg-emerald-950/10 overflow-hidden">
+                          <div className="px-4 py-2 bg-emerald-500/10 border-b border-emerald-500/20 flex items-center justify-between text-emerald-600 dark:text-emerald-400 text-xs font-mono font-bold uppercase">
+                            <div className="flex items-center gap-2">
+                              <ShieldCheck size={15} className="text-emerald-500" />
+                              <span>Official Admin Resolution</span>
+                            </div>
+                            <span className="text-[10px] text-zinc-500">Verified Desk Reply</span>
+                          </div>
+                          <div className="p-4">
+                            <p className="text-xs md:text-sm text-foreground dark:text-zinc-100 font-sans leading-relaxed whitespace-pre-wrap">
+                              {inq.reply}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Awaiting Response Banner if Still Pending */}
+                      {!resolved && !inq.reply && threadMessages.length <= 1 && (
+                        <div className="p-4 rounded-xl bg-amber-500/5 border border-amber-500/20 flex items-start gap-3 text-xs">
+                          <Clock size={16} className="text-amber-500 mt-0.5 shrink-0 animate-spin" />
+                          <div className="space-y-1">
+                            <p className="font-mono font-bold text-amber-500 uppercase tracking-wide text-[11px]">
+                              Ticket In Active SLA Review
+                            </p>
+                            <p className="text-zinc-600 dark:text-zinc-400 text-xs leading-relaxed">
+                              Our team is reviewing your query. Replies will appear here automatically via live realtime synchronization.
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Bottom Action Area: Reply Composer OR Reopen Banner */}
+                    <div className="pt-4 border-t border-black/5 dark:border-zinc-800/80">
+                      {resolved ? (
+                        /* Resolved State: Reopen Option */
+                        <div className="p-4 rounded-xl bg-emerald-500/5 dark:bg-emerald-950/20 border border-emerald-500/20 flex flex-col sm:flex-row items-center justify-between gap-3">
+                          <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 text-xs font-mono">
+                            <CheckCircle2 size={16} className="shrink-0" />
+                            <span>This conversation has been marked as <strong>Resolved & Closed</strong>.</span>
+                          </div>
+                          <button
+                            onClick={() => handleCustomerReopen(inq)}
+                            disabled={isReopening}
+                            className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-extrabold text-xs font-mono uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-sm cursor-pointer disabled:opacity-50 shrink-0"
+                          >
+                            <RefreshCw size={13} className={isReopening ? "animate-spin" : ""} />
+                            <span>{isReopening ? "Reopening..." : "Reopen Query"}</span>
+                          </button>
+                        </div>
+                      ) : (
+                        /* Open State: Customer Live Reply Composer */
+                        <div className="space-y-3">
+                          <label className="text-[11px] font-mono text-zinc-500 uppercase tracking-wider font-bold block flex items-center justify-between">
+                            <span className="flex items-center gap-1.5">
+                              <MessageCircle size={13} className="text-amber-500" />
+                              Send Follow-up Message to Administrator:
+                            </span>
+                            <span className="text-emerald-500 text-[10px]">Realtime Active</span>
+                          </label>
+                          <div className="flex gap-2">
+                            <textarea
+                              rows={2}
+                              value={replyText}
+                              onChange={(e) =>
+                                setCustomerReplies((prev) => ({
+                                  ...prev,
+                                  [qKey]: e.target.value,
+                                }))
+                              }
+                              placeholder="Type your message or response to the administrator..."
+                              className="flex-grow px-3.5 py-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-black/10 dark:border-zinc-800 text-xs text-foreground dark:text-white placeholder:text-zinc-500 focus:outline-none focus:border-amber-500 transition-colors font-sans resize-none"
+                            />
+                            <button
+                              onClick={() => handleSendCustomerReply(inq)}
+                              disabled={isSending || !replyText.trim()}
+                              className="px-4 bg-amber-500 hover:bg-amber-400 text-black font-extrabold text-xs font-mono uppercase tracking-wider rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-md cursor-pointer disabled:opacity-50 shrink-0"
+                            >
+                              {isSending ? (
+                                <RefreshCw size={14} className="animate-spin" />
+                              ) : (
+                                <Send size={14} />
+                              )}
+                              <span className="hidden sm:inline">Send</span>
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               );
@@ -650,7 +712,7 @@ export default function Queries() {
         )}
       </main>
 
-      {/* NEW TICKET MODAL */}
+      {/* NEW SUPPORT TICKET MODAL */}
       {newTicketModalOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-150"
@@ -667,7 +729,7 @@ export default function Queries() {
               </div>
               <button
                 onClick={() => setNewTicketModalOpen(false)}
-                className="p-1 text-zinc-400 hover:text-foreground dark:hover:text-white"
+                className="p-1 text-zinc-400 hover:text-foreground dark:hover:text-white cursor-pointer"
               >
                 ✕
               </button>
@@ -680,11 +742,18 @@ export default function Queries() {
                 </div>
                 <h3 className="text-base font-bold text-foreground dark:text-white">Ticket Created Successfully!</h3>
                 <p className="text-xs text-zinc-500 max-w-xs mx-auto">
-                  Your inquiry has been logged and assigned to our active engineering team.
+                  Your inquiry has been stored securely in the database and synchronized with the administrative desk in real-time.
                 </p>
               </div>
             ) : (
               <form onSubmit={handleCreateTicket} className="space-y-4">
+                {submitError && (
+                  <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl flex items-center gap-2">
+                    <AlertCircle size={14} className="shrink-0" />
+                    <span>{submitError}</span>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-xs font-mono text-zinc-500 uppercase tracking-wider font-bold block mb-1.5">
@@ -758,9 +827,10 @@ export default function Queries() {
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-extrabold text-xs font-mono uppercase tracking-wider transition-all shadow-md cursor-pointer disabled:opacity-50"
+                    className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-extrabold text-xs font-mono uppercase tracking-wider transition-all shadow-md cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
                   >
-                    {submitting ? "Sending..." : "Submit Ticket"}
+                    {submitting && <RefreshCw size={13} className="animate-spin" />}
+                    <span>{submitting ? "Submitting..." : "Submit Ticket"}</span>
                   </button>
                 </div>
               </form>

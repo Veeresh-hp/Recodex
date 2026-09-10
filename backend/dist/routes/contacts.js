@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const db_1 = __importDefault(require("../config/db"));
+const realtime_1 = require("../services/realtime");
 const router = (0, express_1.Router)();
 /**
  * POST /api/contacts
@@ -29,6 +30,19 @@ router.post("/", async (req, res) => {
                 status: "Pending",
             },
         });
+        // Also persist initial customer query message
+        await db_1.default.queryMessage.create({
+            data: {
+                queryId: inquiry.id,
+                ticketId: assignedTicketId,
+                senderId: "customer",
+                senderRole: "CUSTOMER",
+                senderName: name,
+                senderEmail: emailClean,
+                message,
+                createdAt: inquiry.createdAt,
+            },
+        }).catch(() => null);
         console.log(`[CONTACT] New inquiry received from ${name} (${emailClean}) [${assignedTicketId}]`);
         // Trigger Google Sheets / Google Docs Webhook if configured
         const webhookUrl = process.env.GOOGLE_SHEET_WEBHOOK_URL || process.env.GOOGLE_DOC_WEBHOOK_URL || "https://script.google.com/macros/s/AKfycbxzCq2Zsk5b_dCD0eysi3X7MOa5CLgu80EZRFXllz50Djf3GJd0NAAyxsMGFfMoMtxm9w/exec";
@@ -259,60 +273,83 @@ router.put("/:id/reply", async (req, res) => {
                 orderBy: { createdAt: "desc" },
             }).catch(() => null);
         }
-        if (!targetInquiry && email) {
-            targetInquiry = await db_1.default.inquiry.findFirst({
-                where: { email: String(email).trim().toLowerCase() },
-                orderBy: { createdAt: "desc" },
-            }).catch(() => null);
-        }
+        let savedInquiry = null;
         if (targetInquiry) {
-            const updated = await db_1.default.inquiry.update({
+            savedInquiry = await db_1.default.inquiry.update({
                 where: { id: targetInquiry.id },
                 data: {
                     reply,
                     status: "Resolved",
+                    resolvedAt: new Date(),
+                    updatedAt: new Date(),
                 },
             });
-            // Also forward reply to Google Sheet Webhook in background
-            try {
-                const webhookUrl = process.env.GOOGLE_SHEET_WEBHOOK_URL || "https://script.google.com/macros/s/AKfycbxzCq2Zsk5b_dCD0eysi3X7MOa5CLgu80EZRFXllz50Djf3GJd0NAAyxsMGFfMoMtxm9w/exec";
-                fetch(webhookUrl, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        action: "reply",
-                        id: updated.ticketId || updated.id,
-                        ticketId: updated.ticketId || updated.id,
-                        reply,
-                        status: "Resolved",
-                        email: updated.email,
-                    }),
-                }).catch(() => { });
-            }
-            catch (e) { }
-            return res.json({
-                ...updated,
-                id: updated.ticketId || updated.id,
-                dbId: updated.id,
+        }
+        else {
+            // If not existing in DB, create new inquiry with the reply recorded
+            savedInquiry = await db_1.default.inquiry.create({
+                data: {
+                    ticketId: id,
+                    name: name || "Client",
+                    email: (email || "client@recodex.in").trim().toLowerCase(),
+                    phone: phone || "",
+                    type: type || "General Inquiry",
+                    message: message || "Support inquiry query",
+                    reply,
+                    status: "Resolved",
+                    resolvedAt: new Date(),
+                },
             });
         }
-        // If not existing in DB, create new inquiry with the reply recorded
-        const created = await db_1.default.inquiry.create({
+        const ticketKey = savedInquiry.ticketId || savedInquiry.id;
+        // Create QueryMessage
+        const msg = await db_1.default.queryMessage.create({
             data: {
-                ticketId: id,
-                name: name || "Client",
-                email: (email || "client@recodex.in").trim().toLowerCase(),
-                phone: phone || "",
-                type: type || "General Inquiry",
-                message: message || "Support inquiry query",
-                reply,
-                status: "Resolved",
+                queryId: savedInquiry.id,
+                ticketId: ticketKey,
+                senderId: "admin",
+                senderRole: "ADMIN",
+                senderName: "RecodeX Admin",
+                senderEmail: "support@recodex.in",
+                message: reply.trim(),
             },
-        });
+        }).catch(() => null);
+        // Broadcast Realtime delivery
+        const messagePayload = {
+            id: msg?.id || `msg-${Date.now()}`,
+            queryId: ticketKey,
+            senderId: "admin",
+            senderRole: "ADMIN",
+            senderName: "RecodeX Admin",
+            senderEmail: "support@recodex.in",
+            message: reply.trim(),
+            createdAt: msg?.createdAt || new Date(),
+        };
+        await (0, realtime_1.broadcastQueryMessage)(ticketKey, messagePayload);
+        await (0, realtime_1.broadcastQueryStatus)(ticketKey, "Resolved", { resolvedAt: new Date() });
+        // Also forward reply to Google Sheet Webhook in background
+        try {
+            const webhookUrl = process.env.GOOGLE_SHEET_WEBHOOK_URL || "https://script.google.com/macros/s/AKfycbxzCq2Zsk5b_dCD0eysi3X7MOa5CLgu80EZRFXllz50Djf3GJd0NAAyxsMGFfMoMtxm9w/exec";
+            fetch(webhookUrl, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    action: "reply",
+                    id: ticketKey,
+                    ticketId: ticketKey,
+                    reply,
+                    status: "Resolved",
+                    email: savedInquiry.email,
+                }),
+            }).catch(() => { });
+        }
+        catch (e) { }
         return res.json({
-            ...created,
-            id: created.ticketId || created.id,
-            dbId: created.id,
+            ...savedInquiry,
+            id: ticketKey,
+            dbId: savedInquiry.id,
+            ticketId: ticketKey,
+            messagePayload,
         });
     }
     catch (error) {
@@ -345,23 +382,21 @@ router.put("/:id/status", async (req, res) => {
                 orderBy: { createdAt: "desc" },
             }).catch(() => null);
         }
-        if (!targetInquiry && email) {
-            targetInquiry = await db_1.default.inquiry.findFirst({
-                where: { email: String(email).trim().toLowerCase() },
-                orderBy: { createdAt: "desc" },
-            }).catch(() => null);
-        }
         if (targetInquiry) {
             const updated = await db_1.default.inquiry.update({
                 where: { id: targetInquiry.id },
                 data: {
                     status,
                     ...(reply ? { reply } : {}),
+                    ...(status === "Resolved" ? { resolvedAt: new Date() } : { resolvedAt: null }),
+                    updatedAt: new Date(),
                 },
             });
+            const ticketKey = updated.ticketId || updated.id;
+            await (0, realtime_1.broadcastQueryStatus)(ticketKey, status, { resolvedAt: updated.resolvedAt });
             return res.json({
                 ...updated,
-                id: updated.ticketId || updated.id,
+                id: ticketKey,
                 dbId: updated.id,
             });
         }

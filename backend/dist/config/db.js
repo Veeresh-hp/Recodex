@@ -86,6 +86,7 @@ const MOCK_INQUIRIES = [
         createdAt: new Date("2026-08-26T14:57:33.000Z"),
     },
 ];
+const MOCK_QUERY_MESSAGES = [];
 const matchesWhere = (item, where) => {
     if (!where)
         return true;
@@ -296,6 +297,33 @@ const mockPrisma = {
             };
             MOCK_INQUIRIES.unshift(created);
             return created;
+        }
+    },
+    queryMessage: {
+        create: async (args) => {
+            const { data } = args;
+            const newMsg = {
+                id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+                ...data,
+                createdAt: data.createdAt ? new Date(data.createdAt) : new Date(),
+                updatedAt: new Date(),
+            };
+            MOCK_QUERY_MESSAGES.push(newMsg);
+            return newMsg;
+        },
+        findMany: async (args) => {
+            const { where } = args || {};
+            return MOCK_QUERY_MESSAGES.filter((m) => matchesWhere(m, where));
+        },
+        deleteMany: async (args) => {
+            const { where } = args;
+            const before = MOCK_QUERY_MESSAGES.length;
+            for (let i = MOCK_QUERY_MESSAGES.length - 1; i >= 0; i--) {
+                if (matchesWhere(MOCK_QUERY_MESSAGES[i], where)) {
+                    MOCK_QUERY_MESSAGES.splice(i, 1);
+                }
+            }
+            return { count: before - MOCK_QUERY_MESSAGES.length };
         }
     }
 };

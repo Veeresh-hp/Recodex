@@ -14,6 +14,7 @@ const projects_1 = __importDefault(require("./routes/projects"));
 const users_1 = __importDefault(require("./routes/users"));
 const contacts_1 = __importDefault(require("./routes/contacts"));
 const certificates_1 = __importDefault(require("./routes/certificates"));
+const queries_1 = __importDefault(require("./routes/queries"));
 const scheduler_1 = require("./services/scheduler");
 const path_1 = __importDefault(require("path"));
 // Initialize environment variables from .env across various execution contexts (Vercel serverless / local)
@@ -78,6 +79,7 @@ app.use("/api/projects", projects_1.default);
 app.use("/api/users", users_1.default);
 app.use("/api/contacts", contacts_1.default);
 app.use("/api/certificates", certificates_1.default);
+app.use("/api/queries", queries_1.default);
 app.use("/api/inngest", (0, express_3.serve)({ client: client_1.inngest, functions: [functions_1.generateIndustryInsights] }));
 // Basic Health Check Endpoint
 app.get("/health", (_req, res) => {

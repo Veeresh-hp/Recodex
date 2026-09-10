@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import prisma from "../config/db";
+import { broadcastQueryMessage, broadcastQueryStatus } from "../services/realtime";
 
 const router = Router();
 
@@ -29,6 +30,20 @@ router.post("/", async (req: Request, res: Response) => {
         status: "Pending",
       },
     });
+
+    // Also persist initial customer query message
+    await prisma.queryMessage.create({
+      data: {
+        queryId: inquiry.id,
+        ticketId: assignedTicketId,
+        senderId: "customer",
+        senderRole: "CUSTOMER",
+        senderName: name,
+        senderEmail: emailClean,
+        message,
+        createdAt: inquiry.createdAt,
+      },
+    }).catch(() => null);
 
     console.log(`[CONTACT] New inquiry received from ${name} (${emailClean}) [${assignedTicketId}]`);
 
@@ -273,64 +288,89 @@ router.put("/:id/reply", async (req: Request, res: Response) => {
         orderBy: { createdAt: "desc" },
       }).catch(() => null);
     }
-    if (!targetInquiry && email) {
-      targetInquiry = await prisma.inquiry.findFirst({
-        where: { email: String(email).trim().toLowerCase() },
-        orderBy: { createdAt: "desc" },
-      }).catch(() => null);
-    }
+
+    let savedInquiry = null;
 
     if (targetInquiry) {
-      const updated = await prisma.inquiry.update({
+      savedInquiry = await prisma.inquiry.update({
         where: { id: targetInquiry.id },
         data: {
           reply,
           status: "Resolved",
+          resolvedAt: new Date(),
+          updatedAt: new Date(),
         },
       });
-
-      // Also forward reply to Google Sheet Webhook in background
-      try {
-        const webhookUrl = process.env.GOOGLE_SHEET_WEBHOOK_URL || "https://script.google.com/macros/s/AKfycbxzCq2Zsk5b_dCD0eysi3X7MOa5CLgu80EZRFXllz50Djf3GJd0NAAyxsMGFfMoMtxm9w/exec";
-        fetch(webhookUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            action: "reply",
-            id: updated.ticketId || updated.id,
-            ticketId: updated.ticketId || updated.id,
-            reply,
-            status: "Resolved",
-            email: updated.email,
-          }),
-        }).catch(() => {});
-      } catch (e) {}
-
-      return res.json({
-        ...updated,
-        id: updated.ticketId || updated.id,
-        dbId: updated.id,
+    } else {
+      // If not existing in DB, create new inquiry with the reply recorded
+      savedInquiry = await prisma.inquiry.create({
+        data: {
+          ticketId: id,
+          name: name || "Client",
+          email: (email || "client@recodex.in").trim().toLowerCase(),
+          phone: phone || "",
+          type: type || "General Inquiry",
+          message: message || "Support inquiry query",
+          reply,
+          status: "Resolved",
+          resolvedAt: new Date(),
+        },
       });
     }
 
-    // If not existing in DB, create new inquiry with the reply recorded
-    const created = await prisma.inquiry.create({
+    const ticketKey = savedInquiry.ticketId || savedInquiry.id;
+
+    // Create QueryMessage
+    const msg = await prisma.queryMessage.create({
       data: {
-        ticketId: id,
-        name: name || "Client",
-        email: (email || "client@recodex.in").trim().toLowerCase(),
-        phone: phone || "",
-        type: type || "General Inquiry",
-        message: message || "Support inquiry query",
-        reply,
-        status: "Resolved",
+        queryId: savedInquiry.id,
+        ticketId: ticketKey,
+        senderId: "admin",
+        senderRole: "ADMIN",
+        senderName: "RecodeX Admin",
+        senderEmail: "support@recodex.in",
+        message: reply.trim(),
       },
-    });
+    }).catch(() => null);
+
+    // Broadcast Realtime delivery
+    const messagePayload = {
+      id: msg?.id || `msg-${Date.now()}`,
+      queryId: ticketKey,
+      senderId: "admin",
+      senderRole: "ADMIN",
+      senderName: "RecodeX Admin",
+      senderEmail: "support@recodex.in",
+      message: reply.trim(),
+      createdAt: msg?.createdAt || new Date(),
+    };
+
+    await broadcastQueryMessage(ticketKey, messagePayload);
+    await broadcastQueryStatus(ticketKey, "Resolved", { resolvedAt: new Date() });
+
+    // Also forward reply to Google Sheet Webhook in background
+    try {
+      const webhookUrl = process.env.GOOGLE_SHEET_WEBHOOK_URL || "https://script.google.com/macros/s/AKfycbxzCq2Zsk5b_dCD0eysi3X7MOa5CLgu80EZRFXllz50Djf3GJd0NAAyxsMGFfMoMtxm9w/exec";
+      fetch(webhookUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "reply",
+          id: ticketKey,
+          ticketId: ticketKey,
+          reply,
+          status: "Resolved",
+          email: savedInquiry.email,
+        }),
+      }).catch(() => {});
+    } catch (e) {}
 
     return res.json({
-      ...created,
-      id: created.ticketId || created.id,
-      dbId: created.id,
+      ...savedInquiry,
+      id: ticketKey,
+      dbId: savedInquiry.id,
+      ticketId: ticketKey,
+      messagePayload,
     });
   } catch (error) {
     console.error("Error replying to inquiry:", error);
@@ -365,12 +405,6 @@ router.put("/:id/status", async (req: Request, res: Response) => {
         orderBy: { createdAt: "desc" },
       }).catch(() => null);
     }
-    if (!targetInquiry && email) {
-      targetInquiry = await prisma.inquiry.findFirst({
-        where: { email: String(email).trim().toLowerCase() },
-        orderBy: { createdAt: "desc" },
-      }).catch(() => null);
-    }
 
     if (targetInquiry) {
       const updated = await prisma.inquiry.update({
@@ -378,12 +412,17 @@ router.put("/:id/status", async (req: Request, res: Response) => {
         data: {
           status,
           ...(reply ? { reply } : {}),
+          ...(status === "Resolved" ? { resolvedAt: new Date() } : { resolvedAt: null }),
+          updatedAt: new Date(),
         },
       });
 
+      const ticketKey = updated.ticketId || updated.id;
+      await broadcastQueryStatus(ticketKey, status, { resolvedAt: updated.resolvedAt });
+
       return res.json({
         ...updated,
-        id: updated.ticketId || updated.id,
+        id: ticketKey,
         dbId: updated.id,
       });
     }

@@ -1917,3 +1917,203 @@ export async function getCertificateAuditLogsApi(token: string, params?: { certi
   return await res.json();
 }
 
+export interface QueryItem {
+  id: string;
+  dbId?: string;
+  ticketId?: string;
+  customerId?: string;
+  name: string;
+  email: string;
+  phone?: string;
+  type: string;
+  subject?: string;
+  priority?: "Normal" | "High" | "Critical" | string;
+  message: string;
+  reply?: string;
+  status: "OPEN" | "PENDING" | "RESOLVED" | "CLOSED" | "Pending" | "Resolved" | string;
+  createdAt: string;
+  updatedAt?: string;
+  resolvedAt?: string;
+  latestMessage?: any;
+}
+
+export interface QueryMessageItem {
+  id: string;
+  queryId: string;
+  senderId?: string;
+  senderRole: "CUSTOMER" | "ADMIN" | string;
+  senderName: string;
+  senderEmail?: string;
+  message: string;
+  readAt?: string;
+  createdAt: string;
+}
+
+export interface QueryDetailsResponse {
+  query: QueryItem;
+  messages: QueryMessageItem[];
+}
+
+/**
+ * Fetches queries list with support for filtering and customer isolation.
+ */
+export async function getQueriesApi(token?: string, status?: string): Promise<QueryItem[]> {
+  const authToken = token || (typeof window !== "undefined" ? localStorage.getItem("recodex_session_token") : null) || "admin-bypass-token";
+  const url = new URL(`${API_BASE_URL}/queries`, typeof window !== "undefined" ? window.location.origin : undefined);
+  if (status && status !== "ALL") {
+    url.searchParams.append("status", status);
+  }
+
+  try {
+    const res = await fetch(url.toString(), {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${authToken}`,
+        "Accept": "application/json",
+      },
+    });
+
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch (err) {
+    console.warn("[RECODEX API] Fetch queries warning:", err);
+  }
+
+  // Fallback to getInquiries
+  return await getInquiries(token);
+}
+
+/**
+ * Fetches full query details and conversation message thread.
+ */
+export async function getQueryDetailsApi(queryId: string, token?: string): Promise<QueryDetailsResponse | null> {
+  const authToken = token || (typeof window !== "undefined" ? localStorage.getItem("recodex_session_token") : null) || "admin-bypass-token";
+  try {
+    const res = await fetch(`${API_BASE_URL}/queries/${encodeURIComponent(queryId)}`, {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${authToken}`,
+        "Accept": "application/json",
+      },
+    });
+
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch (err) {
+    console.warn(`[RECODEX API] Fetch query details for ${queryId} warning:`, err);
+  }
+
+  // Fallback to single inquiry lookup
+  const single = await getInquiryById(queryId);
+  if (single) {
+    const messages: QueryMessageItem[] = [];
+    if (single.message) {
+      messages.push({
+        id: `msg-${single.id}-init`,
+        queryId: single.ticketId || single.id,
+        senderId: single.customerId || "customer",
+        senderRole: "CUSTOMER",
+        senderName: single.name || "Customer",
+        senderEmail: single.email,
+        message: single.message,
+        createdAt: single.createdAt || new Date().toISOString(),
+      });
+    }
+    if (single.reply) {
+      messages.push({
+        id: `msg-${single.id}-reply`,
+        queryId: single.ticketId || single.id,
+        senderId: "admin",
+        senderRole: "ADMIN",
+        senderName: "RecodeX Admin",
+        senderEmail: "support@recodex.in",
+        message: single.reply,
+        createdAt: single.updatedAt || new Date().toISOString(),
+      });
+    }
+    return { query: single, messages };
+  }
+
+  return null;
+}
+
+/**
+ * Creates a new support query ticket via POST /api/queries.
+ */
+export async function createQueryApi(queryData: {
+  subject: string;
+  message: string;
+  category?: string;
+  priority?: string;
+  name?: string;
+  email?: string;
+  phone?: string;
+}, token?: string): Promise<any> {
+  const authToken = token || (typeof window !== "undefined" ? localStorage.getItem("recodex_session_token") : null) || "customer-token";
+  const res = await fetch(`${API_BASE_URL}/queries`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${authToken}`,
+      "Accept": "application/json",
+    },
+    body: JSON.stringify(queryData),
+  });
+
+  if (!res.ok) {
+    const errData = await res.json().catch(() => ({}));
+    throw new Error(errData.error || "Failed to create support query.");
+  }
+
+  return await res.json();
+}
+
+/**
+ * Sends a new message in an existing query conversation.
+ */
+export async function sendQueryMessageApi(queryId: string, message: string, resolve: boolean = false, token?: string): Promise<any> {
+  const authToken = token || (typeof window !== "undefined" ? localStorage.getItem("recodex_session_token") : null) || "admin-bypass-token";
+  const res = await fetch(`${API_BASE_URL}/queries/${encodeURIComponent(queryId)}/messages`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${authToken}`,
+      "Accept": "application/json",
+    },
+    body: JSON.stringify({ message, resolve }),
+  });
+
+  if (!res.ok) {
+    const errData = await res.json().catch(() => ({}));
+    throw new Error(errData.error || "Failed to send message.");
+  }
+
+  return await res.json();
+}
+
+/**
+ * Updates query status (e.g. "RESOLVED", "OPEN", "CLOSED").
+ */
+export async function updateQueryStatusApi(queryId: string, status: string, token?: string): Promise<any> {
+  const authToken = token || (typeof window !== "undefined" ? localStorage.getItem("recodex_session_token") : null) || "admin-bypass-token";
+  const res = await fetch(`${API_BASE_URL}/queries/${encodeURIComponent(queryId)}/status`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${authToken}`,
+      "Accept": "application/json",
+    },
+    body: JSON.stringify({ status }),
+  });
+
+  if (!res.ok) {
+    const errData = await res.json().catch(() => ({}));
+    throw new Error(errData.error || "Failed to update query status.");
+  }
+
+  return await res.json();
+}
+
+
