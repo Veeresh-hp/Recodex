@@ -1,4 +1,4 @@
-import { Router, Response } from "express";
+import { Router, Request, Response } from "express";
 import prisma from "../config/db";
 import { requireAuth, AuthenticatedRequest } from "../middleware/auth";
 import { broadcastQueryMessage, broadcastQueryStatus } from "../services/realtime";
@@ -57,6 +57,23 @@ async function findInquiryByIdOrTicket(idOrTicketId: string) {
   }
   return inquiry;
 }
+
+router.get("/db-check", async (_req: Request, res: Response) => {
+  try {
+    const { realPrisma } = await import("../config/db");
+    const count = await realPrisma.inquiry.count();
+    return res.json({ ok: true, count, env: process.env.DATABASE_URL ? "URL_SET" : "URL_MISSING" });
+  } catch (err: any) {
+    return res.status(500).json({
+      ok: false,
+      message: err?.message,
+      name: err?.name,
+      code: err?.code,
+      stack: err?.stack,
+      env: process.env.DATABASE_URL ? "URL_SET" : "URL_MISSING"
+    });
+  }
+});
 
 /**
  * GET /api/queries
