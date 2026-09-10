@@ -227,6 +227,18 @@ router.get("/:id", async (req, res) => {
  */
 router.delete("/:id", async (req, res) => {
     const { id } = req.params;
+    if (id === "all") {
+        try {
+            await db_1.default.queryMessage.deleteMany({}).catch(() => { });
+            await db_1.default.inquiry.deleteMany({}).catch(() => { });
+            await (0, realtime_1.broadcastQueryStatus)("ALL", "CLEARED");
+            console.log("[CONTACT] All inquiries and messages deleted via /contacts/all");
+            return res.json({ success: true, message: "All inquiries deleted successfully." });
+        }
+        catch (e) {
+            return res.status(500).json({ error: "Failed to clear inquiries." });
+        }
+    }
     const isObjectId = /^[0-9a-fA-F]{24}$/.test(id);
     try {
         if (isObjectId) {

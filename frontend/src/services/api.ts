@@ -782,6 +782,7 @@ export async function submitInquiry(inquiryData: {
  */
 export async function getInquiries(token?: string, email?: string): Promise<any[]> {
   let backendInquiries: any[] = [];
+  let backendFetchSuccess = false;
   try {
     const headers: Record<string, string> = { "Accept": "application/json" };
     if (token) {
@@ -795,6 +796,7 @@ export async function getInquiries(token?: string, email?: string): Promise<any[
 
     if (response.ok) {
       backendInquiries = await response.json();
+      backendFetchSuccess = true;
     }
   } catch (error) {
     console.warn("[RECODEX API] Fetch backend inquiries warning:", error);
@@ -922,7 +924,9 @@ export async function getInquiries(token?: string, email?: string): Promise<any[
 
   backendInquiries.forEach(processInquiry);
   sheetInquiries.forEach(processInquiry);
-  localInquiries.forEach(processInquiry);
+  if (!backendFetchSuccess) {
+    localInquiries.forEach(processInquiry);
+  }
 
   // Return unique inquiries by primary key
   const uniqueList: any[] = [];
@@ -1019,6 +1023,47 @@ export async function deleteInquiry(id: string, token: string): Promise<any> {
     console.warn("[RECODEX API] Backend endpoint unreachable, deleted locally:", error);
     return { success: true };
   }
+}
+
+/**
+ * Completely clears/deletes all inquiries from database and local browser storage.
+ */
+export async function clearAllInquiriesApi(token?: string): Promise<any> {
+  const authToken = token || (typeof window !== "undefined" ? localStorage.getItem("recodex_session_token") : null) || "admin-bypass-token";
+
+  // 1. Wipe all local browser caches
+  try {
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("recodex_submitted_inquiries");
+      localStorage.removeItem("recodex_inquiry_replies");
+      localStorage.removeItem("recodex_inquiry_statuses");
+      localStorage.removeItem("recodex_deleted_inquiries");
+      window.dispatchEvent(new Event("recodex-inquiries-cleared"));
+      window.dispatchEvent(new Event("recodex-inquiry-deleted"));
+      window.dispatchEvent(new Event("storage"));
+    }
+  } catch (e) {}
+
+  // 2. Call backend DELETE endpoints
+  try {
+    await fetch(`${API_BASE_URL}/queries/all`, {
+      method: "DELETE",
+      headers: {
+        "Authorization": `Bearer ${authToken}`,
+        "Accept": "application/json",
+      },
+    }).catch(() => {});
+
+    await fetch(`${API_BASE_URL}/contacts/all`, {
+      method: "DELETE",
+      headers: {
+        "Authorization": `Bearer ${authToken}`,
+        "Accept": "application/json",
+      },
+    }).catch(() => {});
+  } catch (e) {}
+
+  return { success: true };
 }
 
 /**

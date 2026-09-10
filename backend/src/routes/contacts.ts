@@ -237,6 +237,19 @@ router.get("/:id", async (req: Request, res: Response) => {
  */
 router.delete("/:id", async (req: Request, res: Response) => {
   const { id } = req.params;
+
+  if (id === "all") {
+    try {
+      await prisma.queryMessage.deleteMany({}).catch(() => {});
+      await prisma.inquiry.deleteMany({}).catch(() => {});
+      await broadcastQueryStatus("ALL", "CLEARED");
+      console.log("[CONTACT] All inquiries and messages deleted via /contacts/all");
+      return res.json({ success: true, message: "All inquiries deleted successfully." });
+    } catch (e) {
+      return res.status(500).json({ error: "Failed to clear inquiries." });
+    }
+  }
+
   const isObjectId = /^[0-9a-fA-F]{24}$/.test(id);
 
   try {

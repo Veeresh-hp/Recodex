@@ -480,4 +480,82 @@ router.patch("/:queryId/status", auth_1.requireAuth, async (req, res) => {
         return res.status(500).json({ error: "Failed to update query status." });
     }
 });
+/**
+ * DELETE /api/queries/all
+ * Deletes all inquiries and messages.
+ * Admins wipe the entire system; Customers wipe only their own inquiries.
+ */
+router.delete("/all", auth_1.requireAuth, async (req, res) => {
+    const user = req.user;
+    const userEmail = (user?.email || "").toLowerCase().trim();
+    const isAdmin = isUserAdmin(userEmail, user?.role);
+    try {
+        if (isAdmin) {
+            const deletedMsgs = await db_1.default.queryMessage.deleteMany({});
+            const deletedInqs = await db_1.default.inquiry.deleteMany({});
+            await (0, realtime_1.broadcastQueryStatus)("ALL", "CLEARED");
+            console.log(`[QUERIES] All inquiries (${deletedInqs.count}) and messages (${deletedMsgs.count}) cleared by Admin (${userEmail})`);
+            return res.json({ success: true, message: "All inquiries deleted successfully from the entire system." });
+        }
+        // Customer: delete only their inquiries
+        const userQueries = await db_1.default.inquiry.findMany({
+            where: {
+                OR: [
+                    ...(user?.id ? [{ customerId: user.id }] : []),
+                    ...(userEmail ? [{ email: userEmail }] : []),
+                ],
+            },
+        });
+        const ids = userQueries.map((q) => q.id);
+        await db_1.default.queryMessage.deleteMany({
+            where: { queryId: { in: ids } },
+        });
+        await db_1.default.inquiry.deleteMany({
+            where: { id: { in: ids } },
+        });
+        await (0, realtime_1.broadcastQueryStatus)("ALL", "CLEARED");
+        return res.json({ success: true, message: "Cleared all your inquiries." });
+    }
+    catch (error) {
+        console.error("[QUERIES] Error clearing inquiries:", error);
+        return res.status(500).json({ error: "Failed to clear inquiries." });
+    }
+});
+/**
+ * DELETE /api/queries/:queryId
+ * Deletes a single inquiry and its associated message thread.
+ */
+router.delete("/:queryId", auth_1.requireAuth, async (req, res) => {
+    const { queryId } = req.params;
+    const user = req.user;
+    const userEmail = (user?.email || "").toLowerCase().trim();
+    const isAdmin = isUserAdmin(userEmail, user?.role);
+    try {
+        const inquiry = await findInquiryByIdOrTicket(queryId);
+        if (!inquiry) {
+            return res.json({ success: true, message: "Inquiry not found or already deleted." });
+        }
+        const inqEmail = (inquiry.email || "").toLowerCase().trim();
+        if (!isAdmin) {
+            const isOwner = (inquiry.customerId && user?.id && inquiry.customerId === user.id) ||
+                (inqEmail && userEmail && inqEmail === userEmail);
+            if (!isOwner) {
+                return res.status(403).json({ error: "Forbidden: You cannot delete this inquiry." });
+            }
+        }
+        await db_1.default.queryMessage.deleteMany({
+            where: { queryId: inquiry.id },
+        });
+        await db_1.default.inquiry.delete({
+            where: { id: inquiry.id },
+        });
+        const ticketKey = inquiry.ticketId || inquiry.id;
+        await (0, realtime_1.broadcastQueryStatus)(ticketKey, "DELETED");
+        return res.json({ success: true, message: "Inquiry deleted successfully." });
+    }
+    catch (error) {
+        console.error(`[QUERIES] Error deleting query ${queryId}:`, error);
+        return res.status(500).json({ error: "Failed to delete query." });
+    }
+});
 exports.default = router;

@@ -17,10 +17,10 @@ import {
   deleteInquiry, replyToInquiry, resolveInquiryApi, getUserProfile,
   getCertificatesApi, saveCertificateApi, deleteCertificateApi, approveCertificateApi,
   getPromotedAdminsApi, getAuditLogsApi, logAdminActivityApi,
-  getQueryDetailsApi, sendQueryMessageApi, updateQueryStatusApi, QueryMessageItem,
+  getQueryDetailsApi, sendQueryMessageApi, updateQueryStatusApi, clearAllInquiriesApi, QueryMessageItem,
   AuditLogEntry
 } from "../services/api";
-import { subscribeToQuery } from "../services/realtime";
+import { subscribeToQuery, subscribeToGlobalQueriesFeed } from "../services/realtime";
 import { useTheme } from "../context/ThemeContext";
 
 interface Deployment {
@@ -790,6 +790,24 @@ export default function Dashboard() {
     };
   }, [selectedInquiryId, currentActiveInquiry?.id]);
 
+  // Global Realtime listener for incoming customer messages and new inquiries
+  useEffect(() => {
+    const unsubGlobal = subscribeToGlobalQueriesFeed((activity) => {
+      if (activity.type === "STATUS_CHANGED" && activity.status === "CLEARED") {
+        setInquiries([]);
+        setActiveInquiryMessages([]);
+        setSelectedInquiryId(null);
+        return;
+      }
+      // Re-fetch inquiries list so new customer queries appear immediately on Admin page
+      fetchInquiries(true);
+    });
+
+    return () => {
+      unsubGlobal();
+    };
+  }, []);
+
   // Re-fetch when sidebar tab changes
   useEffect(() => {
     if (activeSidebarTab === "Users") fetchUsers();
@@ -1075,6 +1093,32 @@ export default function Dashboard() {
       if (selectedInquiryId === id) setSelectedInquiryId(null);
       if (replyingInquiryId === id) setReplyingInquiryId(null);
       setToast({ message: "Inquiry removed.", type: "success" });
+    }
+  };
+
+  const handleClearAllInquiries = async () => {
+    if (!window.confirm("Are you sure you want to permanently clear and delete ALL inquiries and conversation histories? This cannot be undone.")) {
+      return;
+    }
+    try {
+      const token = await getAuthToken();
+      await clearAllInquiriesApi(token);
+      setInquiries([]);
+      setActiveInquiryMessages([]);
+      setSelectedInquiryId(null);
+      setReplyingInquiryId(null);
+      setToast({ message: "All inquiries deleted from database and system.", type: "success" });
+      logAdminActivityApi({
+        adminName: adminName || user?.fullName || "Admin",
+        adminEmail: adminEmail || user?.primaryEmailAddress?.emailAddress || "",
+        action: "CLEARED ALL INQUIRIES",
+        target: "All Inquiries & Messages",
+        details: "Purged all pending, resolved, and open inquiries from the system",
+      });
+      fetchAuditLogs();
+    } catch (err: any) {
+      console.error("Failed to clear inquiries:", err);
+      setToast({ message: "Failed to clear inquiries.", type: "error" });
     }
   };
 
@@ -2896,6 +2940,14 @@ export default function Dashboard() {
                   className="px-3.5 py-1.5 bg-primary/10 border border-primary/20 text-primary dark:text-[#00d1ff] rounded-xl text-xs font-mono font-bold hover:bg-primary/20 transition-all flex items-center gap-2 shrink-0 cursor-pointer"
                 >
                   <FileText size={14} /> Export CSV
+                </button>
+                <button
+                  onClick={handleClearAllInquiries}
+                  className="px-3.5 py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-500 hover:text-red-400 rounded-xl text-xs font-mono font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer"
+                  title="Clear all inquiries and messages from database and system"
+                >
+                  <Trash2 size={13} />
+                  <span>Clear All</span>
                 </button>
               </div>
             </div>

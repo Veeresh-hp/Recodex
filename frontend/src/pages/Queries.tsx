@@ -8,6 +8,7 @@ import {
   sendQueryMessageApi,
   updateQueryStatusApi,
   deleteInquiry,
+  clearAllInquiriesApi,
   QueryItem,
   QueryMessageItem,
 } from "../services/api";
@@ -107,7 +108,16 @@ export default function Queries() {
     try {
       const token = await getToken();
       const queries = await getQueriesApi(token || undefined);
-      setInquiries(queries);
+      if (Array.isArray(queries)) {
+        setInquiries(queries);
+        if (queries.length === 0) {
+          try {
+            localStorage.removeItem("recodex_submitted_inquiries");
+            localStorage.removeItem("recodex_inquiry_replies");
+            localStorage.removeItem("recodex_inquiry_statuses");
+          } catch (e) {}
+        }
+      }
 
       // Eagerly pre-load conversation messages for each query
       queries.forEach(async (q) => {
@@ -181,6 +191,15 @@ export default function Queries() {
         },
         onStatusChange: (statusData: RealtimeStatusChange) => {
           console.log(`[REALTIME CUSTOMER] Received status change for ${qKey}:`, statusData);
+          if (statusData.status === "CLEARED") {
+            setInquiries([]);
+            setMessagesMap({});
+            return;
+          }
+          if (statusData.status === "DELETED") {
+            setInquiries((prev) => prev.filter((item) => item.ticketId !== qKey && item.id !== qKey));
+            return;
+          }
           setInquiries((prev) =>
             prev.map((item) => {
               if (item.ticketId === qKey || item.id === qKey) {
@@ -271,6 +290,26 @@ export default function Queries() {
     } catch (e) {
       console.warn("Delete ticket error:", e);
       setInquiries((prev) => prev.filter((i) => i.id !== id && i.ticketId !== id));
+    }
+  };
+
+  // Handle clearing all queries
+  const handleClearAllQueries = async () => {
+    if (!window.confirm("Are you sure you want to clear all your queries? This will permanently delete your inquiry records.")) return;
+    try {
+      const token = await getToken();
+      await clearAllInquiriesApi(token || undefined);
+      setInquiries([]);
+      setMessagesMap({});
+      try {
+        localStorage.removeItem("recodex_submitted_inquiries");
+        localStorage.removeItem("recodex_inquiry_replies");
+        localStorage.removeItem("recodex_inquiry_statuses");
+      } catch (e) {}
+    } catch (e) {
+      console.warn("Clear all queries error:", e);
+      setInquiries([]);
+      setMessagesMap({});
     }
   };
 
@@ -391,6 +430,16 @@ export default function Queries() {
             >
               <RefreshCw size={16} className={loading ? "animate-spin text-amber-500" : ""} />
             </button>
+            {inquiries.length > 0 && (
+              <button
+                onClick={handleClearAllQueries}
+                className="px-3.5 py-2.5 rounded-xl border border-rose-500/25 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-mono font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                title="Clear all your queries"
+              >
+                <Trash2 size={14} />
+                <span>Clear All</span>
+              </button>
+            )}
             <button
               onClick={() => setNewTicketModalOpen(true)}
               className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-extrabold text-xs font-mono uppercase tracking-wider flex items-center gap-2 transition-all shadow-lg hover:shadow-amber-500/20 cursor-pointer"
