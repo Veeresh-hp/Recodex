@@ -2,13 +2,14 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.realPrisma = void 0;
 const client_1 = require("@prisma/client");
-if (!process.env.DATABASE_URL) {
-    process.env.DATABASE_URL = "mongodb+srv://Recodex:Recodex2004@recodex.wahwbbo.mongodb.net/recodex?appName=Recodex";
+const MONGODB_ATLAS_URL = "mongodb+srv://Recodex:Recodex2004@recodex.wahwbbo.mongodb.net/recodex?appName=Recodex";
+if (!process.env.DATABASE_URL || !process.env.DATABASE_URL.startsWith("mongodb")) {
+    process.env.DATABASE_URL = MONGODB_ATLAS_URL;
 }
 exports.realPrisma = new client_1.PrismaClient({
     datasources: {
         db: {
-            url: process.env.DATABASE_URL || "mongodb+srv://Recodex:Recodex2004@recodex.wahwbbo.mongodb.net/recodex?appName=Recodex",
+            url: process.env.DATABASE_URL,
         },
     },
     log: ["error"],

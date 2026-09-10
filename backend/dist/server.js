@@ -55,9 +55,9 @@ dotenv_1.default.config({ path: path_1.default.resolve(__dirname, "../.env") });
 dotenv_1.default.config({ path: path_1.default.resolve(__dirname, "../../.env") });
 dotenv_1.default.config({ path: path_1.default.resolve(process.cwd(), "backend/.env") });
 dotenv_1.default.config();
-// Ensure critical database and auth keys have persistent cloud defaults
-if (!process.env.DATABASE_URL) {
-    process.env.DATABASE_URL = "mongodb+srv://Recodex:Recodex2004@recodex.wahwbbo.mongodb.net/recodex?appName=Recodex";
+const MONGODB_ATLAS_URL = "mongodb+srv://Recodex:Recodex2004@recodex.wahwbbo.mongodb.net/recodex?appName=Recodex";
+if (!process.env.DATABASE_URL || !process.env.DATABASE_URL.startsWith("mongodb")) {
+    process.env.DATABASE_URL = MONGODB_ATLAS_URL;
 }
 if (!process.env.CLERK_PUBLISHABLE_KEY) {
     process.env.CLERK_PUBLISHABLE_KEY = "pk_test_aG9wZWZ1bC1mb3hob3VuZC00OC5jbGVyay5hY2NvdW50cy5kZXYk";

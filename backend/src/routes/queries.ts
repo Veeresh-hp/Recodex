@@ -72,13 +72,15 @@ router.get("/db-check", async (_req: Request, res: Response) => {
     await testPrisma.$disconnect();
     return res.json({ ok: true, count, env: process.env.DATABASE_URL ? "URL_SET" : "URL_MISSING" });
   } catch (err: any) {
+    const rawUrl = process.env.DATABASE_URL || "";
+    const scheme = rawUrl ? rawUrl.split("://")[0] + "://..." : "EMPTY";
     return res.status(500).json({
       ok: false,
       message: err?.message,
       name: err?.name,
       code: err?.code,
-      stack: err?.stack,
-      env: process.env.DATABASE_URL ? "URL_SET" : "URL_MISSING"
+      detectedScheme: scheme,
+      rawUrlLength: rawUrl.length,
     });
   }
 });
