@@ -87,6 +87,29 @@ app.use("/api/certificates", certificateRoutes);
 app.use("/api/queries", queryRoutes);
 app.use("/api/inngest", serve({ client: inngest, functions: [generateIndustryInsights] }));
 
+// Diagnostic DB Health Endpoint
+app.get("/api/health/db", async (_req: Request, res: Response) => {
+  try {
+    const { realPrisma } = await import("./config/db");
+    const count = await realPrisma.inquiry.count();
+    res.json({
+      ok: true,
+      database: "MongoDB Atlas Connected",
+      inquiriesCount: count,
+      envDbUrl: process.env.DATABASE_URL ? "SET" : "NOT_SET",
+    });
+  } catch (err: any) {
+    res.status(500).json({
+      ok: false,
+      error: err?.message || String(err),
+      name: err?.name,
+      code: err?.code,
+      stack: err?.stack,
+      envDbUrl: process.env.DATABASE_URL ? "SET" : "NOT_SET",
+    });
+  }
+});
+
 // Basic Health Check Endpoint
 app.get("/health", (_req: Request, res: Response) => {
   res.json({

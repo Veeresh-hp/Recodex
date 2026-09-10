@@ -297,7 +297,15 @@ const prismaProxy = new Proxy(realPrisma, {
           try {
             return await realMethod.apply(modelTarget, args);
           } catch (dbErr: any) {
-            console.warn(`[PRISMA RESILIENCE] realPrisma.${modelKey}.${methodKey} warning, invoking resilient fallback:`, dbErr?.message || dbErr);
+            console.warn(`[PRISMA RESILIENCE] realPrisma.${modelKey}.${methodKey} warning:`, dbErr?.message || dbErr);
+            if (dbErr?.message?.includes("connect") || dbErr?.message?.includes("closed") || dbErr?.message?.includes("timed out") || dbErr?.message?.includes("Connection") || dbErr?.name === "PrismaClientInitializationError") {
+              try {
+                await realPrisma.$connect();
+                return await realMethod.apply(modelTarget, args);
+              } catch (reconnectErr) {
+                console.warn(`[PRISMA RECONNECT FAILED]:`, reconnectErr);
+              }
+            }
             if (typeof mockMethod === "function") {
               return await mockMethod.apply(mockModel, args);
             }
