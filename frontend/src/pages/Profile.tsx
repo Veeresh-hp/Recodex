@@ -392,7 +392,11 @@ export default function Profile() {
       const sessionToken = localStorage.getItem("recodex_session_token");
       const isAdminBypass = sessionToken === "admin-bypass-token" || localStorage.getItem("recodex_admin_user") === "true";
       const isDevBypass = sessionToken === "dev-bypass-token";
-      const isClientBypass = sessionToken === "client-bypass-token";
+      // Immediately purge any legacy client bypass tokens or sandbox client avatar
+      if (sessionToken === "client-bypass-token") {
+        localStorage.removeItem("recodex_session_token");
+        localStorage.removeItem("profile_avatar_sandbox-client-003");
+      }
 
       if (isAdminBypass) {
         const savedAvatar = localStorage.getItem("profile_avatar_sandbox-admin-001");
@@ -423,26 +427,6 @@ export default function Profile() {
           role: "developer",
           isGoogleUser: false,
           projects: []
-        };
-        setProfile(p);
-        setCurrentAvatar(savedAvatar || null);
-        setLoading(false);
-        return;
-      }
-
-      if (isClientBypass) {
-        const savedAvatar = localStorage.getItem("profile_avatar_sandbox-client-003");
-        const p: UserProfile = {
-          id: "sandbox-client-003",
-          name: "Veeresh H P (Client)",
-          email: "veereshhp_client@gmail.com",
-          phone: "+1 (555) 999-2026",
-          avatar: savedAvatar || null,
-          role: "client",
-          isGoogleUser: false,
-          projects: [
-            getDynamicProjectData("recodex-sandbox-demo-project", "Enterprise Custom Portal Implementation", "Web Systems")
-          ]
         };
         setProfile(p);
         setCurrentAvatar(savedAvatar || null);

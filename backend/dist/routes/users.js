@@ -3,6 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.isPermanentlyExcludedUser = void 0;
 const express_1 = require("express");
 const multer_1 = __importDefault(require("multer"));
 const db_1 = __importDefault(require("../config/db"));
@@ -19,6 +20,21 @@ const upload = (0, multer_1.default)({
 });
 const PROMOTED_ADMINS_FILE = path_1.default.join(__dirname, "../../promoted_admins_db.json");
 const ROOT_ADMIN_EMAILS = ["veereshhp2004@gmail.com", "udaykumaras34@gmail.com"];
+const isPermanentlyExcludedUser = (email, name) => {
+    const e = (email || "").toLowerCase().trim();
+    const n = (name || "").toLowerCase().trim();
+    return e === "veereshhp_client@gmail.com" || e.includes("veereshhp_client") || n.includes("veeresh h p (client)");
+};
+exports.isPermanentlyExcludedUser = isPermanentlyExcludedUser;
+// Immediate background purge to ensure deprecated mock clients never linger in DB
+db_1.default.user.deleteMany({
+    where: {
+        OR: [
+            { email: { contains: "veereshhp_client", mode: "insensitive" } },
+            { name: { contains: "Veeresh H P (Client)", mode: "insensitive" } },
+        ],
+    },
+}).catch((err) => console.warn("Background client user purge check:", err));
 const getSavedPromotedAdmins = () => {
     const rootAdmins = ROOT_ADMIN_EMAILS;
     try {
@@ -221,6 +237,8 @@ router.get("/", async (_req, res) => {
                         const firstName = u.first_name || "";
                         const lastName = u.last_name || "";
                         const fullName = [firstName, lastName].filter(Boolean).join(" ") || u.username || email.split("@")[0];
+                        if ((0, exports.isPermanentlyExcludedUser)(email, fullName))
+                            continue;
                         const isRootAdmin = ROOT_ADMIN_EMAILS.includes(email.toLowerCase().trim());
                         const img = u.image_url || u.profile_image_url || null;
                         const existingUser = await db_1.default.user.findUnique({ where: { id: u.id } });
@@ -248,9 +266,10 @@ router.get("/", async (_req, res) => {
                 console.warn("[RECODEX API] Clerk automatic user sync warning:", clerkErr);
             }
         }
-        const dbUsers = await db_1.default.user.findMany({
+        const rawDbUsers = await db_1.default.user.findMany({
             orderBy: { createdAt: "desc" },
         });
+        const dbUsers = rawDbUsers.filter((u) => !(0, exports.isPermanentlyExcludedUser)(u.email, u.name));
         const getUserKey = (u) => {
             const emailStr = (u.email || "").trim().toLowerCase();
             const nameStr = (u.name || "").trim().toLowerCase().replace(/[^a-z]/g, "");
@@ -274,7 +293,9 @@ router.get("/", async (_req, res) => {
             const key = getUserKey(u);
             userMap.set(key, { ...userMap.get(key), ...u });
         });
-        const finalUsers = Array.from(userMap.values()).map((u) => {
+        const finalUsers = Array.from(userMap.values())
+            .filter((u) => !(0, exports.isPermanentlyExcludedUser)(u.email, u.name))
+            .map((u) => {
             const emailClean = (u.email || "").toLowerCase().trim();
             const isRoot = ROOT_ADMIN_EMAILS.includes(emailClean);
             const isPromoted = promotedAdmins.includes(emailClean);
@@ -322,7 +343,9 @@ router.get("/", async (_req, res) => {
         };
         const userMap = new Map();
         FALLBACK_USERS.forEach((u) => userMap.set(getUserKey(u), { ...u }));
-        const finalUsers = Array.from(userMap.values()).map((u) => {
+        const finalUsers = Array.from(userMap.values())
+            .filter((u) => !(0, exports.isPermanentlyExcludedUser)(u.email, u.name))
+            .map((u) => {
             const emailClean = (u.email || "").toLowerCase().trim();
             const isRoot = ROOT_ADMIN_EMAILS.includes(emailClean);
             const isPromoted = promotedAdmins.includes(emailClean);
@@ -359,6 +382,9 @@ router.post("/sync", async (req, res) => {
     const { id, email, name, role, profileImage } = req.body;
     if (!id || !email || !name) {
         return res.status(400).json({ error: "Missing required identity synchronization parameters (id, email, name)." });
+    }
+    if ((0, exports.isPermanentlyExcludedUser)(email, name)) {
+        return res.status(403).json({ error: "Access denied. This test identity is permanently deactivated." });
     }
     try {
         const isRootAdmin = ROOT_ADMIN_EMAILS.includes(email.toLowerCase().trim());

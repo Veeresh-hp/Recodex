@@ -575,16 +575,29 @@ export default function Dashboard() {
   const fetchUsers = async () => {
     try {
       const data = await getUsers();
-      const mapped = data.map((u: any) => {
-        const emailClean = (u.email || "").toLowerCase().trim();
-        if (emailClean === "veereshhp04@gmail.com") {
-          return { ...u, role: u.role === "suspended" ? "suspended" : "client" };
-        }
-        if (ROOT_ADMIN_EMAILS.includes(emailClean)) {
-          return { ...u, role: "admin" };
-        }
-        return u;
-      });
+      const mapped = data
+        .filter((u: any) => {
+          const emailClean = (u.email || "").toLowerCase().trim();
+          const nameClean = (u.name || "").toLowerCase().trim();
+          if (
+            emailClean === "veereshhp_client@gmail.com" ||
+            emailClean.includes("veereshhp_client") ||
+            nameClean.includes("veeresh h p (client)")
+          ) {
+            return false;
+          }
+          return true;
+        })
+        .map((u: any) => {
+          const emailClean = (u.email || "").toLowerCase().trim();
+          if (emailClean === "veereshhp04@gmail.com") {
+            return { ...u, role: u.role === "suspended" ? "suspended" : "client" };
+          }
+          if (ROOT_ADMIN_EMAILS.includes(emailClean)) {
+            return { ...u, role: "admin" };
+          }
+          return u;
+        });
       setDbUsers((prev) => {
         if (JSON.stringify(prev) === JSON.stringify(mapped)) return prev;
         return mapped;
@@ -1941,30 +1954,74 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* Stat 4: Reports Pending */}
-              <div 
-                onClick={() => setActiveSidebarTab("Reports")}
-                className="glass-card p-6 hover-lift flex flex-col justify-between min-h-[140px] border border-rose-500/30 bg-rose-500/5 relative overflow-hidden group rounded-2xl cursor-pointer hover:border-rose-500/60 transition-all"
-                title="Click to view Reports Hub"
-              >
-                <div className="absolute -right-4 -top-4 w-24 h-24 bg-rose-500/10 rounded-full group-hover:scale-150 transition-transform duration-500 pointer-events-none"></div>
-                <div className="flex justify-between items-start z-10">
-                  <div>
-                    <p className="text-xs font-mono font-bold uppercase tracking-wider text-rose-400 mb-1">Reports Pending</p>
-                    <h3 className="text-3xl font-extrabold font-mono text-rose-500 tracking-tight">
-                      {reports.filter(r => r.status === "Open" || r.status === "Under Review").length}
-                    </h3>
+              {/* Stat 4: Enquiries */}
+              {(() => {
+                const pendingInquiriesCount = inquiries.filter(
+                  (i) => (i?.status || "").toLowerCase() !== "resolved" && (i?.status || "").toLowerCase() !== "closed"
+                ).length;
+                const hasPending = pendingInquiriesCount > 0;
+
+                return (
+                  <div 
+                    onClick={() => setActiveSidebarTab("Inquiries")}
+                    className={`glass-card p-6 hover-lift flex flex-col justify-between min-h-[140px] relative overflow-hidden group border rounded-2xl cursor-pointer transition-all ${
+                      hasPending 
+                        ? "border-amber-500/30 bg-amber-500/5 hover:border-amber-500/60" 
+                        : "border-black/5 dark:border-white/10 hover:border-amber-400/50"
+                    }`}
+                    title="Click to manage Client Enquiries"
+                  >
+                    <div className={`absolute -right-4 -top-4 w-24 h-24 rounded-full group-hover:scale-150 transition-transform duration-500 pointer-events-none ${
+                      hasPending ? "bg-amber-500/10" : "bg-amber-500/5"
+                    }`}></div>
+                    <div className="flex justify-between items-start z-10">
+                      <div>
+                        <p className={`text-xs font-mono font-bold uppercase tracking-wider mb-1 ${
+                          hasPending ? "text-amber-400" : "text-zinc-500 dark:text-zinc-400"
+                        }`}>
+                          Enquiries
+                        </p>
+                        <h3 className={`text-3xl font-extrabold font-mono tracking-tight ${
+                          hasPending ? "text-amber-500" : "text-zinc-900 dark:text-white"
+                        }`}>
+                          {pendingInquiriesCount}
+                        </h3>
+                      </div>
+                      <div className={`p-3 rounded-xl border transition-all ${
+                        hasPending 
+                          ? "bg-amber-500/10 text-amber-400 border-amber-500/20 group-hover:bg-amber-500 group-hover:text-black" 
+                          : "bg-amber-500/10 text-amber-400 border-amber-500/20 group-hover:bg-amber-400 group-hover:text-black"
+                      }`}>
+                        <span className="material-symbols-outlined text-[20px]">
+                          {hasPending ? "chat_bubble" : "question_answer"}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 mt-4 z-10">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-mono font-bold border ${
+                        hasPending 
+                          ? "bg-amber-500/10 text-amber-400 border-amber-500/20" 
+                          : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                      }`}>
+                        {hasPending ? (
+                          <>
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 mr-1.5 animate-ping"></span>
+                            Action required
+                          </>
+                        ) : (
+                          <>
+                            <span className="material-symbols-outlined text-[13px] mr-1">check_circle</span>
+                            All resolved
+                          </>
+                        )}
+                      </span>
+                      <span className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">
+                        {inquiries.length} total received
+                      </span>
+                    </div>
                   </div>
-                  <div className="p-3 bg-rose-500/10 rounded-xl text-rose-400 border border-rose-500/20 group-hover:bg-rose-500 group-hover:text-white transition-all">
-                    <span className="material-symbols-outlined text-[20px]">warning</span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 mt-4 z-10">
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20">
-                    Action required
-                  </span>
-                </div>
-              </div>
+                );
+              })()}
             </div>
 
             {/* Row 2: Charts Area */}
@@ -2073,6 +2130,13 @@ export default function Dashboard() {
                           if (softDeletedUserIds.includes(u.id)) return false;
                           const email = (u.email || "").toLowerCase().trim();
                           const name = (u.name || "").toLowerCase().trim();
+                          if (
+                            email === "veereshhp_client@gmail.com" ||
+                            email.includes("veereshhp_client") ||
+                            name.includes("veeresh h p (client)")
+                          ) {
+                            return false;
+                          }
                           const dummyKeywords = ["john.doe", "sarah@skynet", "vance@blackmesa", "demo@", "john doe", "sarah connor", "alice vance"];
                           if (dummyKeywords.some((k) => email.includes(k) || name.includes(k))) return false;
                           return true;
@@ -2194,6 +2258,14 @@ export default function Dashboard() {
         const filteredUsers = dbUsers.filter((userItem) => {
           if (softDeletedUserIds.includes(userItem.id)) return false;
           const userEmailClean = (userItem.email || "").toLowerCase().trim();
+          const userNameClean = (userItem.name || "").toLowerCase().trim();
+          if (
+            userEmailClean === "veereshhp_client@gmail.com" ||
+            userEmailClean.includes("veereshhp_client") ||
+            userNameClean.includes("veeresh h p (client)")
+          ) {
+            return false;
+          }
           const matchesQuery = userItem.name.toLowerCase().includes(userSearch.toLowerCase()) || 
                                userItem.email.toLowerCase().includes(userSearch.toLowerCase());
           const isItemAdmin = userEmailClean !== "veereshhp04@gmail.com" && (userItem.role === "admin" || ROOT_ADMIN_EMAILS.includes(userEmailClean));

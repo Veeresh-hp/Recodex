@@ -355,11 +355,22 @@ const REAL_ECOSYSTEM_USERS = [
  * Returns real registered & synced users without any demo/dummy users.
  */
 export async function getUsers(): Promise<any[]> {
+  const dummyEmails = ["john.doe@recodex.io", "sarah@skynet.com", "vance@blackmesa.org"];
+  const isExcludedUser = (u: any) => {
+    if (!u) return true;
+    const emailClean = (u.email || "").toLowerCase().trim();
+    const nameClean = (u.name || "").toLowerCase().trim();
+    return (
+      emailClean === "veereshhp_client@gmail.com" ||
+      emailClean.includes("veereshhp_client") ||
+      nameClean.includes("veeresh h p (client)") ||
+      dummyEmails.includes(emailClean)
+    );
+  };
+
   const localSyncedRaw = typeof window !== "undefined" ? localStorage.getItem("recodex_synced_users") : null;
   let localSynced: any[] = localSyncedRaw ? JSON.parse(localSyncedRaw) : [];
-
-  const dummyEmails = ["john.doe@recodex.io", "sarah@skynet.com", "vance@blackmesa.org"];
-  localSynced = localSynced.filter((u: any) => u && u.email && !dummyEmails.includes(u.email.trim().toLowerCase()));
+  localSynced = localSynced.filter((u: any) => !isExcludedUser(u));
 
   let backendUsers: any[] = [];
   try {
@@ -369,7 +380,8 @@ export async function getUsers(): Promise<any[]> {
     });
 
     if (response.ok) {
-      backendUsers = await response.json();
+      const data = await response.json();
+      backendUsers = Array.isArray(data) ? data.filter((u: any) => !isExcludedUser(u)) : [];
     }
   } catch (error) {
     console.warn("[RECODEX API] Server endpoint unreachable.", error);
@@ -458,7 +470,9 @@ export async function getUsers(): Promise<any[]> {
     }
   }
 
-  const finalUsers = Array.from(userMap.values()).map((u: any) => {
+  const finalUsers = Array.from(userMap.values())
+    .filter((u: any) => !isExcludedUser(u))
+    .map((u: any) => {
     const emailClean = (u.email || "").toLowerCase().trim();
     if (emailClean === "veereshhp04@gmail.com") {
       return { ...u, role: u.role === "suspended" ? "suspended" : "client" };

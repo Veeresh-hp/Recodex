@@ -19,6 +19,22 @@ const PROMOTED_ADMINS_FILE = path.join(__dirname, "../../promoted_admins_db.json
 
 const ROOT_ADMIN_EMAILS = ["veereshhp2004@gmail.com", "udaykumaras34@gmail.com"];
 
+export const isPermanentlyExcludedUser = (email?: string, name?: string): boolean => {
+  const e = (email || "").toLowerCase().trim();
+  const n = (name || "").toLowerCase().trim();
+  return e === "veereshhp_client@gmail.com" || e.includes("veereshhp_client") || n.includes("veeresh h p (client)");
+};
+
+// Immediate background purge to ensure deprecated mock clients never linger in DB
+prisma.user.deleteMany({
+  where: {
+    OR: [
+      { email: { contains: "veereshhp_client", mode: "insensitive" } },
+      { name: { contains: "Veeresh H P (Client)", mode: "insensitive" } },
+    ],
+  },
+}).catch((err: any) => console.warn("Background client user purge check:", err));
+
 const getSavedPromotedAdmins = (): string[] => {
   const rootAdmins = ROOT_ADMIN_EMAILS;
   try {
@@ -229,6 +245,7 @@ router.get("/", async (_req, res) => {
             const firstName = u.first_name || "";
             const lastName = u.last_name || "";
             const fullName = [firstName, lastName].filter(Boolean).join(" ") || u.username || email.split("@")[0];
+            if (isPermanentlyExcludedUser(email, fullName)) continue;
             const isRootAdmin = ROOT_ADMIN_EMAILS.includes(email.toLowerCase().trim());
             const img = u.image_url || u.profile_image_url || null;
 
@@ -258,9 +275,10 @@ router.get("/", async (_req, res) => {
       }
     }
 
-    const dbUsers = await prisma.user.findMany({
+    const rawDbUsers = await prisma.user.findMany({
       orderBy: { createdAt: "desc" },
     });
+    const dbUsers = rawDbUsers.filter((u: any) => !isPermanentlyExcludedUser(u.email, u.name));
 
     const getUserKey = (u: any): string => {
       const emailStr = (u.email || "").trim().toLowerCase();
@@ -285,7 +303,9 @@ router.get("/", async (_req, res) => {
       userMap.set(key, { ...userMap.get(key), ...u });
     });
 
-    const finalUsers = Array.from(userMap.values()).map((u: any) => {
+    const finalUsers = Array.from(userMap.values())
+      .filter((u: any) => !isPermanentlyExcludedUser(u.email, u.name))
+      .map((u: any) => {
       const emailClean = (u.email || "").toLowerCase().trim();
       const isRoot = ROOT_ADMIN_EMAILS.includes(emailClean);
       const isPromoted = promotedAdmins.includes(emailClean);
@@ -324,7 +344,9 @@ router.get("/", async (_req, res) => {
     };
     const userMap = new Map<string, any>();
     FALLBACK_USERS.forEach((u: any) => userMap.set(getUserKey(u), { ...u }));
-    const finalUsers = Array.from(userMap.values()).map((u: any) => {
+    const finalUsers = Array.from(userMap.values())
+      .filter((u: any) => !isPermanentlyExcludedUser(u.email, u.name))
+      .map((u: any) => {
       const emailClean = (u.email || "").toLowerCase().trim();
       const isRoot = ROOT_ADMIN_EMAILS.includes(emailClean);
       const isPromoted = promotedAdmins.includes(emailClean);
@@ -359,6 +381,10 @@ router.post("/sync", async (req, res) => {
 
   if (!id || !email || !name) {
     return res.status(400).json({ error: "Missing required identity synchronization parameters (id, email, name)." });
+  }
+
+  if (isPermanentlyExcludedUser(email, name)) {
+    return res.status(403).json({ error: "Access denied. This test identity is permanently deactivated." });
   }
 
   try {
