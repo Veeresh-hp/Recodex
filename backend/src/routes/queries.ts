@@ -498,12 +498,16 @@ router.post("/:queryId/messages", requireAuth, async (req: AuthenticatedRequest,
       senderEmail: createdMessage.senderEmail,
       message: createdMessage.message,
       createdAt: createdMessage.createdAt,
+      queryStatus: nextStatus,
     };
 
     await broadcastQueryMessage(ticketKey, messagePayload);
 
-    if (nextStatus !== inquiry.status) {
+    if (resolve || nextStatus !== inquiry.status) {
       await broadcastQueryStatus(ticketKey, nextStatus, { resolvedAt });
+      if (inquiry.id && inquiry.ticketId && inquiry.id !== inquiry.ticketId) {
+        await broadcastQueryStatus(inquiry.id, nextStatus, { resolvedAt });
+      }
     }
 
     return res.status(201).json({
@@ -576,6 +580,9 @@ router.patch("/:queryId/status", requireAuth, async (req: AuthenticatedRequest, 
 
     // Broadcast Realtime status event
     await broadcastQueryStatus(ticketKey, normalizedStatus, { resolvedAt });
+    if (inquiry.id && inquiry.ticketId && inquiry.id !== inquiry.ticketId) {
+      await broadcastQueryStatus(inquiry.id, normalizedStatus, { resolvedAt });
+    }
 
     return res.json({
       success: true,

@@ -1205,7 +1205,7 @@ export default function Dashboard() {
             ? {
                 ...inq,
                 reply: text,
-                status: isResolve ? "Resolved" : (inq.status || "Pending"),
+                status: isResolve ? "RESOLVED" : (inq.status || "OPEN"),
               }
             : inq
         )
@@ -1536,22 +1536,24 @@ export default function Dashboard() {
 
   const handleToggleResolveInquiry = async (inq: any) => {
     if (!inq) return;
-    const isCurrentlyResolved = (inq.status || "").toLowerCase() === "resolved" || (!!inq.reply && inq.status !== "Pending");
+    const s = (inq.status || "").toLowerCase();
+    const isCurrentlyResolved = s === "resolved" || s === "closed";
     const targetStatus = isCurrentlyResolved ? "Pending" : "Resolved";
+    const nextNormalized = isCurrentlyResolved ? "OPEN" : "RESOLVED";
     const activeKey = inq.ticketId || inq.id;
     try {
       const token = await getAuthToken();
       const currentAdminEmail = adminEmail || user?.primaryEmailAddress?.emailAddress || "veereshhp2004@gmail.com";
       // Primary DB update & realtime broadcast
-      await updateQueryStatusApi(activeKey, targetStatus === "Resolved" ? "RESOLVED" : "OPEN", token, currentAdminEmail).catch(() => {});
+      await updateQueryStatusApi(activeKey, nextNormalized, token, currentAdminEmail).catch(() => {});
       // Legacy backward-compatibility sync
       await resolveInquiryApi(inq.id, targetStatus as any, token, inq);
       
       setInquiries((prev) =>
-        prev.map((i) => (i.id === inq.id || (inq.ticketId && i.id === inq.ticketId) ? { ...i, status: targetStatus } : i))
+        prev.map((i) => (i.id === inq.id || (inq.ticketId && i.id === inq.ticketId) ? { ...i, status: nextNormalized } : i))
       );
       setToast({
-        message: targetStatus === "Resolved" ? "Inquiry conversation marked as Resolved." : "Inquiry reopened as Pending.",
+        message: !isCurrentlyResolved ? "Inquiry conversation marked as Resolved & Closed." : "Inquiry reopened as Open.",
         type: "success",
       });
       logAdminActivityApi({
@@ -2907,7 +2909,10 @@ export default function Dashboard() {
         );
 
       case "Inquiries":
-        const isResolvedInq = (inq: any) => (inq?.status || "").toLowerCase() === "resolved" || (!!inq?.reply && inq?.status !== "Pending");
+        const isResolvedInq = (inq: any) => {
+          const s = (inq?.status || "").toLowerCase();
+          return s === "resolved" || s === "closed";
+        };
 
         const pendingCount = inquiries.filter((i) => !isResolvedInq(i)).length;
         const resolvedCount = inquiries.filter((i) => isResolvedInq(i)).length;

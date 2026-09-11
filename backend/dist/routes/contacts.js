@@ -328,6 +328,9 @@ router.put("/:id/status", async (req, res) => {
             });
             const ticketKey = updated.ticketId || updated.id;
             await (0, realtime_1.broadcastQueryStatus)(ticketKey, status, { resolvedAt: updated.resolvedAt });
+            if (updated.id && updated.ticketId && updated.id !== updated.ticketId) {
+                await (0, realtime_1.broadcastQueryStatus)(updated.id, status, { resolvedAt: updated.resolvedAt });
+            }
             return res.json({
                 ...updated,
                 id: ticketKey,

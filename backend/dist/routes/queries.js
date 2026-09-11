@@ -467,10 +467,14 @@ router.post("/:queryId/messages", auth_1.requireAuth, async (req, res) => {
             senderEmail: createdMessage.senderEmail,
             message: createdMessage.message,
             createdAt: createdMessage.createdAt,
+            queryStatus: nextStatus,
         };
         await (0, realtime_1.broadcastQueryMessage)(ticketKey, messagePayload);
-        if (nextStatus !== inquiry.status) {
+        if (resolve || nextStatus !== inquiry.status) {
             await (0, realtime_1.broadcastQueryStatus)(ticketKey, nextStatus, { resolvedAt });
+            if (inquiry.id && inquiry.ticketId && inquiry.id !== inquiry.ticketId) {
+                await (0, realtime_1.broadcastQueryStatus)(inquiry.id, nextStatus, { resolvedAt });
+            }
         }
         return res.status(201).json({
             success: true,
@@ -530,6 +534,9 @@ router.patch("/:queryId/status", auth_1.requireAuth, async (req, res) => {
         console.log(`[QUERY_STATUS] queryId=${ticketKey} oldStatus=${inquiry.status} newStatus=${normalizedStatus}`);
         // Broadcast Realtime status event
         await (0, realtime_1.broadcastQueryStatus)(ticketKey, normalizedStatus, { resolvedAt });
+        if (inquiry.id && inquiry.ticketId && inquiry.id !== inquiry.ticketId) {
+            await (0, realtime_1.broadcastQueryStatus)(inquiry.id, normalizedStatus, { resolvedAt });
+        }
         return res.json({
             success: true,
             queryId: ticketKey,

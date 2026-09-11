@@ -132,6 +132,15 @@ export default function Queries() {
               [qId]: details.messages,
             }));
           }
+          if (details && details.query && details.query.status) {
+            setInquiries((prev) =>
+              prev.map((item) =>
+                item.ticketId === qId || item.id === qId
+                  ? { ...item, status: details.query.status, reply: details.query.reply || item.reply }
+                  : item
+              )
+            );
+          }
         } catch (e) {}
       });
     } catch (e) {
@@ -185,6 +194,7 @@ export default function Queries() {
                   ...item,
                   reply: newMsg.senderRole === "ADMIN" ? newMsg.message : item.reply,
                   updatedAt: newMsg.createdAt,
+                  ...((newMsg as any).queryStatus ? { status: (newMsg as any).queryStatus } : {}),
                 };
               }
               return item;

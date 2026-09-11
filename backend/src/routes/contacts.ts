@@ -356,6 +356,9 @@ router.put("/:id/status", async (req: Request, res: Response) => {
 
       const ticketKey = updated.ticketId || updated.id;
       await broadcastQueryStatus(ticketKey, status, { resolvedAt: updated.resolvedAt });
+      if (updated.id && updated.ticketId && updated.id !== updated.ticketId) {
+        await broadcastQueryStatus(updated.id, status, { resolvedAt: updated.resolvedAt });
+      }
 
       return res.json({
         ...updated,
