@@ -12,24 +12,55 @@ const path_1 = __importDefault(require("path"));
 const router = (0, express_1.Router)();
 const ROOT_ADMIN_EMAILS = ["veereshhp2004@gmail.com", "udaykumaras34@gmail.com"];
 const PROMOTED_ADMINS_FILE = path_1.default.join(__dirname, "../../promoted_admins_db.json");
-const isUserAdmin = (email, role) => {
-    if (role === "admin")
+const isUserAdmin = async (user, headerEmail) => {
+    if (user?.role === "admin")
         return true;
-    if (!email)
-        return false;
-    const emailClean = email.toLowerCase().trim();
-    if (ROOT_ADMIN_EMAILS.includes(emailClean))
-        return true;
-    try {
-        if (fs_1.default.existsSync(PROMOTED_ADMINS_FILE)) {
-            const data = fs_1.default.readFileSync(PROMOTED_ADMINS_FILE, "utf-8");
-            const list = JSON.parse(data);
-            if (list.map((e) => e.toLowerCase().trim()).includes(emailClean)) {
-                return true;
+    const emailCandidates = [
+        user?.email,
+        headerEmail,
+    ].filter((e) => !!e && typeof e === "string");
+    for (const rawEmail of emailCandidates) {
+        const emailClean = rawEmail.toLowerCase().trim();
+        if (ROOT_ADMIN_EMAILS.includes(emailClean))
+            return true;
+        try {
+            if (fs_1.default.existsSync(PROMOTED_ADMINS_FILE)) {
+                const data = fs_1.default.readFileSync(PROMOTED_ADMINS_FILE, "utf-8");
+                const list = JSON.parse(data);
+                if (list.map((e) => e.toLowerCase().trim()).includes(emailClean)) {
+                    return true;
+                }
             }
         }
+        catch (e) { }
     }
-    catch (e) { }
+    if (user?.id) {
+        try {
+            const dbUser = await db_1.default.user.findUnique({
+                where: { id: user.id },
+            });
+            if (dbUser) {
+                if (dbUser.role === "admin")
+                    return true;
+                const dbEmailClean = (dbUser.email || "").toLowerCase().trim();
+                if (ROOT_ADMIN_EMAILS.includes(dbEmailClean))
+                    return true;
+                try {
+                    if (fs_1.default.existsSync(PROMOTED_ADMINS_FILE)) {
+                        const data = fs_1.default.readFileSync(PROMOTED_ADMINS_FILE, "utf-8");
+                        const list = JSON.parse(data);
+                        if (list.map((e) => e.toLowerCase().trim()).includes(dbEmailClean)) {
+                            return true;
+                        }
+                    }
+                }
+                catch (e) { }
+            }
+        }
+        catch (dbErr) {
+            console.warn("[QUERIES] isUserAdmin db lookup error:", dbErr);
+        }
+    }
     return false;
 };
 /**
@@ -95,8 +126,9 @@ router.get("/db-check", async (_req, res) => {
  */
 router.get("/", auth_1.requireAuth, async (req, res) => {
     const user = req.user;
-    const userEmail = (user?.email || "").toLowerCase().trim();
-    const isAdmin = isUserAdmin(userEmail, user?.role);
+    const headerEmail = req.headers["x-user-email"]?.toLowerCase().trim();
+    const userEmail = (user?.email || headerEmail || "").toLowerCase().trim();
+    const isAdmin = await isUserAdmin(user, headerEmail);
     const { status, search } = req.query;
     try {
         const where = {};
@@ -184,8 +216,9 @@ router.get("/", auth_1.requireAuth, async (req, res) => {
 router.get("/:queryId", auth_1.requireAuth, async (req, res) => {
     const { queryId } = req.params;
     const user = req.user;
-    const userEmail = (user?.email || "").toLowerCase().trim();
-    const isAdmin = isUserAdmin(userEmail, user?.role);
+    const headerEmail = req.headers["x-user-email"]?.toLowerCase().trim();
+    const userEmail = (user?.email || headerEmail || "").toLowerCase().trim();
+    const isAdmin = await isUserAdmin(user, headerEmail);
     try {
         const inquiry = await findInquiryByIdOrTicket(queryId);
         if (!inquiry) {
@@ -357,10 +390,11 @@ router.post("/", auth_1.requireAuth, async (req, res) => {
  */
 router.post("/:queryId/messages", auth_1.requireAuth, async (req, res) => {
     const { queryId } = req.params;
-    const { message, resolve = false } = req.body;
+    const { message, resolve = false, senderEmail } = req.body;
     const user = req.user;
-    const userEmail = (user?.email || "").toLowerCase().trim();
-    const isAdmin = isUserAdmin(userEmail, user?.role);
+    const headerEmail = req.headers["x-user-email"]?.toLowerCase().trim();
+    const userEmail = (user?.email || senderEmail || headerEmail || "").toLowerCase().trim();
+    const isAdmin = await isUserAdmin(user, headerEmail || senderEmail);
     if (!message || !message.trim()) {
         return res.status(400).json({ error: "Message body cannot be empty." });
     }
@@ -459,8 +493,9 @@ router.patch("/:queryId/status", auth_1.requireAuth, async (req, res) => {
     const { queryId } = req.params;
     const { status } = req.body;
     const user = req.user;
-    const userEmail = (user?.email || "").toLowerCase().trim();
-    const isAdmin = isUserAdmin(userEmail, user?.role);
+    const headerEmail = req.headers["x-user-email"]?.toLowerCase().trim();
+    const userEmail = (user?.email || headerEmail || "").toLowerCase().trim();
+    const isAdmin = await isUserAdmin(user, headerEmail);
     if (!status || !["OPEN", "PENDING", "RESOLVED", "CLOSED"].includes(status.toUpperCase())) {
         return res.status(400).json({ error: "Valid status required: OPEN, PENDING, RESOLVED, or CLOSED." });
     }
@@ -514,8 +549,9 @@ router.patch("/:queryId/status", auth_1.requireAuth, async (req, res) => {
  */
 router.delete("/all", auth_1.requireAuth, async (req, res) => {
     const user = req.user;
-    const userEmail = (user?.email || "").toLowerCase().trim();
-    const isAdmin = isUserAdmin(userEmail, user?.role);
+    const headerEmail = req.headers["x-user-email"]?.toLowerCase().trim();
+    const userEmail = (user?.email || headerEmail || "").toLowerCase().trim();
+    const isAdmin = await isUserAdmin(user, headerEmail);
     try {
         if (isAdmin) {
             const deletedMsgs = await db_1.default.queryMessage.deleteMany({});
@@ -555,8 +591,9 @@ router.delete("/all", auth_1.requireAuth, async (req, res) => {
 router.delete("/:queryId", auth_1.requireAuth, async (req, res) => {
     const { queryId } = req.params;
     const user = req.user;
-    const userEmail = (user?.email || "").toLowerCase().trim();
-    const isAdmin = isUserAdmin(userEmail, user?.role);
+    const headerEmail = req.headers["x-user-email"]?.toLowerCase().trim();
+    const userEmail = (user?.email || headerEmail || "").toLowerCase().trim();
+    const isAdmin = await isUserAdmin(user, headerEmail);
     try {
         const inquiry = await findInquiryByIdOrTicket(queryId);
         if (!inquiry) {

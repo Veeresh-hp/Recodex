@@ -1167,8 +1167,9 @@ export default function Dashboard() {
 
     try {
       const token = await getAuthToken();
+      const currentAdminEmail = adminEmail || user?.primaryEmailAddress?.emailAddress || "veereshhp2004@gmail.com";
       // 1. Send query message via primary API (persists in DB, creates QueryMessage, updates status, broadcasts Supabase Realtime)
-      const newMsg = await sendQueryMessageApi(activeKey, text, isResolve, token);
+      const newMsg = await sendQueryMessageApi(activeKey, text, isResolve, token, currentAdminEmail);
 
       // Also call legacy replyToInquiry to ensure local storage caches / Google sheets webhook receive it
       if (isResolve) {
@@ -1540,8 +1541,9 @@ export default function Dashboard() {
     const activeKey = inq.ticketId || inq.id;
     try {
       const token = await getAuthToken();
+      const currentAdminEmail = adminEmail || user?.primaryEmailAddress?.emailAddress || "veereshhp2004@gmail.com";
       // Primary DB update & realtime broadcast
-      await updateQueryStatusApi(activeKey, targetStatus === "Resolved" ? "RESOLVED" : "OPEN", token).catch(() => {});
+      await updateQueryStatusApi(activeKey, targetStatus === "Resolved" ? "RESOLVED" : "OPEN", token, currentAdminEmail).catch(() => {});
       // Legacy backward-compatibility sync
       await resolveInquiryApi(inq.id, targetStatus as any, token, inq);
       

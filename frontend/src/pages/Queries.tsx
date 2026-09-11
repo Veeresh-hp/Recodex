@@ -234,7 +234,8 @@ export default function Queries() {
     setSendingReplies((prev) => ({ ...prev, [qKey]: true }));
     try {
       const token = await getToken();
-      const res = await sendQueryMessageApi(qKey, text, false, token || undefined);
+      const userEmail = user?.primaryEmailAddress?.emailAddress || inq.email;
+      const res = await sendQueryMessageApi(qKey, text, false, token || undefined, userEmail);
 
       // Optimistically append customer message
       if (res && res.message) {

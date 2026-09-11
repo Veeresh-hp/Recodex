@@ -1,5 +1,9 @@
 import { Request, Response, NextFunction } from "express";
 import { getAuth } from "@clerk/express";
+import prisma from "../config/db";
+import fs from "fs";
+import path from "path";
+import jwt from "jsonwebtoken";
 
 // Extend Express Request object to hold user details
 export interface AuthenticatedRequest extends Request {
@@ -7,18 +11,39 @@ export interface AuthenticatedRequest extends Request {
     id: string;
     email?: string;
     role?: string;
+    name?: string;
   };
 }
+
+export const ROOT_ADMIN_EMAILS = ["veereshhp2004@gmail.com", "udaykumaras34@gmail.com"];
+export const PROMOTED_ADMINS_FILE = path.join(__dirname, "../../promoted_admins_db.json");
+
+export const isGlobalAdminEmail = (email?: string): boolean => {
+  if (!email) return false;
+  const clean = email.toLowerCase().trim();
+  if (ROOT_ADMIN_EMAILS.includes(clean)) return true;
+  try {
+    if (fs.existsSync(PROMOTED_ADMINS_FILE)) {
+      const data = fs.readFileSync(PROMOTED_ADMINS_FILE, "utf-8");
+      const list: string[] = JSON.parse(data);
+      if (list.map((e) => e.toLowerCase().trim()).includes(clean)) {
+        return true;
+      }
+    }
+  } catch (e) {}
+  return false;
+};
 
 /**
  * Express middleware to enforce authentication using Clerk sessions.
  */
-export const requireAuth = (
+export const requireAuth = async (
   req: AuthenticatedRequest,
   res: Response,
   next: NextFunction
 ) => {
   const authHeader = req.headers.authorization;
+  const headerEmail = (req.headers["x-user-email"] as string)?.toLowerCase().trim();
 
   if (authHeader) {
     const token = authHeader.split(" ")[1];
@@ -58,10 +83,11 @@ export const requireAuth = (
       if (decodedStr.startsWith("{") && decodedStr.endsWith("}")) {
         const decoded = JSON.parse(decodedStr);
         if (decoded && (decoded.id || decoded.email)) {
+          const userEmail = (decoded.email || headerEmail || "").toLowerCase().trim();
           req.user = {
             id: decoded.id || "customer",
-            email: decoded.email,
-            role: decoded.role || "client",
+            email: userEmail || undefined,
+            role: decoded.role || (isGlobalAdminEmail(userEmail) ? "admin" : "client"),
           };
           return next();
         }
@@ -76,10 +102,75 @@ export const requireAuth = (
       req.user = {
         id: auth.userId,
       };
+
+      // 1. Try resolving email & role from local MongoDB
+      try {
+        const dbUser = await prisma.user.findUnique({
+          where: { id: auth.userId },
+        });
+        if (dbUser) {
+          req.user.email = dbUser.email;
+          req.user.role = dbUser.role;
+          req.user.name = dbUser.name;
+        }
+      } catch (err) {
+        console.warn("[AUTH] DB user lookup warning:", err);
+      }
+
+      // 2. Fallback: check x-user-email header if provided by client
+      if (!req.user.email && headerEmail) {
+        req.user.email = headerEmail;
+      }
+
+      // 3. Fallback: query Clerk API if email is still missing
+      if (!req.user.email && process.env.CLERK_SECRET_KEY) {
+        try {
+          const clerkRes = await fetch(`https://api.clerk.com/v1/users/${auth.userId}`, {
+            headers: {
+              Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}`,
+            },
+          });
+          if (clerkRes.ok) {
+            const clerkUser: any = await clerkRes.json();
+            const email = clerkUser.email_addresses?.[0]?.email_address;
+            if (email) {
+              req.user.email = email;
+            }
+          }
+        } catch (clerkErr) {
+          console.warn("[AUTH] Clerk API fetch warning:", clerkErr);
+        }
+      }
+
+      // 4. Elevate role if user is in root admin or promoted admin list
+      if (req.user.email && isGlobalAdminEmail(req.user.email)) {
+        req.user.role = "admin";
+      }
+
       return next();
     }
   } catch (err) {
     console.warn("[AUTH] Clerk session token verification warning:", err);
+  }
+
+  // Fallback: check if raw token has JWT payload
+  if (authHeader) {
+    const token = authHeader.split(" ")[1];
+    if (token) {
+      try {
+        const decodedJwt: any = jwt.decode(token);
+        if (decodedJwt && (decodedJwt.sub || decodedJwt.userId)) {
+          const uid = decodedJwt.sub || decodedJwt.userId;
+          const email = (decodedJwt.email || headerEmail || "").toLowerCase().trim();
+          req.user = {
+            id: uid,
+            email: email || undefined,
+            role: decodedJwt.role || (isGlobalAdminEmail(email) ? "admin" : "client"),
+          };
+          return next();
+        }
+      } catch (e) {}
+    }
   }
 
   // Only bypass for explicit admin token
@@ -97,3 +188,4 @@ export const requireAuth = (
   });
   return;
 };
+

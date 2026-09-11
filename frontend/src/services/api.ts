@@ -2115,16 +2115,27 @@ export async function createQueryApi(queryData: {
 /**
  * Sends a new message in an existing query conversation.
  */
-export async function sendQueryMessageApi(queryId: string, message: string, resolve: boolean = false, token?: string): Promise<any> {
+export async function sendQueryMessageApi(
+  queryId: string,
+  message: string,
+  resolve: boolean = false,
+  token?: string,
+  userEmail?: string
+): Promise<any> {
   const authToken = token || (typeof window !== "undefined" ? localStorage.getItem("recodex_session_token") : null) || "admin-bypass-token";
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${authToken}`,
+    "Accept": "application/json",
+  };
+  if (userEmail) {
+    headers["x-user-email"] = userEmail.trim();
+  }
+
   const res = await fetch(`${API_BASE_URL}/queries/${encodeURIComponent(queryId)}/messages`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${authToken}`,
-      "Accept": "application/json",
-    },
-    body: JSON.stringify({ message, resolve }),
+    headers,
+    body: JSON.stringify({ message, resolve, senderEmail: userEmail }),
   });
 
   if (!res.ok) {
@@ -2138,15 +2149,25 @@ export async function sendQueryMessageApi(queryId: string, message: string, reso
 /**
  * Updates query status (e.g. "RESOLVED", "OPEN", "CLOSED").
  */
-export async function updateQueryStatusApi(queryId: string, status: string, token?: string): Promise<any> {
+export async function updateQueryStatusApi(
+  queryId: string,
+  status: string,
+  token?: string,
+  userEmail?: string
+): Promise<any> {
   const authToken = token || (typeof window !== "undefined" ? localStorage.getItem("recodex_session_token") : null) || "admin-bypass-token";
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${authToken}`,
+    "Accept": "application/json",
+  };
+  if (userEmail) {
+    headers["x-user-email"] = userEmail.trim();
+  }
+
   const res = await fetch(`${API_BASE_URL}/queries/${encodeURIComponent(queryId)}/status`, {
     method: "PATCH",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${authToken}`,
-      "Accept": "application/json",
-    },
+    headers,
     body: JSON.stringify({ status }),
   });
 
@@ -2157,5 +2178,6 @@ export async function updateQueryStatusApi(queryId: string, status: string, toke
 
   return await res.json();
 }
+
 
 
