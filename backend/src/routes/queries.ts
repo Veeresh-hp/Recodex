@@ -205,7 +205,17 @@ router.get("/", requireAuth, async (req: AuthenticatedRequest, res: Response) =>
       latestMessage: q.messages?.[0] || null,
     }));
 
-    return res.json(formatted);
+    const sorted = formatted.sort((a: any, b: any) => {
+      const isResolvedA = (a.status || "").toUpperCase() === "RESOLVED" || (a.status || "").toUpperCase() === "CLOSED";
+      const isResolvedB = (b.status || "").toUpperCase() === "RESOLVED" || (b.status || "").toUpperCase() === "CLOSED";
+      if (!isResolvedA && isResolvedB) return -1;
+      if (isResolvedA && !isResolvedB) return 1;
+      const timeA = new Date(a.updatedAt || a.createdAt || 0).getTime();
+      const timeB = new Date(b.updatedAt || b.createdAt || 0).getTime();
+      return timeB - timeA;
+    });
+
+    return res.json(sorted);
   } catch (error) {
     console.error("[QUERIES] Error retrieving queries:", error);
     return res.status(500).json({ error: "Failed to retrieve support queries." });

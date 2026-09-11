@@ -98,13 +98,25 @@ router.get("/", async (req, res) => {
             where,
             orderBy: { createdAt: "desc" },
         });
-        const formatted = inquiries.map((inq) => ({
+        const formatted = inquiries
+            .map((inq) => ({
             ...inq,
             id: inq.ticketId || inq.id,
             dbId: inq.id,
             ticketId: inq.ticketId || inq.id,
             status: inq.status || (inq.reply ? "Resolved" : "Pending"),
-        }));
+        }))
+            .sort((a, b) => {
+            const isResolvedA = (a.status || "").toLowerCase() === "resolved" || (a.status || "").toLowerCase() === "closed";
+            const isResolvedB = (b.status || "").toLowerCase() === "resolved" || (b.status || "").toLowerCase() === "closed";
+            if (!isResolvedA && isResolvedB)
+                return -1;
+            if (isResolvedA && !isResolvedB)
+                return 1;
+            const timeA = new Date(a.createdAt || a.date || 0).getTime();
+            const timeB = new Date(b.createdAt || b.date || 0).getTime();
+            return timeB - timeA;
+        });
         return res.json(formatted);
     }
     catch (error) {

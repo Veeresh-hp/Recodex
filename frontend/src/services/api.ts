@@ -948,8 +948,12 @@ export async function getInquiries(token?: string, email?: string): Promise<any[
   });
 
   return uniqueList.sort((a, b) => {
-    const timeA = new Date(a.createdAt || a.timestamp || 0).getTime();
-    const timeB = new Date(b.createdAt || b.timestamp || 0).getTime();
+    const isResolvedA = (a.status || "").toLowerCase() === "resolved" || (a.status || "").toLowerCase() === "closed";
+    const isResolvedB = (b.status || "").toLowerCase() === "resolved" || (b.status || "").toLowerCase() === "closed";
+    if (!isResolvedA && isResolvedB) return -1;
+    if (isResolvedA && !isResolvedB) return 1;
+    const timeA = new Date(a.createdAt || a.timestamp || a.date || 0).getTime();
+    const timeB = new Date(b.createdAt || b.timestamp || b.date || 0).getTime();
     return timeB - timeA;
   });
 }

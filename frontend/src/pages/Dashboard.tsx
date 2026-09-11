@@ -627,11 +627,21 @@ export default function Dashboard() {
     try {
       const data = await getInquiries();
       if (Array.isArray(data)) {
-        setInquiries((prev) => {
-          if (JSON.stringify(prev) === JSON.stringify(data)) return prev;
-          return data;
+        const isResolved = (i: any) => (i?.status || "").toLowerCase() === "resolved" || (i?.status || "").toLowerCase() === "closed";
+        const sorted = [...data].sort((a, b) => {
+          const aRes = isResolved(a);
+          const bRes = isResolved(b);
+          if (!aRes && bRes) return -1;
+          if (aRes && !bRes) return 1;
+          const timeA = new Date(a.createdAt || a.timestamp || a.date || 0).getTime();
+          const timeB = new Date(b.createdAt || b.timestamp || b.date || 0).getTime();
+          return timeB - timeA;
         });
-        if (data.length === 0) {
+        setInquiries((prev) => {
+          if (JSON.stringify(prev) === JSON.stringify(sorted)) return prev;
+          return sorted;
+        });
+        if (sorted.length === 0) {
           setActiveInquiryMessages([]);
           setSelectedInquiryId(null);
         }
@@ -2989,13 +2999,28 @@ export default function Dashboard() {
         const pendingCount = inquiries.filter((i) => !isResolvedInq(i)).length;
         const resolvedCount = inquiries.filter((i) => isResolvedInq(i)).length;
 
-        const filteredInquiries = inquiries.filter((inq) => {
-          if (inquiryStatusFilter === "Pending") return !isResolvedInq(inq);
-          if (inquiryStatusFilter === "Resolved") return isResolvedInq(inq);
-          return true;
-        });
+        const filteredInquiries = inquiries
+          .filter((inq) => {
+            if (inquiryStatusFilter === "Pending") return !isResolvedInq(inq);
+            if (inquiryStatusFilter === "Resolved") return isResolvedInq(inq);
+            return true;
+          })
+          .sort((a, b) => {
+            const aResolved = isResolvedInq(a);
+            const bResolved = isResolvedInq(b);
+            // Always show pending inquiries first
+            if (!aResolved && bResolved) return -1;
+            if (aResolved && !bResolved) return 1;
+            const timeA = new Date(a.createdAt || a.timestamp || a.date || 0).getTime();
+            const timeB = new Date(b.createdAt || b.timestamp || b.date || 0).getTime();
+            return timeB - timeA;
+          });
 
-        const activeInquiry = filteredInquiries.find((i) => i.id === selectedInquiryId) || filteredInquiries[0] || inquiries[0];
+        const activeInquiry =
+          filteredInquiries.find((i) => i.id === selectedInquiryId) ||
+          filteredInquiries.find((i) => !isResolvedInq(i)) ||
+          filteredInquiries[0] ||
+          inquiries[0];
         const isActiveResolved = activeInquiry ? isResolvedInq(activeInquiry) : false;
 
         return (

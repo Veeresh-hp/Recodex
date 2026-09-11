@@ -380,19 +380,29 @@ export default function Queries() {
     return s === "resolved" || s === "closed";
   };
 
-  const filteredInquiries = inquiries.filter((inq) => {
-    const matchesSearch =
-      (inq.subject && inq.subject.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (inq.message && inq.message.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (inq.id && inq.id.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (inq.ticketId && inq.ticketId.toLowerCase().includes(searchQuery.toLowerCase()));
+  const filteredInquiries = inquiries
+    .filter((inq) => {
+      const matchesSearch =
+        (inq.subject && inq.subject.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (inq.message && inq.message.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (inq.id && inq.id.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (inq.ticketId && inq.ticketId.toLowerCase().includes(searchQuery.toLowerCase()));
 
-    if (statusFilter === "ALL") return matchesSearch;
-    const resolved = isResolvedStatus(inq.status);
-    if (statusFilter === "Resolved") return matchesSearch && resolved;
-    if (statusFilter === "Pending") return matchesSearch && !resolved;
-    return matchesSearch;
-  });
+      if (statusFilter === "ALL") return matchesSearch;
+      const resolved = isResolvedStatus(inq.status);
+      if (statusFilter === "Resolved") return matchesSearch && resolved;
+      if (statusFilter === "Pending") return matchesSearch && !resolved;
+      return matchesSearch;
+    })
+    .sort((a, b) => {
+      const aResolved = isResolvedStatus(a.status);
+      const bResolved = isResolvedStatus(b.status);
+      if (!aResolved && bResolved) return -1;
+      if (aResolved && !bResolved) return 1;
+      const timeA = new Date(a.updatedAt || a.createdAt || 0).getTime();
+      const timeB = new Date(b.updatedAt || b.createdAt || 0).getTime();
+      return timeB - timeA;
+    });
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col font-sans select-none relative overflow-hidden">
