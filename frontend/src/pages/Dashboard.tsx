@@ -273,7 +273,7 @@ export default function Dashboard() {
   const [replyText, setReplyText] = useState("");
   const [submittingReply, setSubmittingReply] = useState(false);
   const [selectedInquiryId, setSelectedInquiryId] = useState<string | null>(null);
-  const [inquiryStatusFilter, setInquiryStatusFilter] = useState<"All" | "Pending" | "Resolved">("All");
+  const [inquiryStatusFilter, setInquiryStatusFilter] = useState<"All" | "Pending" | "Resolved">("Pending");
   const [activeInquiryMessages, setActiveInquiryMessages] = useState<QueryMessageItem[]>([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
 
@@ -1973,7 +1973,11 @@ export default function Dashboard() {
 
                 return (
                   <div 
-                    onClick={() => setActiveSidebarTab("Inquiries")}
+                    onClick={() => {
+                      setInquiryStatusFilter("Pending");
+                      setSelectedInquiryId(null);
+                      setActiveSidebarTab("Inquiries");
+                    }}
                     className={`glass-card p-6 hover-lift flex flex-col justify-between min-h-[140px] relative overflow-hidden group border rounded-2xl cursor-pointer transition-all ${
                       hasPending 
                         ? "border-amber-500/30 bg-amber-500/5 hover:border-amber-500/60" 
@@ -3063,18 +3067,10 @@ export default function Dashboard() {
             {/* Filter Pills */}
             <div className="flex items-center gap-2 pb-2">
               <button
-                onClick={() => setInquiryStatusFilter("All")}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer flex items-center gap-2 border ${
-                  inquiryStatusFilter === "All"
-                    ? "bg-primary/15 dark:bg-[#00d1ff]/15 text-primary dark:text-[#00d1ff] border-primary/30 dark:border-[#00d1ff]/30 shadow-sm"
-                    : "bg-black/5 dark:bg-white/5 text-zinc-400 border-transparent hover:text-foreground"
-                }`}
-              >
-                <span>All Queries</span>
-                <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-black/10 dark:bg-white/10">{inquiries.length}</span>
-              </button>
-              <button
-                onClick={() => setInquiryStatusFilter("Pending")}
+                onClick={() => {
+                  setInquiryStatusFilter("Pending");
+                  setSelectedInquiryId(null);
+                }}
                 className={`px-3.5 py-1.5 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer flex items-center gap-2 border ${
                   inquiryStatusFilter === "Pending"
                     ? "bg-amber-500/15 text-amber-500 border-amber-500/30 shadow-sm"
@@ -3086,7 +3082,10 @@ export default function Dashboard() {
                 <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-500/10 text-amber-500">{pendingCount}</span>
               </button>
               <button
-                onClick={() => setInquiryStatusFilter("Resolved")}
+                onClick={() => {
+                  setInquiryStatusFilter("Resolved");
+                  setSelectedInquiryId(null);
+                }}
                 className={`px-3.5 py-1.5 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer flex items-center gap-2 border ${
                   inquiryStatusFilter === "Resolved"
                     ? "bg-emerald-500/15 text-emerald-500 border-emerald-500/30 shadow-sm"
@@ -3096,6 +3095,20 @@ export default function Dashboard() {
                 <CheckCircle2 size={13} />
                 <span>Resolved</span>
                 <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-500/10 text-emerald-500">{resolvedCount}</span>
+              </button>
+              <button
+                onClick={() => {
+                  setInquiryStatusFilter("All");
+                  setSelectedInquiryId(null);
+                }}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer flex items-center gap-2 border ${
+                  inquiryStatusFilter === "All"
+                    ? "bg-primary/15 dark:bg-[#00d1ff]/15 text-primary dark:text-[#00d1ff] border-primary/30 dark:border-[#00d1ff]/30 shadow-sm"
+                    : "bg-black/5 dark:bg-white/5 text-zinc-400 border-transparent hover:text-foreground"
+                }`}
+              >
+                <span>All Queries</span>
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-black/10 dark:bg-white/10">{inquiries.length}</span>
               </button>
             </div>
 
@@ -3107,9 +3120,21 @@ export default function Dashboard() {
             ) : filteredInquiries.length === 0 ? (
               <div className="glass-card p-12 text-center text-zinc-450 border border-dashed border-outline-variant/40 rounded-2xl">
                 <span className="material-symbols-outlined text-[48px] text-zinc-650 mb-2">question_answer</span>
-                <p className="text-xs font-mono uppercase tracking-wider">
+                <p className="text-xs font-mono uppercase tracking-wider mb-2">
                   No {inquiryStatusFilter !== "All" ? inquiryStatusFilter.toLowerCase() : ""} inquiries found.
                 </p>
+                {inquiryStatusFilter === "Pending" && resolvedCount > 0 && (
+                  <button
+                    onClick={() => {
+                      setInquiryStatusFilter("Resolved");
+                      setSelectedInquiryId(null);
+                    }}
+                    className="mt-2 px-3.5 py-1.5 rounded-xl text-xs font-mono font-bold text-emerald-500 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 transition-all cursor-pointer inline-flex items-center gap-1.5"
+                  >
+                    <CheckCircle2 size={13} />
+                    <span>View {resolvedCount} Resolved {resolvedCount === 1 ? "Inquiry" : "Inquiries"}</span>
+                  </button>
+                )}
               </div>
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-gutter items-start">
@@ -4041,6 +4066,10 @@ export default function Dashboard() {
               <button 
                 key={item.label}
                 onClick={() => {
+                  if (item.label === "Inquiries") {
+                    setInquiryStatusFilter("Pending");
+                    setSelectedInquiryId(null);
+                  }
                   setActiveSidebarTab(item.label);
                   setIsMobileMenuOpen(false);
                 }}
@@ -4060,6 +4089,8 @@ export default function Dashboard() {
         <div className="p-3 border-t border-zinc-200/80 dark:border-white/5 space-y-1 bg-zinc-50/80 dark:bg-white/[0.02]">
           <button 
             onClick={() => {
+              setInquiryStatusFilter("Pending");
+              setSelectedInquiryId(null);
               setActiveSidebarTab("Inquiries");
               setIsMobileMenuOpen(false);
             }} 
@@ -4131,7 +4162,14 @@ export default function Dashboard() {
                 <span className="material-symbols-outlined text-[18px] sm:text-[20px]">notifications</span>
                 <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full animate-pulse"></span>
               </button>
-              <button onClick={() => setActiveSidebarTab("Inquiries")} className="p-1.5 sm:p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer">
+              <button 
+                onClick={() => {
+                  setInquiryStatusFilter("Pending");
+                  setSelectedInquiryId(null);
+                  setActiveSidebarTab("Inquiries");
+                }} 
+                className="p-1.5 sm:p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
+              >
                 <span className="material-symbols-outlined text-[18px] sm:text-[20px]">mail</span>
               </button>
               <button onClick={toggleTheme} className="p-1.5 sm:p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer">

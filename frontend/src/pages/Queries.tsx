@@ -83,7 +83,7 @@ export default function Queries() {
   const [messagesMap, setMessagesMap] = useState<Record<string, QueryMessageItem[]>>({});
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState(queryParamId || "");
-  const [statusFilter, setStatusFilter] = useState<"ALL" | "Pending" | "Resolved">("ALL");
+  const [statusFilter, setStatusFilter] = useState<"ALL" | "Pending" | "Resolved">("Pending");
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   // Per-ticket customer reply text state
@@ -489,7 +489,7 @@ export default function Queries() {
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <Filter size={14} className="text-zinc-500" />
             <div className="flex items-center p-1 rounded-xl bg-black/5 dark:bg-zinc-900/60 border border-black/10 dark:border-zinc-800 text-xs font-mono">
-              {(["ALL", "Pending", "Resolved"] as const).map((tab) => (
+              {(["Pending", "Resolved", "ALL"] as const).map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setStatusFilter(tab)}
@@ -525,6 +525,14 @@ export default function Queries() {
                 ? `You have no ${statusFilter.toLowerCase()} queries matching your filter.`
                 : "Need technical guidance or certificate issuance? Click Open Support Ticket above."}
             </p>
+            {statusFilter === "Pending" && inquiries.some((i) => isResolvedStatus(i.status)) && (
+              <button
+                onClick={() => setStatusFilter("Resolved")}
+                className="px-4 py-2 rounded-xl text-xs font-mono font-bold text-amber-500 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 transition-all cursor-pointer inline-flex items-center gap-2"
+              >
+                <span>View Resolved Tickets</span>
+              </button>
+            )}
           </div>
         ) : (
           <div className="space-y-6">
