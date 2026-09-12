@@ -38,7 +38,7 @@ const API_BASE_URL = getApiBaseUrl();
  * @param category - Optional category filter
  * @param search - Optional search query string
  */
-export async function getProjects(category?: string, search?: string): Promise<Project[]> {
+export async function getProjects(category?: string, search?: string, admin?: boolean): Promise<any[]> {
   try {
     const url = new URL(`${API_BASE_URL}/projects`, typeof window !== "undefined" ? window.location.origin : undefined);
     if (category) {
@@ -46,6 +46,9 @@ export async function getProjects(category?: string, search?: string): Promise<P
     }
     if (search) {
       url.searchParams.append("search", search);
+    }
+    if (admin) {
+      url.searchParams.append("admin", "true");
     }
 
     const controller = new AbortController();
@@ -66,14 +69,25 @@ export async function getProjects(category?: string, search?: string): Promise<P
 
     const data = await response.json();
     
-    // Map backend response fields to frontend format (imageUrl -> image)
+    // If backend returns empty array, fall back to MOCK_PROJECTS so older 50 projects are never lost
+    if (!Array.isArray(data) || data.length === 0) {
+      let fallback = [...MOCK_PROJECTS];
+      if (category) fallback = fallback.filter((p) => p.category === category);
+      if (search) {
+        const query = search.toLowerCase();
+        fallback = fallback.filter(p => p.title.toLowerCase().includes(query) || p.description.toLowerCase().includes(query));
+      }
+      return fallback;
+    }
+
+    // Map backend response fields to frontend format (imageUrl -> image) preserving assignment fields
     return data.map((item: any) => ({
       id: item.id,
       dir: MOCK_PROJECTS.find((m) => m.id === item.id)?.dir || item.dir || item.id,
       title: item.title,
       description: item.description,
       longDescription: item.longDescription,
-      status: item.status,
+      status: item.status || "Active",
       image: item.imageUrl || item.image,
       category: item.category,
       tags: item.tags,
@@ -81,6 +95,19 @@ export async function getProjects(category?: string, search?: string): Promise<P
       stars: item.stars,
       forks: item.forks,
       files: item.files,
+      assignedEmail: item.assignedEmail || item.assignments?.[0]?.user?.email || null,
+      assignedUserId: item.assignedUserId || item.assignments?.[0]?.userId || null,
+      assignedUserName: item.assignedUserName || item.assignments?.[0]?.user?.name || null,
+      repoUrl: item.repoUrl,
+      liveUrl: item.liveUrl,
+      progress: item.progress !== null && item.progress !== undefined ? item.progress : (item.assignments?.[0]?.progress ?? 0),
+      startDate: item.startDate,
+      expectedDate: item.expectedDate,
+      contractId: item.contractId,
+      isPrivate: item.isPrivate,
+      createdAt: item.createdAt,
+      updatedAt: item.updatedAt,
+      assignments: item.assignments,
     }));
   } catch (error) {
     console.warn("[RECODEX API] Local server unreachable. Reverting to static network mock nodes.", error);
@@ -96,7 +123,7 @@ export async function getProjects(category?: string, search?: string): Promise<P
         (p) =>
           p.title.toLowerCase().includes(query) ||
           p.description.toLowerCase().includes(query) ||
-          p.tags.some((t) => t.toLowerCase().includes(query))
+          p.tags.some((tag) => tag.toLowerCase().includes(query))
       );
     }
     return results;
@@ -2222,8 +2249,8 @@ export async function createProjectApi(
     milestones?: any[];
     deliverables?: string[];
   },
-  token?: string,
-  userEmail?: string
+  token?: string | null,
+  userEmail?: string | null
 ): Promise<any> {
   const authToken = token || (typeof window !== "undefined" ? localStorage.getItem("recodex_session_token") : null) || "admin-bypass-token";
   const headers: Record<string, string> = {
@@ -2250,9 +2277,55 @@ export async function createProjectApi(
 }
 
 /**
+ * Admin: Updates project status, timeline (expectedDate, days), progress, or assignment fields.
+ */
+export async function updateProjectStatusApi(
+  projectId: string,
+  updateData: {
+    status?: string;
+    progress?: number;
+    expectedDate?: string;
+    startDate?: string;
+    assignedEmail?: string;
+    assignedUserId?: string;
+    assignedUserName?: string;
+    repoUrl?: string;
+    liveUrl?: string;
+    title?: string;
+    category?: string;
+    isPrivate?: boolean;
+  },
+  token?: string | null,
+  userEmail?: string | null
+): Promise<any> {
+  const authToken = token || (typeof window !== "undefined" ? localStorage.getItem("recodex_session_token") : null) || "admin-bypass-token";
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${authToken}`,
+    "Accept": "application/json",
+  };
+  if (userEmail) {
+    headers["x-user-email"] = userEmail.trim();
+  }
+
+  const res = await fetch(`${API_BASE_URL}/projects/${projectId}`, {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify(updateData),
+  });
+
+  if (!res.ok) {
+    const errData = await res.json().catch(() => ({}));
+    throw new Error(errData.error || `Failed to update project: ${res.status}`);
+  }
+
+  return await res.json();
+}
+
+/**
  * User / Client Space: Fetches client projects strictly allotted to the authenticated user/email, or all for admin.
  */
-export async function getMyProjectsApi(token?: string, userEmail?: string): Promise<any[]> {
+export async function getMyProjectsApi(token?: string | null, userEmail?: string | null): Promise<any[]> {
   const authToken = token || (typeof window !== "undefined" ? localStorage.getItem("recodex_session_token") : null) || "dev-bypass-token";
   const headers: Record<string, string> = {
     "Authorization": `Bearer ${authToken}`,

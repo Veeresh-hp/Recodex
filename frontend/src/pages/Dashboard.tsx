@@ -7,19 +7,21 @@ import {
   Settings as SettingsIcon, Users, BarChart3, 
   Trash2, Plus, Edit3, Globe,
   AlertTriangle, Search, FileText, CheckCircle, Award, XCircle, RefreshCw, Send, Menu, X,
-  Mail, MessageSquare, Upload, Download, Eye, FileUp, PlusCircle, Calendar, Slash, CheckCircle2, HelpCircle, Clock, ShieldCheck, Lock
+  Mail, MessageSquare, Upload, Download, Eye, FileUp, PlusCircle, Calendar, Slash, CheckCircle2, HelpCircle, Clock, ShieldCheck, Lock,
+  Sliders, Sparkles, UserCheck, Flame, ExternalLink
 } from "lucide-react";
 import { useAuth, useUser, useClerk } from "@clerk/clerk-react";
 import Chart from "chart.js/auto";
 import { 
   getProjects, getUsers, updateUser, deleteUser, 
-  updateProject, deleteProject, createProjectApi, getInquiries, 
+  updateProject, deleteProject, createProjectApi, updateProjectStatusApi, getInquiries, 
   deleteInquiry, replyToInquiry, resolveInquiryApi, getUserProfile,
   getCertificatesApi, saveCertificateApi, deleteCertificateApi, approveCertificateApi,
   getPromotedAdminsApi, getAuditLogsApi, logAdminActivityApi,
   getQueryDetailsApi, sendQueryMessageApi, updateQueryStatusApi, clearAllInquiriesApi, QueryMessageItem,
   AuditLogEntry
 } from "../services/api";
+import { MOCK_PROJECTS } from "../data/mockData";
 import { subscribeToQuery, subscribeToGlobalQueriesFeed } from "../services/realtime";
 import { useTheme } from "../context/ThemeContext";
 
@@ -360,6 +362,17 @@ export default function Dashboard() {
   const [projectSearch, setProjectSearch] = useState("");
   const [projectStatusFilter, setProjectStatusFilter] = useState("All");
   const [projectSortBy, setProjectSortBy] = useState<string>("default");
+  const [projectTabFilter, setProjectTabFilter] = useState<"all" | "assigned">("all");
+
+  // Project control modal states
+  const [editingProjectControl, setEditingProjectControl] = useState<any | null>(null);
+  const [controlStatus, setControlStatus] = useState("Active");
+  const [controlProgress, setControlProgress] = useState(10);
+  const [controlDaysRemaining, setControlDaysRemaining] = useState(30);
+  const [controlExpectedDate, setControlExpectedDate] = useState("");
+  const [controlAssignedEmail, setControlAssignedEmail] = useState("");
+  const [controlAssignedUserName, setControlAssignedUserName] = useState("");
+  const [isSavingProjectControl, setIsSavingProjectControl] = useState(false);
 
   const [categories, setCategories] = useState<string[]>(() => {
     const stored = localStorage.getItem("recodex_global_categories");
@@ -626,16 +639,137 @@ export default function Dashboard() {
     }
   };
 
-  // Fetch real projects directly from backend API
+  // Fetch real projects directly from backend API with fallback
   const fetchProjects = async () => {
     setProjectsLoading(true);
     try {
-      const data = await getProjects();
-      setDbProjects(data);
+      const data = await getProjects(undefined, undefined, true);
+      if (Array.isArray(data) && data.length > 0) {
+        setDbProjects(data);
+      } else {
+        setDbProjects(MOCK_PROJECTS);
+      }
     } catch (err) {
       console.log("[RECODEX ERROR] Backend project fetch failed:", err);
+      setDbProjects(MOCK_PROJECTS);
     } finally {
       setProjectsLoading(false);
+    }
+  };
+
+  // Helper: Checks if project was created in the last 48 hours
+  const isNewProject = (createdAt?: string | Date) => {
+    if (!createdAt) return false;
+    const createdTime = new Date(createdAt).getTime();
+    if (isNaN(createdTime)) return false;
+    const diffHours = (Date.now() - createdTime) / (1000 * 60 * 60);
+    return diffHours >= 0 && diffHours <= 48;
+  };
+
+  // Helper: Gets remaining hours for the 48h NEW badge
+  const getRemainingNewHours = (createdAt?: string | Date) => {
+    if (!createdAt) return 0;
+    const createdTime = new Date(createdAt).getTime();
+    if (isNaN(createdTime)) return 0;
+    const diffHours = (Date.now() - createdTime) / (1000 * 60 * 60);
+    return Math.max(1, Math.round(48 - diffHours));
+  };
+
+  // Helper: Computes remaining days until expected date
+  const calculateDaysRemaining = (expectedDate?: string, createdAt?: string) => {
+    if (expectedDate) {
+      const expTime = new Date(expectedDate).getTime();
+      if (!isNaN(expTime)) {
+        return Math.ceil((expTime - Date.now()) / (1000 * 60 * 60 * 24));
+      }
+    }
+    const createdTime = createdAt ? new Date(createdAt).getTime() : Date.now();
+    const defaultExp = createdTime + 30 * 24 * 60 * 60 * 1000;
+    return Math.ceil((defaultExp - Date.now()) / (1000 * 60 * 60 * 24));
+  };
+
+  // Quick status modifier
+  const handleQuickStatusChange = async (projectId: string, newStatus: string) => {
+    setDbProjects((prev) => prev.map((p) => p.id === projectId ? { ...p, status: newStatus } : p));
+    try {
+      const token = await getToken();
+      await updateProjectStatusApi(projectId, { status: newStatus }, token, adminEmail);
+    } catch (err) {
+      console.error("Failed to update project status:", err);
+    }
+  };
+
+  // Quick days adjust (+/- delta days)
+  const handleAdjustProjectDays = async (p: any, deltaDays: number) => {
+    const currentDays = calculateDaysRemaining(p.expectedDate, p.createdAt);
+    const targetDays = Math.max(1, currentDays + deltaDays);
+    const targetDate = new Date(Date.now() + targetDays * 24 * 60 * 60 * 1000).toISOString();
+
+    setDbProjects((prev) => prev.map((item) => item.id === p.id ? { ...item, expectedDate: targetDate } : item));
+    try {
+      const token = await getToken();
+      await updateProjectStatusApi(p.id, { expectedDate: targetDate }, token, adminEmail);
+    } catch (err) {
+      console.error("Failed to update project deadline:", err);
+    }
+  };
+
+  // Open Project Controls Modal
+  const openProjectControlsModal = (p: any) => {
+    setEditingProjectControl(p);
+    setControlStatus(p.status || "Active");
+    setControlProgress(p.progress !== undefined && p.progress !== null ? p.progress : 10);
+    const days = calculateDaysRemaining(p.expectedDate, p.createdAt);
+    setControlDaysRemaining(days);
+    if (p.expectedDate) {
+      try {
+        const d = new Date(p.expectedDate);
+        if (!isNaN(d.getTime())) {
+          setControlExpectedDate(d.toISOString().split("T")[0]);
+        } else {
+          setControlExpectedDate("");
+        }
+      } catch {
+        setControlExpectedDate("");
+      }
+    } else {
+      const d = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+      setControlExpectedDate(d.toISOString().split("T")[0]);
+    }
+    setControlAssignedEmail(p.assignedEmail || p.assignments?.[0]?.user?.email || "");
+    setControlAssignedUserName(p.assignedUserName || p.assignments?.[0]?.user?.name || "");
+  };
+
+  // Save Project Controls from Modal
+  const handleSaveProjectControls = async () => {
+    if (!editingProjectControl) return;
+    setIsSavingProjectControl(true);
+    try {
+      const token = await getToken();
+      const updatedExpDate = controlExpectedDate 
+        ? new Date(controlExpectedDate).toISOString() 
+        : new Date(Date.now() + controlDaysRemaining * 24 * 60 * 60 * 1000).toISOString();
+
+      const payload = {
+        status: controlStatus,
+        progress: Number(controlProgress),
+        expectedDate: updatedExpDate,
+        assignedEmail: controlAssignedEmail.trim() || undefined,
+        assignedUserName: controlAssignedUserName.trim() || undefined,
+      };
+
+      await updateProjectStatusApi(editingProjectControl.id, payload, token, adminEmail);
+
+      setDbProjects((prev) => prev.map((p) => p.id === editingProjectControl.id ? {
+        ...p,
+        ...payload,
+      } : p));
+
+      setEditingProjectControl(null);
+    } catch (err) {
+      console.error("Failed to save project controls:", err);
+    } finally {
+      setIsSavingProjectControl(false);
     }
   };
 
@@ -1846,8 +1980,22 @@ export default function Dashboard() {
 
       const created = await createProjectApi(projectPayload, token, adminEmail);
 
+      // Ensure createdAt and assignment fields are set so 48h NEW badge immediately triggers
+      const finalizedProject = {
+        ...created,
+        createdAt: created.createdAt || new Date().toISOString(),
+        assignedEmail: assignedEmailVal,
+        assignedUserId: assignedUserIdVal,
+        assignedUserName: assignedUserNameVal,
+      };
+
       // Optimistically add to dbProjects
-      setDbProjects((prev) => [created, ...prev]);
+      setDbProjects((prev) => [finalizedProject, ...prev]);
+
+      // If project is assigned, automatically switch to "assigned" tab to view it
+      if (assignedEmailVal || assignedUserIdVal) {
+        setProjectTabFilter("assigned");
+      }
 
       // If assigned, also update local client storage snapshot for instant availability
       try {
@@ -2846,10 +2994,31 @@ export default function Dashboard() {
         );
 
       case "Projects":
-        const filteredProjects = dbProjects.filter((p) => {
-          if (softDeletedProjectIds.includes(p.id)) return false;
-          const matchesQuery = p.title.toLowerCase().includes(projectSearch.toLowerCase()) || 
-                               (p.category && p.category.toLowerCase().includes(projectSearch.toLowerCase()));
+        const isProjectAssigned = (p: any) => {
+          return Boolean(
+            (p.assignedEmail && String(p.assignedEmail).trim() !== "") ||
+            (p.assignedUserId && String(p.assignedUserId).trim() !== "") ||
+            (p.assignments && p.assignments.length > 0) ||
+            (p.devs && p.devs.length > 0) ||
+            p.contractId
+          );
+        };
+
+        const totalActiveProjects = dbProjects.filter((p) => !softDeletedProjectIds.includes(p.id));
+        const allAssignedProjectsCount = totalActiveProjects.filter(isProjectAssigned).length;
+        const allProjectsCount = totalActiveProjects.length;
+
+        const filteredProjects = totalActiveProjects.filter((p) => {
+          if (projectTabFilter === "assigned" && !isProjectAssigned(p)) {
+            return false;
+          }
+          const q = projectSearch.toLowerCase().trim();
+          const matchesQuery = !q || 
+            (p.title || "").toLowerCase().includes(q) || 
+            (p.category && p.category.toLowerCase().includes(q)) ||
+            (p.assignedEmail && p.assignedEmail.toLowerCase().includes(q)) ||
+            (p.assignedUserName && p.assignedUserName.toLowerCase().includes(q)) ||
+            (p.id && p.id.toLowerCase().includes(q));
           const matchesStatus = projectStatusFilter === "All" ? true : p.status === projectStatusFilter;
           return matchesQuery && matchesStatus;
         }).sort((a, b) => {
@@ -2858,6 +3027,11 @@ export default function Dashboard() {
           if (projectSortBy === "category_asc") return (a.category || "").localeCompare(b.category || "");
           if (projectSortBy === "stars_desc") return ((b.stars || 0) + (b.forks || 0)) - ((a.stars || 0) + (a.forks || 0));
           if (projectSortBy === "status_asc") return (a.status || "").localeCompare(b.status || "");
+          if (projectSortBy === "newest") {
+            const timeA = new Date(a.createdAt || 0).getTime();
+            const timeB = new Date(b.createdAt || 0).getTime();
+            return timeB - timeA;
+          }
           return 0;
         });
 
@@ -2869,29 +3043,71 @@ export default function Dashboard() {
         };
 
         return (
-          <div className="bg-white dark:bg-[#07090e] border border-zinc-200 dark:border-zinc-800/80 rounded-2xl p-6 sm:p-8 space-y-6 shadow-xs transition-colors duration-300">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div className="bg-white dark:bg-[#07090e] border border-zinc-200 dark:border-zinc-800/80 rounded-2xl p-6 sm:p-8 space-y-6 shadow-xs transition-colors duration-300 select-text">
+            {/* Header & Main Toggle */}
+            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 border-b border-zinc-200/80 dark:border-zinc-800/80 pb-5">
               <div>
-                <h3 className="text-lg font-bold text-foreground dark:text-white font-sans font-extrabold uppercase">Project Management</h3>
-                <p className="text-xs text-zinc-400 dark:text-zinc-500">Review, approve, assign, and mark ecosystem projects completed.</p>
+                <h3 className="text-lg font-bold text-foreground dark:text-white font-sans font-extrabold uppercase tracking-tight flex items-center gap-2">
+                  <span>Project Management</span>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-primary/10 text-primary dark:text-[#00d1ff] border border-primary/20">
+                    Live Control
+                  </span>
+                </h3>
+                <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">
+                  Full governance over ecosystem projects, client allotments, deadlines, and delivery statuses.
+                </p>
               </div>
 
-              {/* Filters & Search & Sort */}
-              <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
+              {/* Projects vs Assigned Projects Toggle Tabs */}
+              <div className="flex items-center gap-2 p-1 bg-zinc-100 dark:bg-zinc-900/90 border border-zinc-200 dark:border-zinc-800/80 rounded-xl shrink-0">
                 <button
-                  onClick={() => setShowCreateProjectModal(true)}
-                  className="px-3.5 py-1.5 bg-primary dark:bg-[#00d1ff] text-white dark:text-black rounded-lg text-xs font-mono font-bold hover:brightness-110 active:scale-95 transition-all flex items-center gap-1.5 shrink-0 cursor-pointer shadow-sm"
+                  type="button"
+                  onClick={() => setProjectTabFilter("all")}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                    projectTabFilter === "all"
+                      ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-sm border border-zinc-200/80 dark:border-zinc-700"
+                      : "text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200"
+                  }`}
                 >
-                  <Plus size={13} />
-                  <span>Create Project</span>
+                  <Layers size={13} className={projectTabFilter === "all" ? "text-primary dark:text-[#00d1ff]" : ""} />
+                  <span>All Projects</span>
+                  <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
+                    projectTabFilter === "all" ? "bg-primary/15 text-primary dark:text-[#00d1ff] font-extrabold" : "bg-zinc-200/60 dark:bg-zinc-800 text-zinc-400"
+                  }`}>
+                    {allProjectsCount}
+                  </span>
                 </button>
-                <div className="relative w-full md:w-48">
+
+                <button
+                  type="button"
+                  onClick={() => setProjectTabFilter("assigned")}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                    projectTabFilter === "assigned"
+                      ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-sm border border-zinc-200/80 dark:border-zinc-700"
+                      : "text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200"
+                  }`}
+                >
+                  <UserCheck size={13} className={projectTabFilter === "assigned" ? "text-cyan-400" : ""} />
+                  <span>Assigned Projects</span>
+                  <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
+                    projectTabFilter === "assigned" ? "bg-cyan-500/20 text-cyan-400 font-extrabold" : "bg-zinc-200/60 dark:bg-zinc-800 text-zinc-400"
+                  }`}>
+                    {allAssignedProjectsCount}
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            {/* Sub-toolbar: Search, Filters, Sort, Create Action */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
+                <div className="relative w-full md:w-60">
                   <span className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-zinc-400 dark:text-zinc-500">
                     <Search size={12} />
                   </span>
                   <input
                     type="text"
-                    placeholder="Search title..."
+                    placeholder={projectTabFilter === "assigned" ? "Search title, client, email..." : "Search projects..."}
                     value={projectSearch}
                     onChange={(e) => setProjectSearch(e.target.value)}
                     className="w-full pl-7 pr-3 py-1.5 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg text-xs text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:border-cyan-500 transition-all font-mono"
@@ -2904,10 +3120,13 @@ export default function Dashboard() {
                   className="bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-2.5 py-1.5 text-xs text-zinc-700 dark:text-zinc-300 font-mono outline-none cursor-pointer focus:border-cyan-500 transition-all"
                 >
                   <option value="All">All Statuses</option>
+                  <option value="Active">Active</option>
+                  <option value="In Progress">In Progress</option>
+                  <option value="In Review">In Review</option>
+                  <option value="Deploying">Deploying</option>
+                  <option value="Completed">Completed</option>
                   <option value="Pending">Pending</option>
                   <option value="Approved">Approved</option>
-                  <option value="In Progress">In Progress</option>
-                  <option value="Completed">Completed</option>
                   <option value="Cancelled">Cancelled</option>
                 </select>
 
@@ -2917,18 +3136,37 @@ export default function Dashboard() {
                   className="bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-2.5 py-1.5 text-xs text-zinc-700 dark:text-zinc-300 font-mono outline-none cursor-pointer focus:border-cyan-500 transition-all"
                 >
                   <option value="default">Sort: Default</option>
+                  <option value="newest">Sort: Newest First</option>
                   <option value="title_asc">Sort: Title (A → Z)</option>
                   <option value="title_desc">Sort: Title (Z → A)</option>
                   <option value="category_asc">Sort: Category</option>
-                  <option value="stars_desc">Sort: Stars/Forks Highest</option>
+                  <option value="stars_desc">Sort: Stars Highest</option>
                   <option value="status_asc">Sort: Status</option>
                 </select>
               </div>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <button
+                  onClick={fetchProjects}
+                  title="Reload projects from database"
+                  className="p-2 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-300 rounded-lg text-xs transition-all cursor-pointer"
+                >
+                  <RefreshCw size={13} className={projectsLoading ? "animate-spin text-primary" : ""} />
+                </button>
+                <button
+                  onClick={() => setShowCreateProjectModal(true)}
+                  className="px-3.5 py-1.5 bg-primary dark:bg-[#00d1ff] text-white dark:text-black rounded-lg text-xs font-mono font-bold hover:brightness-110 active:scale-95 transition-all flex items-center gap-1.5 shrink-0 cursor-pointer shadow-sm"
+                >
+                  <Plus size={13} />
+                  <span>Create Project</span>
+                </button>
+              </div>
             </div>
 
+            {/* Projects Table */}
             <div className="border border-zinc-200 dark:border-zinc-800/80 rounded-xl overflow-hidden bg-white dark:bg-[#0b0e14]">
               <div className="overflow-x-auto text-xs font-mono w-full select-text">
-                <table className="w-full min-w-[650px] border-collapse text-left">
+                <table className="w-full min-w-[850px] border-collapse text-left">
                   <thead>
                     <tr className="border-b border-zinc-200 dark:border-zinc-800/80 bg-zinc-50/80 dark:bg-zinc-900/60 text-[9px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-widest h-11 select-none">
                       <th 
@@ -2941,106 +3179,366 @@ export default function Dashboard() {
                           {projectSortBy === "title_desc" && <span className="text-[10px] text-primary dark:text-[#00d1ff]">▼</span>}
                         </div>
                       </th>
-                    <th 
-                      onClick={() => toggleProjectSort("category")}
-                      className="px-5 py-3 cursor-pointer hover:text-primary dark:hover:text-[#00d1ff] transition-colors"
-                    >
-                      <div className="flex items-center gap-1">
-                        <span>Category</span>
-                        {projectSortBy === "category_asc" && <span className="text-[10px] text-primary dark:text-[#00d1ff]">▲</span>}
-                      </div>
-                    </th>
-                    <th 
-                      onClick={() => toggleProjectSort("stars")}
-                      className="px-5 py-3 cursor-pointer hover:text-primary dark:hover:text-[#00d1ff] transition-colors"
-                    >
-                      <div className="flex items-center gap-1">
-                        <span>Stars / Forks</span>
-                        {projectSortBy === "stars_desc" && <span className="text-[10px] text-primary dark:text-[#00d1ff]">▼</span>}
-                      </div>
-                    </th>
-                    <th 
-                      onClick={() => toggleProjectSort("status")}
-                      className="px-5 py-3 cursor-pointer hover:text-primary dark:hover:text-[#00d1ff] transition-colors"
-                    >
-                      <div className="flex items-center gap-1">
-                        <span>Status</span>
-                        {projectSortBy === "status_asc" && <span className="text-[10px] text-primary dark:text-[#00d1ff]">▲</span>}
-                      </div>
-                    </th>
-                    <th className="px-5 py-3 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-200/80 dark:divide-zinc-800/60">
-                  {filteredProjects.map((p) => {
-                    const isPending = p.status === "Pending" || !p.status;
-                    return (
-                      <tr key={p.id} className="h-14 hover:bg-zinc-50/60 dark:hover:bg-zinc-900/30 transition-colors">
-                        <td className="px-5 py-3.5 text-zinc-900 dark:text-white font-extrabold max-w-[200px] truncate">{p.title}</td>
-                        <td className="px-5 py-3.5 text-zinc-500 dark:text-zinc-400">{p.category}</td>
-                        <td className="px-5 py-3.5 text-zinc-500 dark:text-zinc-400">{p.stars} ⭐ / {p.forks} 🍴</td>
-                        <td className="px-5 py-3.5">
-                          <span className={`px-2 py-0.5 rounded text-[8px] font-mono font-black uppercase border ${
-                            p.status === "Completed" ? "bg-green-500/10 border-green-500/25 text-green-500" :
-                            p.status === "Cancelled" ? "bg-red-500/10 border-red-500/25 text-red-500" :
-                            p.status === "Approved" ? "bg-blue-500/10 border-blue-500/25 text-blue-500" :
-                            p.status === "In Progress" ? "bg-cyan-500/10 border-cyan-500/25 text-[#00d1ff]" :
-                            "bg-yellow-500/10 border-yellow-500/25 text-yellow-500 animate-pulse"
-                          }`}>
-                            {p.status || "Pending"}
-                          </span>
-                        </td>
-                        <td className="px-5 py-3.5 text-right">
-                          <div className="flex justify-end gap-1.5">
-                            {isPending && (
-                              <>
-                                <button
-                                  onClick={() => handleModifyProjectStatus(p.id, "Approved")}
-                                  className="px-2 py-1 bg-green-500/10 border border-green-500/20 text-green-500 hover:bg-green-500/20 rounded text-[8px] font-mono font-bold uppercase tracking-wider"
-                                >
-                                  Approve
-                                </button>
-                                <button
-                                  onClick={() => handleModifyProjectStatus(p.id, "Cancelled")}
-                                  className="px-2 py-1 bg-red-500/10 border border-red-500/20 text-red-500 hover:bg-red-500/20 rounded text-[8px] font-mono font-bold uppercase tracking-wider"
-                                >
-                                  Reject
-                                </button>
-                              </>
-                            )}
-                            {p.status === "Approved" && (
+                      <th className="px-4 py-3">Assigned User / Client</th>
+                      <th 
+                        onClick={() => toggleProjectSort("status")}
+                        className="px-4 py-3 cursor-pointer hover:text-primary dark:hover:text-[#00d1ff] transition-colors"
+                      >
+                        <div className="flex items-center gap-1">
+                          <span>Status Control</span>
+                          {projectSortBy === "status_asc" && <span className="text-[10px] text-primary dark:text-[#00d1ff]">▲</span>}
+                        </div>
+                      </th>
+                      <th className="px-4 py-3">Days Remaining & Deadline</th>
+                      <th className="px-4 py-3">Progress</th>
+                      <th className="px-5 py-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-200/80 dark:divide-zinc-800/60">
+                    {filteredProjects.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="px-5 py-12 text-center text-zinc-400 dark:text-zinc-500 font-mono">
+                          <div className="flex flex-col items-center justify-center gap-2">
+                            <Layers size={24} className="text-zinc-400/50" />
+                            <span className="font-bold text-sm text-foreground dark:text-zinc-300">
+                              {projectTabFilter === "assigned" ? "No Assigned Projects Found" : "No Projects Found"}
+                            </span>
+                            <span className="text-xs text-zinc-500">
+                              {projectTabFilter === "assigned"
+                                ? "Provision a new project contract to assign it to an email or user."
+                                : "No projects match the search filter."}
+                            </span>
+                            {projectTabFilter === "assigned" && (
                               <button
-                                onClick={() => handleModifyProjectStatus(p.id, "In Progress")}
-                                className="px-2 py-1 bg-cyan-500/10 border border-cyan-500/20 text-cyan-500 hover:bg-cyan-500/20 rounded text-[8px] font-mono font-bold uppercase tracking-wider"
+                                onClick={() => setShowCreateProjectModal(true)}
+                                className="mt-2 px-3 py-1.5 bg-primary/20 text-primary dark:text-[#00d1ff] border border-primary/30 rounded-lg text-xs font-bold hover:brightness-110 cursor-pointer"
                               >
-                                Start Work
+                                + Create & Assign Project
                               </button>
                             )}
-                            {p.status === "In Progress" && (
-                              <button
-                                onClick={() => handleModifyProjectStatus(p.id, "Completed")}
-                                className="px-2 py-1 bg-green-500/10 border border-green-500/20 text-green-500 hover:bg-green-500/20 rounded text-[8px] font-mono font-bold uppercase tracking-wider"
-                              >
-                                Complete
-                              </button>
-                            )}
-                            <button
-                              onClick={() => handleRemoveProject(p.id)}
-                              className="px-1.5 py-1 text-zinc-450 hover:text-red-500 border border-black/10 dark:border-zinc-800 rounded bg-white/5 dark:bg-zinc-955"
-                            >
-                              <Trash2 size={11} />
-                            </button>
                           </div>
                         </td>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                    ) : (
+                      filteredProjects.map((p) => {
+                        const hasNewBadge = isNewProject(p.createdAt);
+                        const remainingHours = getRemainingNewHours(p.createdAt);
+                        const daysRemaining = calculateDaysRemaining(p.expectedDate, p.createdAt);
+                        const isAssigned = isProjectAssigned(p);
+
+                        return (
+                          <tr key={p.id} className="h-16 hover:bg-zinc-50/60 dark:hover:bg-zinc-900/30 transition-colors">
+                            {/* Project Title & Badges */}
+                            <td className="px-5 py-3.5 max-w-[260px]">
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="font-extrabold text-zinc-900 dark:text-white truncate max-w-[200px]">
+                                    {p.title}
+                                  </span>
+                                  {/* 48-Hour NEW Badge */}
+                                  {hasNewBadge && (
+                                    <span 
+                                      title={`Newly arrived project! Badge active for next ${remainingHours}h`}
+                                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-mono font-black bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shadow-sm animate-pulse tracking-wide shrink-0 cursor-help"
+                                    >
+                                      <Sparkles size={9} />
+                                      <span>NEW</span>
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2 text-[10px] text-zinc-400">
+                                  <span className="truncate max-w-[130px]">{p.category}</span>
+                                  {p.stars !== undefined && (
+                                    <span className="text-zinc-500 font-mono">⭐ {p.stars}</span>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+
+                            {/* Assigned User / Client */}
+                            <td className="px-4 py-3.5 max-w-[200px]">
+                              {isAssigned ? (
+                                <div className="flex items-center gap-2">
+                                  <div className="w-6 h-6 rounded-lg bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 flex items-center justify-center text-[10px] font-bold shrink-0">
+                                    {(p.assignedUserName || p.assignedEmail || "U")[0].toUpperCase()}
+                                  </div>
+                                  <div className="truncate">
+                                    <div className="text-[11px] font-bold text-foreground dark:text-zinc-200 truncate">
+                                      {p.assignedUserName || (p.assignedEmail ? p.assignedEmail.split("@")[0] : "Client")}
+                                    </div>
+                                    <div className="text-[10px] text-cyan-400/90 font-mono truncate">
+                                      {p.assignedEmail || "User ID linked"}
+                                    </div>
+                                  </div>
+                                </div>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-[10px] text-zinc-400 dark:text-zinc-500 font-mono italic">
+                                  <span>Marketplace</span>
+                                </span>
+                              )}
+                            </td>
+
+                            {/* Status Control */}
+                            <td className="px-4 py-3.5">
+                              <select
+                                value={p.status || "Active"}
+                                onChange={(e) => handleQuickStatusChange(p.id, e.target.value)}
+                                className={`px-2 py-1 rounded-lg text-[9px] font-mono font-black uppercase border outline-none cursor-pointer transition-all ${
+                                  p.status === "Completed" ? "bg-green-500/10 border-green-500/30 text-green-500" :
+                                  p.status === "Cancelled" ? "bg-red-500/10 border-red-500/30 text-red-500" :
+                                  p.status === "Approved" ? "bg-blue-500/10 border-blue-500/30 text-blue-500" :
+                                  p.status === "In Progress" ? "bg-cyan-500/10 border-cyan-500/30 text-cyan-400" :
+                                  p.status === "In Review" ? "bg-purple-500/10 border-purple-500/30 text-purple-400" :
+                                  p.status === "Deploying" ? "bg-amber-500/10 border-amber-500/30 text-amber-400 animate-pulse" :
+                                  "bg-yellow-500/10 border-yellow-500/30 text-yellow-500"
+                                }`}
+                              >
+                                <option value="Active" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white">Active</option>
+                                <option value="In Progress" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white">In Progress</option>
+                                <option value="In Review" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white">In Review</option>
+                                <option value="Deploying" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white">Deploying</option>
+                                <option value="Completed" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white">Completed</option>
+                                <option value="Pending" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white">Pending</option>
+                                <option value="Approved" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white">Approved</option>
+                                <option value="Cancelled" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white">Cancelled</option>
+                              </select>
+                            </td>
+
+                            {/* Days Remaining & Timeline Controls */}
+                            <td className="px-4 py-3.5">
+                              <div className="flex items-center gap-2">
+                                <span className={`px-2 py-0.5 rounded-md text-[9px] font-mono font-bold border ${
+                                  p.status === "Completed" ? "bg-zinc-500/10 border-zinc-500/20 text-zinc-400" :
+                                  daysRemaining <= 0 ? "bg-rose-500/15 border-rose-500/30 text-rose-400 animate-pulse" :
+                                  daysRemaining <= 5 ? "bg-amber-500/15 border-amber-500/30 text-amber-400" :
+                                  "bg-cyan-500/10 border-cyan-500/20 text-cyan-400"
+                                }`}>
+                                  {p.status === "Completed" ? "Delivered" : daysRemaining <= 0 ? "Overdue" : `${daysRemaining}d left`}
+                                </span>
+
+                                {/* Quick +/- 7 Days controls */}
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    type="button"
+                                    title="Subtract 7 days from deadline"
+                                    onClick={() => handleAdjustProjectDays(p, -7)}
+                                    className="px-1.5 py-0.5 text-[8px] font-mono rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-500 hover:text-foreground dark:hover:text-white border border-zinc-200 dark:border-zinc-700 cursor-pointer"
+                                  >
+                                    -7d
+                                  </button>
+                                  <button
+                                    type="button"
+                                    title="Add 7 days to deadline"
+                                    onClick={() => handleAdjustProjectDays(p, 7)}
+                                    className="px-1.5 py-0.5 text-[8px] font-mono rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-500 hover:text-foreground dark:hover:text-white border border-zinc-200 dark:border-zinc-700 cursor-pointer"
+                                  >
+                                    +7d
+                                  </button>
+                                </div>
+                              </div>
+                            </td>
+
+                            {/* Progress Indicator */}
+                            <td className="px-4 py-3.5">
+                              <div className="w-24 space-y-1">
+                                <div className="flex justify-between text-[9px] font-mono text-zinc-400">
+                                  <span>{p.progress ?? (p.status === "Completed" ? 100 : 20)}%</span>
+                                </div>
+                                <div className="w-full bg-zinc-200 dark:bg-zinc-800 h-1.5 rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full bg-primary dark:bg-[#00d1ff] transition-all duration-300"
+                                    style={{ width: `${p.progress ?? (p.status === "Completed" ? 100 : 20)}%` }}
+                                  />
+                                </div>
+                              </div>
+                            </td>
+
+                            {/* Actions & Deep Controls */}
+                            <td className="px-5 py-3.5 text-right">
+                              <div className="flex justify-end items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  title="Open Project Controls"
+                                  onClick={() => openProjectControlsModal(p)}
+                                  className="p-1.5 text-primary dark:text-[#00d1ff] hover:bg-primary/10 border border-primary/20 rounded-lg transition-all cursor-pointer"
+                                >
+                                  <Sliders size={12} />
+                                </button>
+                                <button
+                                  type="button"
+                                  title="Delete Project"
+                                  onClick={() => handleRemoveProject(p.id)}
+                                  className="p-1.5 text-zinc-400 hover:text-red-500 hover:bg-red-500/10 border border-zinc-200 dark:border-zinc-800 rounded-lg transition-all cursor-pointer"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
+
+            {/* Quick Project Controls Modal */}
+            {editingProjectControl && createPortal(
+              <div className="fixed top-0 left-0 w-screen h-screen bg-black/70 backdrop-blur-md z-[100] flex items-center justify-center p-4 select-text animate-in fade-in duration-200">
+                <div className="bg-white dark:bg-[#07090e] border border-black/10 dark:border-white/10 p-6 sm:p-8 rounded-3xl w-full max-w-lg shadow-2xl relative space-y-6">
+                  <button
+                    onClick={() => setEditingProjectControl(null)}
+                    className="absolute top-5 right-5 text-zinc-400 hover:text-foreground dark:hover:text-white transition-colors cursor-pointer"
+                  >
+                    <XCircle size={20} />
+                  </button>
+
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary dark:text-[#00d1ff] flex items-center justify-center border border-primary/20">
+                      <Sliders size={18} />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-bold text-foreground dark:text-white font-sans uppercase">
+                        Manage Project Controls
+                      </h3>
+                      <p className="text-xs text-zinc-400 truncate max-w-[280px]">
+                        {editingProjectControl.title}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4 font-sans text-xs">
+                    {/* Status control */}
+                    <div>
+                      <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider block mb-1 font-bold">
+                        Current Status
+                      </label>
+                      <select
+                        value={controlStatus}
+                        onChange={(e) => setControlStatus(e.target.value)}
+                        className="w-full px-3.5 py-2.5 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl text-foreground dark:text-white font-mono cursor-pointer outline-none"
+                      >
+                        <option value="Active" className="bg-white dark:bg-zinc-900">Active (In Sprint)</option>
+                        <option value="In Progress" className="bg-white dark:bg-zinc-900">In Progress</option>
+                        <option value="In Review" className="bg-white dark:bg-zinc-900">In Review</option>
+                        <option value="Deploying" className="bg-white dark:bg-zinc-900">Deploying</option>
+                        <option value="Completed" className="bg-white dark:bg-zinc-900">Completed</option>
+                        <option value="Pending" className="bg-white dark:bg-zinc-900">Pending</option>
+                        <option value="Approved" className="bg-white dark:bg-zinc-900">Approved</option>
+                        <option value="Cancelled" className="bg-white dark:bg-zinc-900">Cancelled</option>
+                      </select>
+                    </div>
+
+                    {/* Sprint Progress Slider */}
+                    <div>
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider font-bold">
+                          Sprint Progress: {controlProgress}%
+                        </label>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        step="5"
+                        value={controlProgress}
+                        onChange={(e) => setControlProgress(Number(e.target.value))}
+                        className="w-full accent-primary dark:accent-[#00d1ff] cursor-pointer"
+                      />
+                    </div>
+
+                    {/* Timeline / Days / Expected Date */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider block mb-1 font-bold">
+                          Days Remaining
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="365"
+                          value={controlDaysRemaining}
+                          onChange={(e) => {
+                            const val = Number(e.target.value);
+                            setControlDaysRemaining(val);
+                            const d = new Date(Date.now() + val * 24 * 60 * 60 * 1000);
+                            setControlExpectedDate(d.toISOString().split("T")[0]);
+                          }}
+                          className="w-full px-3.5 py-2 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl text-foreground dark:text-white font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider block mb-1 font-bold">
+                          Target Delivery Date
+                        </label>
+                        <input
+                          type="date"
+                          value={controlExpectedDate}
+                          onChange={(e) => {
+                            setControlExpectedDate(e.target.value);
+                            const diff = Math.ceil((new Date(e.target.value).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+                            if (!isNaN(diff)) setControlDaysRemaining(Math.max(1, diff));
+                          }}
+                          className="w-full px-3.5 py-2 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl text-foreground dark:text-white font-mono cursor-pointer"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Client Assignment controls */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider block mb-1 font-bold">
+                          Assigned Email
+                        </label>
+                        <input
+                          type="email"
+                          placeholder="client@gmail.com"
+                          value={controlAssignedEmail}
+                          onChange={(e) => setControlAssignedEmail(e.target.value)}
+                          className="w-full px-3.5 py-2 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl text-foreground dark:text-white font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider block mb-1 font-bold">
+                          Assigned Client Name
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Full Name"
+                          value={controlAssignedUserName}
+                          onChange={(e) => setControlAssignedUserName(e.target.value)}
+                          className="w-full px-3.5 py-2 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl text-foreground dark:text-white"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex items-center justify-end gap-2 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setEditingProjectControl(null)}
+                        className="px-4 py-2 rounded-xl text-xs font-mono font-bold bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isSavingProjectControl}
+                        onClick={handleSaveProjectControls}
+                        className="px-5 py-2 rounded-xl text-xs font-mono font-bold bg-primary dark:bg-[#00d1ff] text-white dark:text-black hover:brightness-110 flex items-center gap-2 cursor-pointer shadow-md"
+                      >
+                        {isSavingProjectControl && <RefreshCw size={12} className="animate-spin" />}
+                        <span>Save Controls</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>,
+              document.body
+            )}
           </div>
-        </div>
-      );
+        );
 
       case "Categories":
         return (

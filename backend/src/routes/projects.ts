@@ -17,15 +17,19 @@ const upload = multer({
 
 /**
  * GET /api/projects
- * Fetches all projects, optionally filtered by category.
+ * Fetches all projects, optionally filtered by category, search, or admin mode.
  */
 router.get("/", async (req, res) => {
-  const { category, search } = req.query;
+  const { category, search, admin, includePrivate } = req.query;
 
   try {
-    const filters: any = {
-      isPrivate: { not: true },
-    };
+    const filters: any = {};
+    const isAdminQuery = admin === "true" || includePrivate === "true";
+
+    // Public marketplace excludes private projects, admin views all
+    if (!isAdminQuery) {
+      filters.isPrivate = { not: true };
+    }
 
     if (category) {
       filters.category = String(category);
@@ -39,7 +43,7 @@ router.get("/", async (req, res) => {
       ];
     }
 
-    const projects = await prisma.project.findMany({
+    let projects = await prisma.project.findMany({
       where: filters,
       select: {
         id: true,
@@ -59,6 +63,16 @@ router.get("/", async (req, res) => {
         scheduledCompletionAt: true,
         automaticIssuance: true,
         issuanceDelayDays: true,
+        assignedEmail: true,
+        assignedUserId: true,
+        assignedUserName: true,
+        repoUrl: true,
+        liveUrl: true,
+        progress: true,
+        startDate: true,
+        expectedDate: true,
+        contractId: true,
+        isPrivate: true,
         createdAt: true,
         updatedAt: true,
         assignments: {
@@ -66,11 +80,33 @@ router.get("/", async (req, res) => {
             id: true,
             status: true,
             certificateStatus: true,
+            userId: true,
+            user: {
+              select: { id: true, name: true, email: true },
+            },
           },
         },
       },
       orderBy: { createdAt: "desc" },
     });
+
+    // Fallback: If DB query returns 0 projects, load mockProjects.json so older 50 projects are never lost
+    if (!projects || projects.length === 0) {
+      try {
+        const mockProjects = require("../config/mockProjects.json");
+        if (Array.isArray(mockProjects) && mockProjects.length > 0) {
+          projects = mockProjects.map((p: any) => ({
+            ...p,
+            imageUrl: p.image || p.imageUrl,
+            isPrivate: false,
+            createdAt: p.createdAt || new Date("2024-01-01T00:00:00.000Z"),
+            updatedAt: p.updatedAt || new Date("2024-01-01T00:00:00.000Z"),
+          }));
+        }
+      } catch (mockErr) {
+        console.warn("Could not load fallback mock projects:", mockErr);
+      }
+    }
 
     return res.json(projects);
   } catch (error: any) {
@@ -779,6 +815,74 @@ router.put(
     }
   }
 );
+
+/**
+ * PATCH /api/projects/:id
+ * Quick update endpoint to modify status, timeline (expectedDate, daysRemaining), progress, assignments, and URLs.
+ */
+router.patch("/:id", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  const { id } = req.params;
+  const {
+    status,
+    progress,
+    expectedDate,
+    startDate,
+    assignedEmail,
+    assignedUserId,
+    assignedUserName,
+    repoUrl,
+    liveUrl,
+    title,
+    category,
+    isPrivate,
+  } = req.body;
+
+  try {
+    const existing = await prisma.project.findUnique({ where: { id } });
+    if (!existing) {
+      return res.status(404).json({ error: "Project not found." });
+    }
+
+    const data: any = {};
+    if (status !== undefined) data.status = status;
+    if (progress !== undefined) data.progress = Number(progress);
+    if (expectedDate !== undefined) data.expectedDate = expectedDate;
+    if (startDate !== undefined) data.startDate = startDate;
+    if (assignedEmail !== undefined) data.assignedEmail = assignedEmail ? String(assignedEmail).toLowerCase().trim() : null;
+    if (assignedUserId !== undefined) data.assignedUserId = assignedUserId;
+    if (assignedUserName !== undefined) data.assignedUserName = assignedUserName;
+    if (repoUrl !== undefined) data.repoUrl = repoUrl;
+    if (liveUrl !== undefined) data.liveUrl = liveUrl;
+    if (title !== undefined) data.title = title;
+    if (category !== undefined) data.category = category;
+    if (isPrivate !== undefined) data.isPrivate = Boolean(isPrivate);
+
+    const updated = await prisma.project.update({
+      where: { id },
+      data,
+    });
+
+    // If progress or status was updated and project has assignments, sync them
+    if (status !== undefined || progress !== undefined) {
+      try {
+        await prisma.projectAssignment.updateMany({
+          where: { projectId: id },
+          data: {
+            ...(status === "Completed" ? { status: "COMPLETED" } : {}),
+            ...(progress !== undefined ? { progress: Number(progress) } : {}),
+          },
+        });
+      } catch (err) {
+        console.warn("Could not sync assignment status:", err);
+      }
+    }
+
+    return res.json(updated);
+  } catch (error: any) {
+    console.error(`Error patching project ${id}:`, error);
+    return res.status(500).json({ error: "Failed to update project." });
+  }
+});
 
 /**
  * DELETE /api/projects/:id
