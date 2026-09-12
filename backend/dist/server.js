@@ -99,9 +99,9 @@ try {
 catch (clerkErr) {
     console.warn("[SERVER] Clerk middleware initialization warning (continuing with route handling):", clerkErr);
 }
-// Expose built-in JSON body parsers
-app.use(express_1.default.json());
-app.use(express_1.default.urlencoded({ extended: true }));
+// Expose built-in JSON body parsers with 50mb limit for certificate PDF/image uploads
+app.use(express_1.default.json({ limit: "50mb" }));
+app.use(express_1.default.urlencoded({ extended: true, limit: "50mb" }));
 // Standard Request Logging Middleware
 app.use((req, _res, next) => {
     console.log(`[HTTP] ${req.method} ${req.url} - ${new Date().toISOString()}`);

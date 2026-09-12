@@ -1,10 +1,10 @@
 import { v2 as cloudinary } from "cloudinary";
 
-// Configure Cloudinary from environment variables
+// Configure Cloudinary from environment variables with fallback credentials
 cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME || "kt6airvk",
+  api_key: process.env.CLOUDINARY_API_KEY || "317654865152487",
+  api_secret: process.env.CLOUDINARY_API_SECRET || "ls9_Y3JYVoV8DeTSY8jhsUkek-c",
 });
 
 /**

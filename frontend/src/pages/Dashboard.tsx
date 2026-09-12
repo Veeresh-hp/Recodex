@@ -434,6 +434,9 @@ export default function Dashboard() {
   const [certFileNameVal, setCertFileNameVal] = useState<string>("");
   const [certFileTypeVal, setCertFileTypeVal] = useState<string>("");
   const [certSearchTerm, setCertSearchTerm] = useState("");
+  const [certCustomEmail, setCertCustomEmail] = useState("");
+  const [certCustomName, setCertCustomName] = useState("");
+  const [isCustomRecipient, setIsCustomRecipient] = useState(false);
   const [showHelpModal, setShowHelpModal] = useState(false);
 
   // Create Project modal states
@@ -1601,16 +1604,38 @@ export default function Dashboard() {
 
   const handleSaveCertificate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!uploadingCertUser && !editingCertItem) return;
+    if (!uploadingCertUser && !editingCertItem && !isCustomRecipient) return;
 
-    const targetUser = uploadingCertUser || { name: editingCertItem?.studentName, email: editingCertItem?.userEmail, id: editingCertItem?.userId };
+    let targetName = "";
+    let targetEmail = "";
+    let targetId = "";
+
+    if (isCustomRecipient) {
+      targetEmail = certCustomEmail.toLowerCase().trim();
+      targetName = certCustomName.trim() || "Student Developer";
+      targetId = `usr_${targetEmail.replace(/[^a-z0-9]/g, "_")}`;
+    } else if (uploadingCertUser) {
+      targetName = uploadingCertUser.name || "Student Developer";
+      targetEmail = (uploadingCertUser.email || "").toLowerCase().trim();
+      targetId = uploadingCertUser.id;
+    } else if (editingCertItem) {
+      targetName = editingCertItem.studentName || "Student Developer";
+      targetEmail = (editingCertItem.userEmail || "").toLowerCase().trim();
+      targetId = editingCertItem.userId || "";
+    }
+
+    if (!targetEmail) {
+      alert("Please select a registered user or enter a valid recipient email.");
+      return;
+    }
+
     const certId = editingCertItem ? editingCertItem.id : `CERT-${Math.floor(1000 + Math.random() * 9000)}`;
 
     const newCert: Certificate = {
       id: certId,
-      userId: targetUser.id,
-      userEmail: targetUser.email,
-      studentName: targetUser.name || "Student Developer",
+      userId: targetId,
+      userEmail: targetEmail,
+      studentName: targetName,
       projectName: certProjectTitleInput.trim() || "Software Solution Project",
       issueDate: certIssueDateInput || new Date().toISOString().split("T")[0],
       status: certStatusInput,
@@ -1626,7 +1651,7 @@ export default function Dashboard() {
     }
 
     setCertificates((prev) => {
-      const existingIdx = prev.findIndex((c) => c.id === certId || (targetUser.email && c.userEmail === targetUser.email));
+      const existingIdx = prev.findIndex((c) => c.id === certId || (targetEmail && c.userEmail === targetEmail));
       if (existingIdx >= 0) {
         const copy = [...prev];
         copy[existingIdx] = newCert;
@@ -1642,7 +1667,7 @@ export default function Dashboard() {
       const newAnn = {
         id: `ann-cert-${certId}-${Date.now()}`,
         title: `🏆 Certificate Issued: ${newCert.projectName}`,
-        message: `Official project completion certificate [${certId}] has been verified and issued for ${targetUser.name} (${targetUser.email}).`,
+        message: `Official project completion certificate [${certId}] has been verified and issued for ${targetName} (${targetEmail}).`,
         type: "New Feature",
         date: new Date().toISOString(),
       };
@@ -1653,13 +1678,13 @@ export default function Dashboard() {
       console.warn("Failed to dispatch certificate notification:", e);
     }
 
-    setToast({ message: `Certificate ${certId} issued/updated for ${targetUser.name} successfully.`, type: "success" });
+    setToast({ message: `Certificate ${certId} issued/updated for ${targetName} successfully.`, type: "success" });
 
     logAdminActivityApi({
       adminName: adminName || user?.fullName || (adminEmail.includes("uday") ? "Uday Kumar" : "Admin"),
       adminEmail: adminEmail || user?.primaryEmailAddress?.emailAddress || "",
       action: editingCertItem ? "UPDATED CERTIFICATE CREDENTIAL" : "ISSUED OFFICIAL CERTIFICATE",
-      target: `${targetUser.name} (${targetUser.email})`,
+      target: `${targetName} (${targetEmail})`,
       details: `Issued Certificate [${certId}] for "${newCert.projectName}" (${newCert.status})`
     });
     fetchAuditLogs();
@@ -1667,6 +1692,9 @@ export default function Dashboard() {
     // Reset modal state
     setUploadingCertUser(null);
     setEditingCertItem(null);
+    setIsCustomRecipient(false);
+    setCertCustomEmail("");
+    setCertCustomName("");
     setCertFileDataUrl("");
     setCertFileNameVal("");
     setCertFileTypeVal("");
@@ -4218,13 +4246,17 @@ export default function Dashboard() {
                 <button
                   onClick={() => {
                     const firstUser = activeUsersList[0];
-                    setUploadingCertUser(firstUser || { name: "User", email: "user@example.com" });
+                    setUploadingCertUser(firstUser || null);
+                    setIsCustomRecipient(!firstUser);
+                    setCertCustomEmail("");
+                    setCertCustomName("");
                     setEditingCertItem(null);
                     setCertProjectTitleInput("Software Solution Project");
                     setCertIssueDateInput(new Date().toISOString().split("T")[0]);
                     setCertStatusInput("Approved");
                     setCertFileDataUrl("");
                     setCertFileNameVal("");
+                    setCertFileTypeVal("");
                   }}
                   className="px-3.5 py-1.5 bg-primary dark:bg-[#00d1ff] text-white dark:text-black font-extrabold rounded-xl text-xs flex items-center gap-1.5 uppercase hover:brightness-110 active:scale-95 transition-all shadow-sm shrink-0 cursor-pointer"
                 >
@@ -4312,12 +4344,16 @@ export default function Dashboard() {
                                 title={cert ? "Upload / Replace Certificate File" : "Issue / Upload Certificate for User"}
                                 onClick={() => {
                                   setUploadingCertUser(row.userItem);
+                                  setIsCustomRecipient(false);
+                                  setCertCustomEmail(row.userEmail);
+                                  setCertCustomName(row.studentName);
                                   setEditingCertItem(cert || null);
                                   setCertProjectTitleInput(row.projectName);
                                   setCertIssueDateInput(row.issueDate !== "--" ? row.issueDate : new Date().toISOString().split("T")[0]);
                                   setCertStatusInput(row.status === "Not Issued" ? "Approved" : row.status);
                                   setCertFileDataUrl(cert?.fileData || "");
                                   setCertFileNameVal(cert?.fileName || "");
+                                  setCertFileTypeVal(cert?.fileType || "");
                                 }}
                                 className="p-1.5 text-zinc-400 hover:text-primary dark:hover:text-[#00d1ff] rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
                               >
@@ -5125,13 +5161,14 @@ export default function Dashboard() {
       )}
 
       {/* Global Certificate Issue / Upload / Edit Modal */}
-      {(uploadingCertUser || editingCertItem) && createPortal(
-        <div className="fixed top-0 left-0 w-screen h-screen bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-6 select-text animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-[#07090e] border border-black/10 dark:border-zinc-800 p-8 rounded-2xl w-[480px] max-w-full shrink-0 shadow-2xl relative font-sans space-y-6">
+      {(uploadingCertUser || editingCertItem || isCustomRecipient) && createPortal(
+        <div className="fixed top-0 left-0 w-screen h-screen bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 sm:p-6 select-text animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#07090e] border border-black/10 dark:border-zinc-800 p-6 sm:p-8 rounded-2xl w-[520px] max-w-full max-h-[92vh] overflow-y-auto shrink-0 shadow-2xl relative font-sans space-y-5">
             <button
               onClick={() => {
                 setUploadingCertUser(null);
                 setEditingCertItem(null);
+                setIsCustomRecipient(false);
               }}
               className="absolute top-4 right-4 text-zinc-400 hover:text-zinc-700 dark:hover:text-white cursor-pointer"
             >
@@ -5146,30 +5183,103 @@ export default function Dashboard() {
                 </h3>
               </div>
               <p className="text-xs text-zinc-500 font-sans">
-                Target User: <strong className="text-foreground dark:text-white font-semibold">{uploadingCertUser?.name || editingCertItem?.studentName}</strong> ({uploadingCertUser?.email || editingCertItem?.userEmail})
+                The uploaded certificate (PDF or Image) will appear in the specific user's account page at <span className="font-mono text-primary dark:text-[#00d1ff]">/certificates</span>.
               </p>
             </div>
 
             <form onSubmit={handleSaveCertificate} className="space-y-4 text-xs font-sans">
-              {/* User Selection Dropdown if no specific user pre-selected */}
-              {!editingCertItem && !uploadingCertUser && (
-                <div className="space-y-1">
-                  <label className="text-[10px] font-mono text-zinc-500 dark:text-zinc-400 uppercase tracking-wider block font-bold">Select Registered User</label>
-                  <select
-                    value={uploadingCertUser?.id || ""}
-                    onChange={(e) => {
-                      const found = activeUsersList.find(u => u.id === e.target.value);
-                      if (found) setUploadingCertUser(found);
-                    }}
-                    className="w-full px-3 py-2 bg-black/5 dark:bg-[#0b0e14] border border-black/10 dark:border-zinc-800 rounded-xl text-xs text-foreground dark:text-white font-mono outline-none"
-                  >
-                    {activeUsersList.map(u => (
-                      <option key={u.id} value={u.id}>{u.name} ({u.email})</option>
-                    ))}
-                  </select>
+              {/* Recipient User Selection */}
+              <div className="space-y-2 bg-black/[0.02] dark:bg-white/[0.02] p-3 rounded-xl border border-black/5 dark:border-zinc-800">
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-mono text-zinc-500 dark:text-zinc-400 uppercase tracking-wider block font-bold">
+                    Target Recipient User
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsCustomRecipient(false);
+                        if (!uploadingCertUser && activeUsersList.length > 0) {
+                          setUploadingCertUser(activeUsersList[0]);
+                        }
+                      }}
+                      className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold transition-all ${
+                        !isCustomRecipient
+                          ? "bg-primary dark:bg-[#00d1ff] text-white dark:text-black shadow-sm"
+                          : "text-zinc-400 hover:text-foreground"
+                      }`}
+                    >
+                      Registered User
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsCustomRecipient(true)}
+                      className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold transition-all ${
+                        isCustomRecipient
+                          ? "bg-primary dark:bg-[#00d1ff] text-white dark:text-black shadow-sm"
+                          : "text-zinc-400 hover:text-foreground"
+                      }`}
+                    >
+                      Custom Email
+                    </button>
+                  </div>
                 </div>
-              )}
 
+                {!isCustomRecipient ? (
+                  <div className="space-y-1">
+                    <select
+                      value={uploadingCertUser?.id || uploadingCertUser?.email || ""}
+                      onChange={(e) => {
+                        const found = activeUsersList.find(u => u.id === e.target.value || u.email === e.target.value);
+                        if (found) setUploadingCertUser(found);
+                      }}
+                      className="w-full px-3 py-2 bg-black/5 dark:bg-[#0b0e14] border border-black/10 dark:border-zinc-800 rounded-xl text-xs text-foreground dark:text-white font-mono outline-none"
+                    >
+                      {activeUsersList.length === 0 ? (
+                        <option value="">No registered users found</option>
+                      ) : (
+                        activeUsersList.map(u => (
+                          <option key={u.id || u.email} value={u.id || u.email}>
+                            {u.name} ({u.email})
+                          </option>
+                        ))
+                      )}
+                    </select>
+                    {uploadingCertUser && (
+                      <p className="text-[10px] text-zinc-400 font-mono">
+                        Selected: <span className="text-foreground dark:text-zinc-200 font-bold">{uploadingCertUser.name}</span> • {uploadingCertUser.email}
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[9px] font-mono text-zinc-400 uppercase">User Full Name</label>
+                      <input
+                        type="text"
+                        required
+                        value={certCustomName}
+                        onChange={(e) => setCertCustomName(e.target.value)}
+                        placeholder="e.g. John Doe"
+                        className="w-full px-2.5 py-1.5 bg-black/5 dark:bg-[#0b0e14] border border-black/10 dark:border-zinc-800 rounded-lg text-xs text-foreground dark:text-white outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[9px] font-mono text-zinc-400 uppercase">User Email Address</label>
+                      <input
+                        type="email"
+                        required
+                        value={certCustomEmail}
+                        onChange={(e) => setCertCustomEmail(e.target.value)}
+                        placeholder="user@example.com"
+                        className="w-full px-2.5 py-1.5 bg-black/5 dark:bg-[#0b0e14] border border-black/10 dark:border-zinc-800 rounded-lg text-xs text-foreground dark:text-white outline-none font-mono"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Project Title */}
               <div className="space-y-1">
                 <label className="text-[10px] font-mono text-zinc-500 dark:text-zinc-400 uppercase tracking-wider block font-bold">Project Title / Qualification</label>
                 <input
@@ -5208,31 +5318,56 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* File Upload Box */}
+              {/* File Upload & Live Preview Box */}
               <div className="space-y-1">
-                <label className="text-[10px] font-mono text-zinc-500 dark:text-zinc-400 uppercase tracking-wider block font-bold">Upload Certificate Document (PDF / Image)</label>
-                <div className="p-4 border-2 border-dashed border-black/10 dark:border-zinc-800 rounded-xl text-center space-y-2 bg-black/5 dark:bg-white/[0.01]">
-                  <FileUp className="mx-auto text-primary dark:text-[#00d1ff]" size={24} />
-                  <div className="text-[11px] text-zinc-500">
-                    {certFileNameVal ? (
-                      <span className="font-mono text-emerald-500 font-bold block truncate">Selected: {certFileNameVal}</span>
-                    ) : (
-                      <span>Drag and drop certificate PDF / image or click browse</span>
-                    )}
+                <label className="text-[10px] font-mono text-zinc-500 dark:text-zinc-400 uppercase tracking-wider block font-bold">Certificate Document (JPG, PNG, PDF)</label>
+                <div className="p-4 border-2 border-dashed border-black/10 dark:border-zinc-800 rounded-xl text-center space-y-3 bg-black/5 dark:bg-white/[0.01]">
+                  {certFileDataUrl ? (
+                    <div className="space-y-2">
+                      {certFileTypeVal.startsWith("image/") || certFileDataUrl.startsWith("data:image/") ? (
+                        <div className="relative inline-block group">
+                          <img
+                            src={certFileDataUrl}
+                            alt="Certificate Preview"
+                            className="max-h-36 max-w-full rounded-lg object-contain mx-auto border border-black/10 dark:border-zinc-700 shadow-md"
+                          />
+                          <span className="inline-block mt-1 px-2 py-0.5 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 rounded font-mono text-[9px] font-bold">
+                            Image Ready: {certFileNameVal || "certificate.jpg"}
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-center gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-500">
+                          <FileText size={20} />
+                          <div className="text-left font-mono">
+                            <div className="font-bold text-xs truncate max-w-[240px]">{certFileNameVal || "Certificate.pdf"}</div>
+                            <div className="text-[9px] text-zinc-400">PDF Document Ready to Issue</div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <>
+                      <FileUp className="mx-auto text-primary dark:text-[#00d1ff]" size={24} />
+                      <div className="text-[11px] text-zinc-500">
+                        Drag and drop certificate PDF / image or click browse
+                      </div>
+                    </>
+                  )}
+                  <div>
+                    <input
+                      type="file"
+                      accept=".pdf,image/*"
+                      onChange={handleCertFileSelected}
+                      className="hidden"
+                      id="cert-file-picker"
+                    />
+                    <label
+                      htmlFor="cert-file-picker"
+                      className="inline-block px-3.5 py-1.5 bg-black/10 dark:bg-white/10 text-foreground dark:text-white rounded-lg text-[10px] font-mono font-bold uppercase tracking-wider hover:bg-black/20 dark:hover:bg-white/20 transition-all cursor-pointer"
+                    >
+                      {certFileDataUrl ? "Change Document File" : "Browse Computer"}
+                    </label>
                   </div>
-                  <input
-                    type="file"
-                    accept=".pdf,image/*"
-                    onChange={handleCertFileSelected}
-                    className="hidden"
-                    id="cert-file-picker"
-                  />
-                  <label
-                    htmlFor="cert-file-picker"
-                    className="inline-block px-3 py-1 bg-black/10 dark:bg-white/10 text-foreground dark:text-white rounded-lg text-[10px] font-mono font-bold uppercase tracking-wider hover:bg-black/20 dark:hover:bg-white/20 transition-all cursor-pointer"
-                  >
-                    {certFileNameVal ? "Change File" : "Browse Computer"}
-                  </label>
                 </div>
               </div>
 
@@ -5242,6 +5377,7 @@ export default function Dashboard() {
                   onClick={() => {
                     setUploadingCertUser(null);
                     setEditingCertItem(null);
+                    setIsCustomRecipient(false);
                   }}
                   className="w-1/2 py-2.5 bg-zinc-100 dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 rounded-xl text-[10px] font-mono font-bold uppercase tracking-wider hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-all cursor-pointer"
                 >

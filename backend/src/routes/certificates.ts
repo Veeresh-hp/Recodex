@@ -619,7 +619,7 @@ router.post("/admin/manual-upload", async (req: Request, res: Response) => {
       }
 
       let targetProject = null;
-      const targetProjId = projectId || `proj_${finalProjectTitle.toLowerCase().replace(/[^a-z0-9]/g, "-").slice(0, 30)}`;
+      const targetProjId = projectId || `proj_${certId.toLowerCase().replace(/[^a-z0-9]/g, "_")}`;
       targetProject = await prisma.project.findUnique({ where: { id: targetProjId } }).catch(() => null);
       if (!targetProject) {
         targetProject = await prisma.project.create({
@@ -719,7 +719,7 @@ const formatPrismaCertificate = (c: any) => ({
   status: c.status === "ISSUED" ? "Approved" : (c.status === "PENDING" ? "Pending" : (c.status === "REVOKED" ? "Revoked" : c.status)),
   finalScore: c.finalScore || 100,
   grade: c.grade || "A+",
-  fileData: c.pdfUrl || (c.metadata as any)?.fileData,
+  fileData: c.pdfUrl || c.previewUrl || (c.metadata as any)?.fileData,
   fileName: (c.metadata as any)?.fileName,
   fileType: (c.metadata as any)?.fileType,
   description: (c.metadata as any)?.description || "Official verification of project completion and cryptographic identity signature validation.",
@@ -987,14 +987,23 @@ router.get("/", async (req: Request, res: Response) => {
     });
 
     let allCerts = Array.from(mergedMap.values());
-    if (email) {
+    if (email && userId) {
+      const emailClean = String(email).toLowerCase().trim();
+      const uId = String(userId).trim();
+      allCerts = allCerts.filter((c: any) => {
+        const cEmail = (c.userEmail || c.recipientEmail || "").toLowerCase().trim();
+        const cUid = String(c.userId || "").trim();
+        return (emailClean && cEmail === emailClean) || (uId && cUid === uId);
+      });
+    } else if (email) {
       const emailClean = String(email).toLowerCase().trim();
       allCerts = allCerts.filter((c: any) => {
         const cEmail = (c.userEmail || c.recipientEmail || "").toLowerCase().trim();
         return cEmail === emailClean;
       });
     } else if (userId) {
-      allCerts = allCerts.filter((c: any) => c.userId === String(userId));
+      const uId = String(userId).trim();
+      allCerts = allCerts.filter((c: any) => String(c.userId || "").trim() === uId);
     }
 
     return res.json(allCerts);
@@ -1084,7 +1093,7 @@ router.post("/", async (req: Request, res: Response) => {
       }
 
       let targetProject = null;
-      const targetProjId = cert.projectId || `proj_${projectName.toLowerCase().replace(/[^a-z0-9]/g, "-").slice(0, 30)}`;
+      const targetProjId = cert.projectId || `proj_${certId.toLowerCase().replace(/[^a-z0-9]/g, "_")}`;
       targetProject = await prisma.project.findUnique({ where: { id: targetProjId } }).catch(() => null);
       if (!targetProject) {
         targetProject = await prisma.project.create({

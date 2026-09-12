@@ -69,9 +69,9 @@ try {
   console.warn("[SERVER] Clerk middleware initialization warning (continuing with route handling):", clerkErr);
 }
 
-// Expose built-in JSON body parsers
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Expose built-in JSON body parsers with 50mb limit for certificate PDF/image uploads
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 // Standard Request Logging Middleware
 app.use((req: Request, _res: Response, next: NextFunction) => {

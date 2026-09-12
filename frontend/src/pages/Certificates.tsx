@@ -15,7 +15,7 @@ interface Certificate {
   studentName: string;
   projectName: string;
   issueDate: string;
-  status: "Approved" | "Pending" | "Revoked" | "Not Issued";
+  status: "Approved" | "Pending" | "Revoked" | "Not Issued" | "ISSUED" | "PENDING" | string;
   fileData?: string;
   fileName?: string;
   fileType?: string;
@@ -54,6 +54,14 @@ export default function Certificates() {
     allUserEmails.push(userEmail);
   }
 
+  // Also support query param email or verify ID
+  const queryParams = new URLSearchParams(window.location.search);
+  const verifyParam = queryParams.get("verify")?.toLowerCase().trim();
+  const urlEmail = queryParams.get("email")?.toLowerCase().trim();
+  if (urlEmail && !allUserEmails.includes(urlEmail)) {
+    allUserEmails.push(urlEmail);
+  }
+
   const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(" ") || user?.fullName || user?.username || "RecodeX Engineer";
 
   const fetchCerts = async () => {
@@ -86,7 +94,12 @@ export default function Certificates() {
         if (["cert-9402", "cert-1842", "cert-0691"].includes((c.id || "").toLowerCase().trim())) return false;
 
         const certEmail = (c.userEmail || c.recipientEmail || "").toLowerCase().trim();
-        const certUserId = c.userId || "";
+        const certUserId = (c.userId || "").trim();
+
+        // Direct verification match via ?verify=
+        if (verifyParam && (c.id?.toLowerCase().trim() === verifyParam || c.certificateId?.toLowerCase().trim() === verifyParam)) {
+          return true;
+        }
 
         const matchEmail = allUserEmails.length > 0 && certEmail && allUserEmails.includes(certEmail);
         const matchUserId = Boolean(userId && certUserId && certUserId === userId);
@@ -164,6 +177,9 @@ export default function Certificates() {
       (c.studentName && c.studentName.toLowerCase().includes(searchQuery.toLowerCase()));
 
     if (filterStatus === "ALL") return matchesSearch;
+    const isApprovedStatus = c.status === "Approved" || c.status === "ISSUED";
+    if (filterStatus === "Approved") return matchesSearch && isApprovedStatus;
+    if (filterStatus === "Pending") return matchesSearch && (c.status === "Pending" || c.status === "PENDING");
     return matchesSearch && c.status === filterStatus;
   });
 
@@ -316,6 +332,45 @@ export default function Certificates() {
                         </p>
                       </div>
                     </div>
+
+                    {/* Document Preview Thumbnail if uploaded */}
+                    {cert.fileData && (
+                      <div 
+                        onClick={() => setSelectedCert(cert)}
+                        className="mb-4 rounded-xl overflow-hidden border border-black/10 dark:border-zinc-800 bg-black/5 dark:bg-zinc-950 flex items-center justify-center cursor-pointer hover:border-primary/50 transition-colors group/thumb"
+                      >
+                        {cert.fileData.toLowerCase().includes(".pdf") || cert.fileType === "application/pdf" || cert.fileData.startsWith("data:application/pdf") ? (
+                          <div className="py-4 px-3.5 flex items-center gap-3 w-full bg-red-500/5 hover:bg-red-500/10 transition-colors">
+                            <div className="w-9 h-9 rounded-lg bg-red-500/10 text-red-500 flex items-center justify-center shrink-0">
+                              <FileText size={20} />
+                            </div>
+                            <div className="min-w-0 flex-1 text-left">
+                              <div className="text-xs font-mono font-bold text-foreground dark:text-zinc-200 truncate">
+                                {cert.fileName || `${cert.projectName}.pdf`}
+                              </div>
+                              <div className="text-[10px] font-mono text-emerald-500 flex items-center gap-1 font-semibold">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                Verified PDF Document
+                              </div>
+                            </div>
+                            <Eye size={15} className="text-zinc-400 group-hover/thumb:text-primary transition-colors shrink-0" />
+                          </div>
+                        ) : (
+                          <div className="relative w-full h-36 bg-black/20 flex items-center justify-center overflow-hidden">
+                            <img
+                              src={cert.fileData}
+                              alt={cert.projectName}
+                              className="w-full h-full object-cover group-hover/thumb:scale-105 transition-transform duration-300"
+                            />
+                            <div className="absolute inset-0 bg-black/30 opacity-0 group-hover/thumb:opacity-100 transition-opacity flex items-center justify-center">
+                              <span className="px-2.5 py-1 bg-black/70 text-white rounded-lg text-[10px] font-mono font-bold flex items-center gap-1">
+                                <Eye size={12} /> Click to View
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     {/* Description / Summary */}
                     <p className="text-xs text-zinc-600 dark:text-zinc-400 line-clamp-2 mb-4 leading-relaxed">

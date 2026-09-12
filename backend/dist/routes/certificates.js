@@ -542,7 +542,7 @@ router.post("/admin/manual-upload", async (req, res) => {
                 }).catch(() => null);
             }
             let targetProject = null;
-            const targetProjId = projectId || `proj_${finalProjectTitle.toLowerCase().replace(/[^a-z0-9]/g, "-").slice(0, 30)}`;
+            const targetProjId = projectId || `proj_${certId.toLowerCase().replace(/[^a-z0-9]/g, "_")}`;
             targetProject = await db_1.default.project.findUnique({ where: { id: targetProjId } }).catch(() => null);
             if (!targetProject) {
                 targetProject = await db_1.default.project.create({
@@ -641,7 +641,7 @@ const formatPrismaCertificate = (c) => ({
     status: c.status === "ISSUED" ? "Approved" : (c.status === "PENDING" ? "Pending" : (c.status === "REVOKED" ? "Revoked" : c.status)),
     finalScore: c.finalScore || 100,
     grade: c.grade || "A+",
-    fileData: c.pdfUrl || c.metadata?.fileData,
+    fileData: c.pdfUrl || c.previewUrl || c.metadata?.fileData,
     fileName: c.metadata?.fileName,
     fileType: c.metadata?.fileType,
     description: c.metadata?.description || "Official verification of project completion and cryptographic identity signature validation.",
@@ -898,7 +898,16 @@ router.get("/", async (req, res) => {
             mergedMap.set(key, c);
         });
         let allCerts = Array.from(mergedMap.values());
-        if (email) {
+        if (email && userId) {
+            const emailClean = String(email).toLowerCase().trim();
+            const uId = String(userId).trim();
+            allCerts = allCerts.filter((c) => {
+                const cEmail = (c.userEmail || c.recipientEmail || "").toLowerCase().trim();
+                const cUid = String(c.userId || "").trim();
+                return (emailClean && cEmail === emailClean) || (uId && cUid === uId);
+            });
+        }
+        else if (email) {
             const emailClean = String(email).toLowerCase().trim();
             allCerts = allCerts.filter((c) => {
                 const cEmail = (c.userEmail || c.recipientEmail || "").toLowerCase().trim();
@@ -906,7 +915,8 @@ router.get("/", async (req, res) => {
             });
         }
         else if (userId) {
-            allCerts = allCerts.filter((c) => c.userId === String(userId));
+            const uId = String(userId).trim();
+            allCerts = allCerts.filter((c) => String(c.userId || "").trim() === uId);
         }
         return res.json(allCerts);
     }
@@ -985,7 +995,7 @@ router.post("/", async (req, res) => {
                 }).catch(() => null);
             }
             let targetProject = null;
-            const targetProjId = cert.projectId || `proj_${projectName.toLowerCase().replace(/[^a-z0-9]/g, "-").slice(0, 30)}`;
+            const targetProjId = cert.projectId || `proj_${certId.toLowerCase().replace(/[^a-z0-9]/g, "_")}`;
             targetProject = await db_1.default.project.findUnique({ where: { id: targetProjId } }).catch(() => null);
             if (!targetProject) {
                 targetProject = await db_1.default.project.create({
