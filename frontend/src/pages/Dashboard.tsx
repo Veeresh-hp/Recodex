@@ -13,7 +13,7 @@ import { useAuth, useUser, useClerk } from "@clerk/clerk-react";
 import Chart from "chart.js/auto";
 import { 
   getProjects, getUsers, updateUser, deleteUser, 
-  updateProject, deleteProject, getInquiries, 
+  updateProject, deleteProject, createProjectApi, getInquiries, 
   deleteInquiry, replyToInquiry, resolveInquiryApi, getUserProfile,
   getCertificatesApi, saveCertificateApi, deleteCertificateApi, approveCertificateApi,
   getPromotedAdminsApi, getAuditLogsApi, logAdminActivityApi,
@@ -422,6 +422,25 @@ export default function Dashboard() {
   const [certFileTypeVal, setCertFileTypeVal] = useState<string>("");
   const [certSearchTerm, setCertSearchTerm] = useState("");
   const [showHelpModal, setShowHelpModal] = useState(false);
+
+  // Create Project modal states
+  const [showCreateProjectModal, setShowCreateProjectModal] = useState(false);
+  const [newProjTitle, setNewProjTitle] = useState("");
+  const [newProjId, setNewProjId] = useState("");
+  const [newProjCategory, setNewProjCategory] = useState("Web Systems");
+  const [newProjStatus, setNewProjStatus] = useState("Active");
+  const [newProjTags, setNewProjTags] = useState("REACT, NODE.JS, TYPESCRIPT");
+  const [newProjDesc, setNewProjDesc] = useState("");
+  const [newProjAssigneeMode, setNewProjAssigneeMode] = useState<"existing" | "custom">("existing");
+  const [newProjSelectedUserId, setNewProjSelectedUserId] = useState("");
+  const [newProjCustomEmail, setNewProjCustomEmail] = useState("");
+  const [newProjCustomName, setNewProjCustomName] = useState("");
+  const [newProjRepoUrl, setNewProjRepoUrl] = useState("");
+  const [newProjLiveUrl, setNewProjLiveUrl] = useState("");
+  const [newProjProgress, setNewProjProgress] = useState(15);
+  const [newProjExpectedDays, setNewProjExpectedDays] = useState(30);
+  const [creatingProject, setCreatingProject] = useState(false);
+  const [createProjectError, setCreateProjectError] = useState<string | null>(null);
 
   const [announcements, setAnnouncements] = useState<Announcement[]>(() => {
     const stored = localStorage.getItem("recodex_global_announcements");
@@ -1765,6 +1784,141 @@ export default function Dashboard() {
     }
   };
 
+  const handleCreateProject = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newProjTitle.trim()) {
+      setCreateProjectError("Project title is required.");
+      return;
+    }
+
+    setCreatingProject(true);
+    setCreateProjectError(null);
+
+    try {
+      const token = await getAuthToken();
+      const generatedId = (newProjId.trim() || newProjTitle.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")) + "-" + Math.random().toString(36).substring(2, 6);
+      
+      let assignedEmailVal: string | undefined = undefined;
+      let assignedUserIdVal: string | undefined = undefined;
+      let assignedUserNameVal: string | undefined = undefined;
+
+      if (newProjAssigneeMode === "existing" && newProjSelectedUserId) {
+        const found = dbUsers.find((u) => u.id === newProjSelectedUserId);
+        if (found) {
+          assignedUserIdVal = found.id;
+          assignedEmailVal = found.email?.toLowerCase().trim();
+          assignedUserNameVal = found.name;
+        }
+      } else if (newProjAssigneeMode === "custom" && newProjCustomEmail.trim()) {
+        assignedEmailVal = newProjCustomEmail.trim().toLowerCase();
+        assignedUserNameVal = newProjCustomName.trim() || assignedEmailVal.split("@")[0];
+      }
+
+      const tagsList = newProjTags
+        .split(",")
+        .map((t) => t.trim().toUpperCase())
+        .filter(Boolean);
+
+      const startDateStr = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+      const expDate = new Date(Date.now() + (newProjExpectedDays || 30) * 86400000);
+      const expectedDateStr = expDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+      const contractIdStr = `RCX-CTR-${Math.floor(100000 + Math.random() * 900000)}`;
+
+      const projectPayload = {
+        id: generatedId,
+        title: newProjTitle.trim(),
+        description: newProjDesc.trim() || `Dedicated client deliverable and software sprint execution for ${newProjTitle.trim()}.`,
+        longDescription: newProjDesc.trim(),
+        status: newProjStatus,
+        category: newProjCategory,
+        tags: tagsList.length > 0 ? tagsList : ["REACT", "NODE.JS", "TYPESCRIPT"],
+        assignedEmail: assignedEmailVal,
+        assignedUserId: assignedUserIdVal,
+        assignedUserName: assignedUserNameVal,
+        repoUrl: newProjRepoUrl.trim() || `https://github.com/recodex/${generatedId}`,
+        liveUrl: newProjLiveUrl.trim() || undefined,
+        progress: Number(newProjProgress) || 10,
+        startDate: startDateStr,
+        expectedDate: expectedDateStr,
+        contractId: contractIdStr,
+        isPrivate: true,
+      };
+
+      const created = await createProjectApi(projectPayload, token, adminEmail);
+
+      // Optimistically add to dbProjects
+      setDbProjects((prev) => [created, ...prev]);
+
+      // If assigned, also update local client storage snapshot for instant availability
+      try {
+        const stored = localStorage.getItem("recodex_client_projects");
+        const existingClient: any[] = stored ? JSON.parse(stored) : [];
+        const clientCard = {
+          title: created.title,
+          category: created.category,
+          status: created.status,
+          progress: created.progress || 10,
+          startDate: created.startDate,
+          expectedDate: created.expectedDate,
+          daysRemaining: newProjExpectedDays || 30,
+          repositoryUrl: created.repoUrl,
+          liveUrl: created.liveUrl,
+          leadArchitect: created.assignedUserName || "Veeresh H P (Lead Architect)",
+          techStack: created.tags,
+          contractId: created.contractId,
+          assignedEmail: created.assignedEmail,
+          assignedUserId: created.assignedUserId,
+          milestones: [
+            { id: 1, name: "Architecture & Infrastructure Setup", description: "System scaffolding, dependency pinning, and secure sandbox provisioning.", completed: true },
+            { id: 2, name: "Core Business Logic & API Endpoints", description: "Implementation of backend telemetry, controllers, and database models.", completed: (created.progress || 0) >= 50, current: (created.progress || 0) < 50 },
+            { id: 3, name: "Integration Testing & SLA Verification", description: "Automated end-to-end testing, stress evaluation, and edge compliance.", completed: (created.progress || 0) >= 90, current: (created.progress || 0) >= 50 && (created.progress || 0) < 90 },
+            { id: 4, name: "Production Deployment & Handover", description: "Final release packaging, domain routing, and cryptographic key transfer.", completed: (created.progress || 0) === 100, current: (created.progress || 0) >= 90 && (created.progress || 0) < 100 },
+          ],
+          deliverablesList: [
+            "Complete source code repository",
+            "Production deployment configuration",
+            "Automated test coverage documentation",
+            "Cryptographic certificate of authenticity"
+          ]
+        };
+        existingClient.unshift(clientCard);
+        localStorage.setItem("recodex_client_projects", JSON.stringify(existingClient));
+      } catch (e) {}
+
+      logAdminActivityApi({
+        adminName: adminName || user?.fullName || "Admin",
+        adminEmail: adminEmail || "",
+        action: "CREATED PROJECT",
+        target: `${newProjTitle} (ID: ${generatedId})`,
+        details: `Created new project allocated to ${assignedEmailVal || assignedUserNameVal || "Client"}`
+      });
+
+      setToast({
+        message: `Project "${newProjTitle}" created and assigned to ${assignedEmailVal || assignedUserNameVal || "Client"}!`,
+        type: "success",
+      });
+
+      fetchProjects();
+
+      // Reset form
+      setShowCreateProjectModal(false);
+      setNewProjTitle("");
+      setNewProjId("");
+      setNewProjDesc("");
+      setNewProjCustomEmail("");
+      setNewProjCustomName("");
+      setNewProjSelectedUserId("");
+      setNewProjRepoUrl("");
+      setNewProjLiveUrl("");
+      setNewProjProgress(15);
+    } catch (err: any) {
+      console.error("Project creation failed:", err);
+      setCreateProjectError(err.message || "Failed to create project.");
+    } finally {
+      setCreatingProject(false);
+    }
+  };
+
   const handleModifyProjectStatus = async (projId: string, nextStatus: string) => {
     try {
       const token = await getAuthToken();
@@ -2724,6 +2878,13 @@ export default function Dashboard() {
 
               {/* Filters & Search & Sort */}
               <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
+                <button
+                  onClick={() => setShowCreateProjectModal(true)}
+                  className="px-3.5 py-1.5 bg-primary dark:bg-[#00d1ff] text-white dark:text-black rounded-lg text-xs font-mono font-bold hover:brightness-110 active:scale-95 transition-all flex items-center gap-1.5 shrink-0 cursor-pointer shadow-sm"
+                >
+                  <Plus size={13} />
+                  <span>Create Project</span>
+                </button>
                 <div className="relative w-full md:w-48">
                   <span className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-zinc-400 dark:text-zinc-500">
                     <Search size={12} />
@@ -4049,7 +4210,7 @@ export default function Dashboard() {
         <div className="px-4 py-3">
           <button 
             onClick={() => {
-              setActiveSidebarTab("Projects");
+              setShowCreateProjectModal(true);
               setIsMobileMenuOpen(false);
             }} 
             className="w-full py-2.5 px-4 bg-primary text-white dark:text-black rounded-xl font-mono text-xs font-extrabold uppercase tracking-wider hover:brightness-110 active:scale-95 transition-all shadow-md dark:shadow-[0_0_20px_rgba(0,209,255,0.25)] hover-lift flex items-center justify-center gap-2 cursor-pointer"
@@ -4631,6 +4792,326 @@ export default function Dashboard() {
                 Download Certificate Document
               </button>
             </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Create Project Modal */}
+      {showCreateProjectModal && createPortal(
+        <div className="fixed top-0 left-0 w-screen h-screen bg-black/70 backdrop-blur-md z-[100] flex items-center justify-center p-4 sm:p-6 select-text animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#07090e] border border-black/10 dark:border-white/10 p-6 sm:p-8 rounded-3xl w-full max-w-2xl shadow-2xl relative space-y-6 max-h-[90vh] overflow-y-auto no-scrollbar">
+            <button
+              onClick={() => {
+                setShowCreateProjectModal(false);
+                setCreateProjectError(null);
+              }}
+              className="absolute top-5 right-5 text-zinc-400 hover:text-foreground dark:hover:text-white transition-colors cursor-pointer"
+            >
+              <XCircle size={20} />
+            </button>
+
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary dark:text-[#00d1ff] flex items-center justify-center border border-primary/20">
+                <Code size={20} />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-foreground dark:text-white font-sans font-extrabold uppercase">
+                  Provision New Project Contract
+                </h3>
+                <p className="text-xs text-zinc-500 font-sans">
+                  Allocate and configure an ecosystem project for an individual client or developer.
+                </p>
+              </div>
+            </div>
+
+            {createProjectError && (
+              <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/25 text-rose-400 text-xs font-mono flex items-center gap-2">
+                <AlertTriangle size={15} className="shrink-0" />
+                <span>{createProjectError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleCreateProject} className="space-y-4 font-sans text-xs">
+              {/* Row 1: Title & Category */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider block mb-1.5 font-bold">
+                    Project Title *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Distributed Ledger Microservice"
+                    value={newProjTitle}
+                    onChange={(e) => {
+                      setNewProjTitle(e.target.value);
+                      if (!newProjId) {
+                        const slug = e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+                        setNewProjId(slug);
+                      }
+                    }}
+                    className="w-full px-3.5 py-2.5 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl text-foreground dark:text-white placeholder-zinc-500 focus:outline-none focus:border-primary dark:focus:border-[#00d1ff] transition-all font-sans"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider block mb-1.5 font-bold">
+                    Category *
+                  </label>
+                  <select
+                    value={newProjCategory}
+                    onChange={(e) => setNewProjCategory(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl text-foreground dark:text-white focus:outline-none focus:border-primary dark:focus:border-[#00d1ff] transition-all font-sans cursor-pointer"
+                  >
+                    {categories.map((c) => (
+                      <option key={c} value={c} className="bg-white dark:bg-zinc-900 text-foreground dark:text-white">
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Row 2: Unique ID & Status */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider block mb-1.5 font-bold">
+                    Unique Project Slug / ID
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. distributed-ledger-service"
+                    value={newProjId}
+                    onChange={(e) => setNewProjId(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl text-foreground dark:text-white font-mono text-xs placeholder-zinc-500 focus:outline-none focus:border-primary dark:focus:border-[#00d1ff] transition-all"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider block mb-1.5 font-bold">
+                    Status
+                  </label>
+                  <select
+                    value={newProjStatus}
+                    onChange={(e) => setNewProjStatus(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl text-foreground dark:text-white focus:outline-none focus:border-primary dark:focus:border-[#00d1ff] transition-all font-sans cursor-pointer"
+                  >
+                    <option value="Active" className="bg-white dark:bg-zinc-900">Active (In Sprint)</option>
+                    <option value="In Review" className="bg-white dark:bg-zinc-900">In Review</option>
+                    <option value="Deploying" className="bg-white dark:bg-zinc-900">Deploying</option>
+                    <option value="Completed" className="bg-white dark:bg-zinc-900">Completed</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Client Allocation Section */}
+              <div className="p-4 rounded-2xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/10 dark:border-white/10 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-mono uppercase font-extrabold text-primary dark:text-[#00d1ff] flex items-center gap-1.5">
+                    <ShieldCheck size={13} />
+                    <span>Assign Project to Client / Developer</span>
+                  </span>
+                  <div className="flex items-center gap-1 text-[10px] font-mono">
+                    <button
+                      type="button"
+                      onClick={() => setNewProjAssigneeMode("existing")}
+                      className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                        newProjAssigneeMode === "existing"
+                          ? "bg-primary/20 text-primary dark:text-[#00d1ff] font-bold"
+                          : "text-zinc-500 hover:text-foreground"
+                      }`}
+                    >
+                      Registered User
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNewProjAssigneeMode("custom")}
+                      className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                        newProjAssigneeMode === "custom"
+                          ? "bg-primary/20 text-primary dark:text-[#00d1ff] font-bold"
+                          : "text-zinc-500 hover:text-foreground"
+                      }`}
+                    >
+                      Custom Email
+                    </button>
+                  </div>
+                </div>
+
+                {newProjAssigneeMode === "existing" ? (
+                  <div>
+                    <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider block mb-1.5">
+                      Select Registered User from System ({dbUsers.length} available)
+                    </label>
+                    <select
+                      value={newProjSelectedUserId}
+                      onChange={(e) => setNewProjSelectedUserId(e.target.value)}
+                      className="w-full px-3.5 py-2.5 bg-white dark:bg-[#0b0e14] border border-black/10 dark:border-white/10 rounded-xl text-foreground dark:text-white focus:outline-none focus:border-primary dark:focus:border-[#00d1ff] transition-all font-sans cursor-pointer"
+                    >
+                      <option value="">-- Select a User --</option>
+                      {dbUsers.map((u) => (
+                        <option key={u.id} value={u.id} className="bg-white dark:bg-zinc-900">
+                          {u.name} — {u.email} ({u.role || "client"})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider block mb-1.5">
+                        Client Email Address *
+                      </label>
+                      <input
+                        type="email"
+                        placeholder="client@gmail.com"
+                        value={newProjCustomEmail}
+                        onChange={(e) => setNewProjCustomEmail(e.target.value)}
+                        className="w-full px-3.5 py-2.5 bg-white dark:bg-[#0b0e14] border border-black/10 dark:border-white/10 rounded-xl text-foreground dark:text-white placeholder-zinc-500 focus:outline-none focus:border-primary dark:focus:border-[#00d1ff] transition-all font-sans"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider block mb-1.5">
+                        Client Name (Optional)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Client Full Name"
+                        value={newProjCustomName}
+                        onChange={(e) => setNewProjCustomName(e.target.value)}
+                        className="w-full px-3.5 py-2.5 bg-white dark:bg-[#0b0e14] border border-black/10 dark:border-white/10 rounded-xl text-foreground dark:text-white placeholder-zinc-500 focus:outline-none focus:border-primary dark:focus:border-[#00d1ff] transition-all font-sans"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="text-[10px] font-mono text-zinc-400 bg-amber-500/5 border border-amber-500/20 p-2.5 rounded-xl flex items-start gap-2">
+                  <Lock size={12} className="text-amber-500 shrink-0 mt-0.5" />
+                  <span>
+                    <strong>Security Policy:</strong> This project will only be accessible to the allocated user and administrators at <code>/my-projects</code>. It is excluded from the public marketplace.
+                  </span>
+                </div>
+              </div>
+
+              {/* Progress & Timeline */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <div className="flex justify-between items-center mb-1.5">
+                    <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider font-bold">
+                      Sprint Progress: {newProjProgress}%
+                    </label>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    step="5"
+                    value={newProjProgress}
+                    onChange={(e) => setNewProjProgress(Number(e.target.value))}
+                    className="w-full accent-primary dark:accent-[#00d1ff] cursor-pointer"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider block mb-1.5 font-bold">
+                    Target Duration (Days)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="365"
+                    value={newProjExpectedDays}
+                    onChange={(e) => setNewProjExpectedDays(Number(e.target.value))}
+                    className="w-full px-3.5 py-2.5 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl text-foreground dark:text-white focus:outline-none focus:border-primary dark:focus:border-[#00d1ff] transition-all font-mono"
+                  />
+                </div>
+              </div>
+
+              {/* Tech Stack Tags */}
+              <div>
+                <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider block mb-1.5 font-bold">
+                  Tech Stack (Comma Separated)
+                </label>
+                <input
+                  type="text"
+                  placeholder="REACT, NODE.JS, TYPESCRIPT, TAILWIND"
+                  value={newProjTags}
+                  onChange={(e) => setNewProjTags(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl text-foreground dark:text-white font-mono text-xs placeholder-zinc-500 focus:outline-none focus:border-primary dark:focus:border-[#00d1ff] transition-all"
+                />
+              </div>
+
+              {/* Repo & Live URLs */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider block mb-1.5 font-bold">
+                    Repository URL (Optional)
+                  </label>
+                  <input
+                    type="url"
+                    placeholder="https://github.com/recodex/project"
+                    value={newProjRepoUrl}
+                    onChange={(e) => setNewProjRepoUrl(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl text-foreground dark:text-white placeholder-zinc-500 focus:outline-none focus:border-primary dark:focus:border-[#00d1ff] transition-all font-sans"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider block mb-1.5 font-bold">
+                    Live Demo / Cloud URL (Optional)
+                  </label>
+                  <input
+                    type="url"
+                    placeholder="https://preview.recodex.in"
+                    value={newProjLiveUrl}
+                    onChange={(e) => setNewProjLiveUrl(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl text-foreground dark:text-white placeholder-zinc-500 focus:outline-none focus:border-primary dark:focus:border-[#00d1ff] transition-all font-sans"
+                  />
+                </div>
+              </div>
+
+              {/* Scope & Description */}
+              <div>
+                <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider block mb-1.5 font-bold">
+                  Project Deliverable Description & Specifications
+                </label>
+                <textarea
+                  rows={3}
+                  placeholder="Detail the deliverable scope, sprint objectives, and handover terms..."
+                  value={newProjDesc}
+                  onChange={(e) => setNewProjDesc(e.target.value)}
+                  className="w-full p-3 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl text-foreground dark:text-white placeholder-zinc-500 focus:outline-none focus:border-primary dark:focus:border-[#00d1ff] transition-all font-sans resize-none"
+                />
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCreateProjectModal(false);
+                    setCreateProjectError(null);
+                  }}
+                  className="w-1/2 py-2.5 bg-zinc-100 dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 rounded-xl text-xs font-mono font-bold uppercase tracking-wider hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-all cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={creatingProject}
+                  className="w-1/2 py-2.5 bg-primary dark:bg-[#00d1ff] text-white dark:text-black font-extrabold rounded-xl text-xs uppercase hover:brightness-110 active:scale-95 transition-all cursor-pointer shadow-md disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {creatingProject ? (
+                    <>
+                      <div className="w-3.5 h-3.5 border-2 border-white dark:border-black border-t-transparent rounded-full animate-spin"></div>
+                      <span>Provisioning...</span>
+                    </>
+                  ) : (
+                    <span>Create & Assign Project</span>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>,
         document.body

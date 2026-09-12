@@ -8,6 +8,7 @@ import {
   FileCode2, Users, AlertCircle, ArrowUpRight, Play, MessageSquare
 } from "lucide-react";
 import TerminalModal from "../components/TerminalModal";
+import { getMyProjectsApi } from "../services/api";
 
 interface ProjectDeliverable {
   title: string;
@@ -30,10 +31,12 @@ interface ProjectDeliverable {
   }[];
   deliverablesList: string[];
   contractId: string;
+  assignedEmail?: string;
+  assignedUserId?: string;
 }
 
 export default function MyProjects() {
-  const { isLoaded, userId } = useAuth();
+  const { isLoaded, userId, getToken } = useAuth();
   const { user } = useUser();
   const [clientProjects, setClientProjects] = useState<ProjectDeliverable[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,22 +49,65 @@ export default function MyProjects() {
   const userEmail = (user?.primaryEmailAddress?.emailAddress || "").toLowerCase().trim();
 
   useEffect(() => {
-    // Load real client projects assigned to this user from storage / API
-    try {
-      const stored = localStorage.getItem("recodex_client_projects");
-      if (stored) {
-        const parsed: ProjectDeliverable[] = JSON.parse(stored);
-        setClientProjects(parsed);
-      } else {
-        setClientProjects([]);
+    let isMounted = true;
+    const loadProjects = async () => {
+      if (!isLoaded) return;
+      setLoading(true);
+
+      try {
+        const token = await getToken();
+        const apiProjects = await getMyProjectsApi(token || undefined, userEmail || undefined);
+
+        if (isMounted) {
+          if (Array.isArray(apiProjects) && apiProjects.length > 0) {
+            setClientProjects(apiProjects);
+            localStorage.setItem("recodex_client_projects", JSON.stringify(apiProjects));
+          } else {
+            // Check local fallback with strict user/email matching
+            const stored = localStorage.getItem("recodex_client_projects");
+            if (stored) {
+              const parsed: any[] = JSON.parse(stored);
+              const isAdmin = userEmail === "veereshhp2004@gmail.com" || userEmail.includes("admin") || localStorage.getItem("recodex_admin_user") === "true";
+              const userFiltered = isAdmin
+                ? parsed
+                : parsed.filter((p: any) => {
+                    const matchEmail = p.assignedEmail && p.assignedEmail.toLowerCase().trim() === userEmail;
+                    const matchId = p.assignedUserId && p.assignedUserId === userId;
+                    return matchEmail || matchId;
+                  });
+              setClientProjects(userFiltered);
+            } else {
+              setClientProjects([]);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("API load failed for my-projects:", err);
+        if (isMounted) {
+          const stored = localStorage.getItem("recodex_client_projects");
+          if (stored) {
+            const parsed: any[] = JSON.parse(stored);
+            const isAdmin = userEmail === "veereshhp2004@gmail.com" || userEmail.includes("admin") || localStorage.getItem("recodex_admin_user") === "true";
+            const userFiltered = isAdmin
+              ? parsed
+              : parsed.filter((p: any) => {
+                  const matchEmail = p.assignedEmail && p.assignedEmail.toLowerCase().trim() === userEmail;
+                  const matchId = p.assignedUserId && p.assignedUserId === userId;
+                  return matchEmail || matchId;
+                });
+            setClientProjects(userFiltered);
+          } else {
+            setClientProjects([]);
+          }
+        }
+      } finally {
+        if (isMounted) setLoading(false);
       }
-    } catch (e) {
-      console.warn("Failed to load client projects:", e);
-      setClientProjects([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [isLoaded, userEmail]);
+    };
+
+    loadProjects();
+    return () => { isMounted = false; };
+  }, [isLoaded, userId, userEmail]);
 
   const filteredProjects = clientProjects.filter((p) => {
     const matchesSearch =
@@ -214,6 +260,11 @@ export default function MyProjects() {
                       <span className="text-xs font-mono text-zinc-500 hidden sm:inline">
                         • {project.category}
                       </span>
+                      {project.assignedEmail && (
+                        <span className="text-xs font-mono text-emerald-500/90 hidden md:inline">
+                          • Allotted: {project.assignedEmail}
+                        </span>
+                      )}
                     </div>
                     <h2 className="text-xl sm:text-2xl font-bold text-foreground dark:text-white tracking-tight pt-1">
                       {project.title}

@@ -24,7 +24,9 @@ const upload = (0, multer_1.default)({
 router.get("/", async (req, res) => {
     const { category, search } = req.query;
     try {
-        const filters = {};
+        const filters = {
+            isPrivate: { not: true },
+        };
         if (category) {
             filters.category = String(category);
         }
@@ -72,6 +74,138 @@ router.get("/", async (req, res) => {
     catch (error) {
         console.error("Error fetching projects:", error);
         return res.status(500).json({ error: "Failed to retrieve project listings." });
+    }
+});
+/**
+ * GET /api/projects/my-projects
+ * Authenticated endpoint: Fetches assigned projects for the logged-in user or all client projects if admin.
+ * Strictly enforces that non-admin users only see projects assigned to their ID or email address.
+ */
+router.get("/my-projects", auth_1.requireAuth, async (req, res) => {
+    try {
+        const userId = req.user?.id;
+        const userEmail = req.user?.email?.toLowerCase().trim();
+        const isAdmin = req.user?.role === "admin";
+        if (!userId && !userEmail) {
+            return res.status(401).json({ error: "Authentication required to access client projects." });
+        }
+        let projects = [];
+        if (isAdmin) {
+            // Admins can see all client projects (those with contractId, assignedEmail, or assignments)
+            projects = await db_1.default.project.findMany({
+                where: {
+                    OR: [
+                        { assignedEmail: { not: null } },
+                        { assignedUserId: { not: null } },
+                        { contractId: { not: null } },
+                        { isPrivate: true },
+                        { assignments: { some: {} } },
+                    ],
+                },
+                include: {
+                    assignments: {
+                        include: { user: true },
+                    },
+                    devs: {
+                        include: { user: true },
+                    },
+                },
+                orderBy: { updatedAt: "desc" },
+            });
+        }
+        else {
+            // Regular user / Client: ONLY projects assigned to their Clerk userId OR their email
+            const orConditions = [];
+            if (userId) {
+                orConditions.push({ assignedUserId: userId });
+                orConditions.push({ assignments: { some: { userId } } });
+                orConditions.push({ devs: { some: { userId } } });
+            }
+            if (userEmail) {
+                orConditions.push({ assignedEmail: { equals: userEmail, mode: "insensitive" } });
+            }
+            if (orConditions.length === 0) {
+                return res.json([]);
+            }
+            projects = await db_1.default.project.findMany({
+                where: {
+                    OR: orConditions,
+                },
+                include: {
+                    assignments: {
+                        include: { user: true },
+                    },
+                    devs: {
+                        include: { user: true },
+                    },
+                },
+                orderBy: { updatedAt: "desc" },
+            });
+        }
+        // Format projects to conform with ProjectDeliverable interface
+        const formatted = projects.map((p) => {
+            const pStart = p.startDate || new Date(p.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+            const pExp = p.expectedDate || new Date(new Date(p.createdAt).getTime() + 30 * 86400000).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+            const daysRem = Math.max(0, Math.ceil((new Date(pExp).getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
+            let milestonesList = [];
+            if (p.milestones) {
+                try {
+                    milestonesList = typeof p.milestones === "string" ? JSON.parse(p.milestones) : p.milestones;
+                }
+                catch {
+                    milestonesList = [];
+                }
+            }
+            if (!milestonesList || milestonesList.length === 0) {
+                milestonesList = [
+                    { id: 1, name: "Architecture & Infrastructure Setup", description: "System scaffolding, dependency pinning, and secure sandbox provisioning.", completed: true },
+                    { id: 2, name: "Core Business Logic & API Endpoints", description: "Implementation of backend telemetry, controllers, and database models.", completed: (p.progress || 0) >= 50, current: (p.progress || 0) < 50 },
+                    { id: 3, name: "Integration Testing & SLA Verification", description: "Automated end-to-end testing, stress evaluation, and edge compliance.", completed: (p.progress || 0) >= 90, current: (p.progress || 0) >= 50 && (p.progress || 0) < 90 },
+                    { id: 4, name: "Production Deployment & Handover", description: "Final release packaging, domain routing, and cryptographic key transfer.", completed: (p.progress || 0) === 100, current: (p.progress || 0) >= 90 && (p.progress || 0) < 100 },
+                ];
+            }
+            let deliverablesList = [];
+            if (p.deliverables) {
+                try {
+                    deliverablesList = typeof p.deliverables === "string" ? JSON.parse(p.deliverables) : p.deliverables;
+                }
+                catch {
+                    deliverablesList = [];
+                }
+            }
+            if (!deliverablesList || deliverablesList.length === 0) {
+                deliverablesList = [
+                    "Complete source code repository",
+                    "Production deployment configuration",
+                    "Automated test coverage documentation",
+                    "Cryptographic certificate of authenticity"
+                ];
+            }
+            return {
+                id: p.id,
+                title: p.title,
+                category: p.category,
+                status: p.status || "Active",
+                progress: p.progress !== null && p.progress !== undefined ? p.progress : (p.assignments?.[0]?.progress || 10),
+                startDate: pStart,
+                expectedDate: pExp,
+                daysRemaining: daysRem,
+                repositoryUrl: p.repoUrl || `https://github.com/recodex/${p.id}`,
+                liveUrl: p.liveUrl || undefined,
+                leadArchitect: p.assignedUserName || "Veeresh H P (Lead Architect)",
+                assignedEmail: p.assignedEmail || p.assignments?.[0]?.user?.email || null,
+                assignedUserId: p.assignedUserId || p.assignments?.[0]?.userId || null,
+                techStack: (p.tags && p.tags.length > 0) ? p.tags : ["REACT", "NODE.JS", "TYPESCRIPT", "TAILWIND"],
+                milestones: milestonesList,
+                deliverablesList: deliverablesList,
+                contractId: p.contractId || `RCX-CTR-${p.id.slice(0, 6).toUpperCase()}`,
+            };
+        });
+        return res.json(formatted);
+    }
+    catch (error) {
+        console.error("Error fetching my-projects:", error);
+        return res.status(500).json({ error: "Failed to fetch client projects." });
     }
 });
 /**
@@ -326,7 +460,7 @@ router.post("/:id/submit", auth_1.requireAuth, async (req, res) => {
  */
 router.post("/", auth_1.requireAuth, upload.single("image"), async (req, res) => {
     try {
-        const { id, title, description, longDescription, status, category, tags, files, certificateEnabled, certificateName, completionMethod, scheduledCompletionAt, automaticIssuance, issuanceDelayDays, assignedUserIds, } = req.body;
+        const { id, title, description, longDescription, status, category, tags, files, certificateEnabled, certificateName, completionMethod, scheduledCompletionAt, automaticIssuance, issuanceDelayDays, assignedUserIds, assignedEmail, assignedUserId, assignedUserName, repoUrl, liveUrl, progress, startDate, expectedDate, contractId, isPrivate, milestones, deliverables, } = req.body;
         if (!id || !title || !description || !category) {
             return res.status(400).json({ error: "Missing required project fields (id, title, description, category)." });
         }
@@ -369,6 +503,53 @@ router.post("/", auth_1.requireAuth, upload.single("image"), async (req, res) =>
                 filesJson = { "README.md": `# ${title}\n\nProject initialized.` };
             }
         }
+        let cleanAssignedEmail = assignedEmail ? String(assignedEmail).toLowerCase().trim() : null;
+        let cleanAssignedUserId = assignedUserId ? String(assignedUserId).trim() : null;
+        let cleanAssignedUserName = assignedUserName ? String(assignedUserName).trim() : null;
+        // If assignedEmail is provided, check if user exists in User table
+        if (cleanAssignedEmail && !cleanAssignedUserId) {
+            try {
+                const foundUser = await db_1.default.user.findUnique({ where: { email: cleanAssignedEmail } });
+                if (foundUser) {
+                    cleanAssignedUserId = foundUser.id;
+                    if (!cleanAssignedUserName)
+                        cleanAssignedUserName = foundUser.name;
+                }
+            }
+            catch (e) { }
+        }
+        // If assignedUserId is provided, lookup user email if not set
+        if (cleanAssignedUserId && !cleanAssignedEmail) {
+            try {
+                const foundUser = await db_1.default.user.findUnique({ where: { id: cleanAssignedUserId } });
+                if (foundUser) {
+                    cleanAssignedEmail = foundUser.email?.toLowerCase().trim() || null;
+                    if (!cleanAssignedUserName)
+                        cleanAssignedUserName = foundUser.name;
+                }
+            }
+            catch (e) { }
+        }
+        const isPrivateVal = isPrivate === "true" || isPrivate === true || Boolean(cleanAssignedEmail) || Boolean(cleanAssignedUserId);
+        const contractIdVal = contractId || `RCX-CTR-${id.slice(0, 6).toUpperCase()}`;
+        let milestonesJson = null;
+        if (milestones) {
+            try {
+                milestonesJson = typeof milestones === "string" ? JSON.parse(milestones) : milestones;
+            }
+            catch {
+                milestonesJson = null;
+            }
+        }
+        let deliverablesJson = null;
+        if (deliverables) {
+            try {
+                deliverablesJson = typeof deliverables === "string" ? JSON.parse(deliverables) : deliverables;
+            }
+            catch {
+                deliverablesJson = null;
+            }
+        }
         const project = await db_1.default.project.create({
             data: {
                 id,
@@ -386,10 +567,31 @@ router.post("/", auth_1.requireAuth, upload.single("image"), async (req, res) =>
                 scheduledCompletionAt: scheduledCompletionAt ? new Date(scheduledCompletionAt) : null,
                 automaticIssuance: automaticIssuance === "false" || automaticIssuance === false ? false : true,
                 issuanceDelayDays: issuanceDelayDays ? parseInt(issuanceDelayDays, 10) : 0,
-                devsCount: 0,
+                devsCount: cleanAssignedUserId ? 1 : 0,
+                assignedEmail: cleanAssignedEmail,
+                assignedUserId: cleanAssignedUserId,
+                assignedUserName: cleanAssignedUserName,
+                repoUrl: repoUrl || `https://github.com/recodex/${id}`,
+                liveUrl: liveUrl || null,
+                progress: progress !== undefined && progress !== null ? parseInt(progress, 10) : 10,
+                startDate: startDate || new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+                expectedDate: expectedDate || new Date(Date.now() + 30 * 86400000).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+                contractId: contractIdVal,
+                isPrivate: isPrivateVal,
+                milestones: milestonesJson,
+                deliverables: deliverablesJson,
             },
         });
-        // Handle initial user assignments
+        // Handle direct assigned user linkage
+        if (cleanAssignedUserId) {
+            try {
+                await certificateService_1.ProjectAssignmentService.assignUsersToProject(project.id, [cleanAssignedUserId], req.user?.id || "ADMIN");
+            }
+            catch (err) {
+                console.warn("Direct user assignment warning:", err);
+            }
+        }
+        // Handle additional user assignments
         if (assignedUserIds) {
             let userIdsToAssign = [];
             try {

@@ -2197,5 +2197,82 @@ export async function updateQueryStatusApi(
   return await res.json();
 }
 
+/**
+ * Admin: Creates a new project in the database with user/email assignment and privacy control.
+ */
+export async function createProjectApi(
+  projectData: {
+    id: string;
+    title: string;
+    description: string;
+    longDescription?: string;
+    status?: string;
+    category: string;
+    tags?: string[];
+    assignedEmail?: string;
+    assignedUserId?: string;
+    assignedUserName?: string;
+    repoUrl?: string;
+    liveUrl?: string;
+    progress?: number;
+    startDate?: string;
+    expectedDate?: string;
+    contractId?: string;
+    isPrivate?: boolean;
+    milestones?: any[];
+    deliverables?: string[];
+  },
+  token?: string,
+  userEmail?: string
+): Promise<any> {
+  const authToken = token || (typeof window !== "undefined" ? localStorage.getItem("recodex_session_token") : null) || "admin-bypass-token";
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${authToken}`,
+    "Accept": "application/json",
+  };
+  if (userEmail) {
+    headers["x-user-email"] = userEmail.trim();
+  }
+
+  const res = await fetch(`${API_BASE_URL}/projects`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(projectData),
+  });
+
+  if (!res.ok) {
+    const errData = await res.json().catch(() => ({}));
+    throw new Error(errData.error || `Failed to create project: ${res.status}`);
+  }
+
+  return await res.json();
+}
+
+/**
+ * User / Client Space: Fetches client projects strictly allotted to the authenticated user/email, or all for admin.
+ */
+export async function getMyProjectsApi(token?: string, userEmail?: string): Promise<any[]> {
+  const authToken = token || (typeof window !== "undefined" ? localStorage.getItem("recodex_session_token") : null) || "dev-bypass-token";
+  const headers: Record<string, string> = {
+    "Authorization": `Bearer ${authToken}`,
+    "Accept": "application/json",
+  };
+  if (userEmail) {
+    headers["x-user-email"] = userEmail.trim();
+  }
+
+  const res = await fetch(`${API_BASE_URL}/projects/my-projects`, {
+    method: "GET",
+    headers,
+  });
+
+  if (!res.ok) {
+    return [];
+  }
+
+  return await res.json();
+}
+
 
 
