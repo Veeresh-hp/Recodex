@@ -338,12 +338,15 @@ export default function Profile() {
               !["cert-9402", "cert-1842", "cert-0691"].includes((c.id || "").toLowerCase().trim())
           );
 
-          // STRICT USER MATCH: Certificates must belong strictly to this user's email or ID
+          // STRICT USER MATCH: Certificates must belong strictly to this user's email, ID, or student name
+          const profileName = (profile.name || "").toLowerCase().trim();
           const filtered = cleanedCerts.filter((c) => {
             const certEmail = (c.userEmail || "").toLowerCase().trim();
+            const certStudent = (c.studentName || "").toLowerCase().trim();
             const isEmailMatch = Boolean(certEmail && userEmailClean && certEmail === userEmailClean);
             const isIdMatch = Boolean(c.userId && profile.id && c.userId === profile.id);
-            return isEmailMatch || isIdMatch;
+            const isNameMatch = Boolean(profileName && certStudent && (certStudent === profileName || profileName.includes(certStudent) || certStudent.includes(profileName)));
+            return isEmailMatch || isIdMatch || isNameMatch;
           });
 
           setUserCertificates(filtered);

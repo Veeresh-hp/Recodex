@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { useAuth, useUser, useClerk } from "@clerk/clerk-react";
 import { useLoginModal } from "@/context/LoginModalContext";
+import { getCertificatesApi } from "@/services/api";
 
 export default function Navbar() {
   const { pathname } = useLocation();
@@ -82,6 +83,11 @@ export default function Navbar() {
         const email = (user.primaryEmailAddress?.emailAddress || "").toLowerCase().trim();
         setUserEmail(email);
 
+        const allEmails = [
+          email,
+          ...((user.emailAddresses || []).map((e) => (e.emailAddress || "").toLowerCase().trim())),
+        ].filter(Boolean);
+
         // Check synced users list for promoted admin roles
         const syncedUsersRaw = localStorage.getItem("recodex_synced_users");
         const syncedUsers: any[] = syncedUsersRaw ? JSON.parse(syncedUsersRaw) : [];
@@ -108,28 +114,98 @@ export default function Navbar() {
             .toUpperCase()
         );
 
-        // Load dynamic telemetry counts for this user
-        try {
-          const certsRaw = localStorage.getItem("recodex_synced_certificates");
-          const certs: any[] = certsRaw ? JSON.parse(certsRaw) : [];
-          const matchedCerts = certs.filter(
-            (c: any) =>
-              c && !c.id?.includes("7729") && (
-                (c.userEmail && c.userEmail.toLowerCase().trim() === email) ||
-                (c.userId && c.userId === userId) ||
-                (c.studentName && c.studentName.toLowerCase().includes(name.toLowerCase()))
-              )
-          );
-          setCertCount(matchedCerts.length);
+        const nameAliases = [
+          name.toLowerCase().trim(),
+          (user.fullName || "").toLowerCase().trim(),
+          (user.username || "").toLowerCase().trim(),
+          (user.firstName || "").toLowerCase().trim(),
+          (user.lastName || "").toLowerCase().trim(),
+          email.split("@")[0].toLowerCase().trim(),
+        ].filter(Boolean);
 
+        // Load dynamic telemetry counts for this user
+        const calculateCertTelemetry = (extraCerts: any[] = []) => {
+          try {
+            const deletedRaw = localStorage.getItem("recodex_deleted_certificates");
+            const deletedSet = new Set<string>(
+              deletedRaw ? JSON.parse(deletedRaw).map((s: string) => String(s).toLowerCase().trim()) : []
+            );
+
+            const localRaw1 = localStorage.getItem("recodex_global_certificates");
+            const localRaw2 = localStorage.getItem("recodex_synced_certificates");
+            const localCerts1: any[] = localRaw1 ? JSON.parse(localRaw1) : [];
+            const localCerts2: any[] = localRaw2 ? JSON.parse(localRaw2) : [];
+
+            const combinedMap = new Map<string, any>();
+            [...localCerts1, ...localCerts2, ...extraCerts].forEach((c) => {
+              if (c && (c.id || c.certificateId)) {
+                const key = (c.id || c.certificateId).toLowerCase().trim();
+                if (!deletedSet.has(key)) combinedMap.set(key, c);
+              }
+            });
+
+            const matchedCerts = Array.from(combinedMap.values()).filter((c: any) => {
+              if (!c) return false;
+              const cId = (c.id || "").toLowerCase().trim();
+              const cCertId = (c.certificateId || "").toLowerCase().trim();
+              if (deletedSet.has(cId) || deletedSet.has(cCertId)) return false;
+              if (c.status === "Deleted" || c.status === "DELETED") return false;
+
+              if (c.id?.startsWith("CERT-REQ-") || c.credentialId?.startsWith("RCX-PEND-")) return false;
+              if (["john doe", "alice vance", "sarah connor"].includes((c.studentName || c.recipientName || "").toLowerCase().trim())) return false;
+              if (["cert-9402", "cert-1842", "cert-0691"].includes((c.id || "").toLowerCase().trim())) return false;
+
+              const certEmail = (c.userEmail || c.recipientEmail || "").toLowerCase().trim();
+              const certUserId = (c.userId || "").trim();
+              const certStudent = (c.studentName || c.recipientName || "").toLowerCase().trim();
+
+              const matchEmail = allEmails.length > 0 && certEmail && allEmails.includes(certEmail);
+              const matchUserId = Boolean(userId && certUserId && certUserId === userId);
+              const matchName = Boolean(
+                certStudent &&
+                nameAliases.some((alias) => certStudent === alias || certStudent.includes(alias) || alias.includes(certStudent))
+              );
+
+              return matchEmail || matchUserId || matchName;
+            });
+
+            setCertCount(matchedCerts.length);
+          } catch (e) {
+            console.warn("Cert telemetry count error:", e);
+          }
+        };
+
+        // 1. Calculate immediately from local caches for instant UI update
+        calculateCertTelemetry();
+
+        // 2. Fetch from backend API to ensure server-synced certificates are also included
+        getCertificatesApi(email, userId)
+          .then((serverCerts) => {
+            if (Array.isArray(serverCerts)) {
+              calculateCertTelemetry(serverCerts);
+            }
+          })
+          .catch(() => {});
+
+        try {
           const inqsRaw = localStorage.getItem("recodex_submitted_inquiries");
           const inqs: any[] = inqsRaw ? JSON.parse(inqsRaw) : [];
-          const userInqs = inqs.filter((i: any) => i && i.subject !== "Account Onboarding & Security Clearance" && i.email && i.email.toLowerCase().trim() === email);
+          const userInqs = inqs.filter((i: any) => {
+            if (!i || i.subject === "Account Onboarding & Security Clearance") return false;
+            const inqEmail = (i.email || "").toLowerCase().trim();
+            return inqEmail && allEmails.includes(inqEmail);
+          });
           setInquiryCount(userInqs.length);
 
           const clientProjRaw = localStorage.getItem("recodex_client_projects");
           const clientProjs: any[] = clientProjRaw ? JSON.parse(clientProjRaw) : [];
-          setProjectCount(clientProjs.length);
+          const userProjs = clientProjs.filter((p: any) => {
+            if (!p) return false;
+            const pEmail = (p.userEmail || p.email || "").toLowerCase().trim();
+            const pUserId = (p.userId || "").trim();
+            return (pEmail && allEmails.includes(pEmail)) || (userId && pUserId && pUserId === userId);
+          });
+          setProjectCount(userProjs.length > 0 ? userProjs.length : clientProjs.length);
         } catch (e) {
           console.warn("Telemetry load warning:", e);
         }
@@ -167,10 +243,12 @@ export default function Navbar() {
     window.addEventListener("recodex-auth-update", checkNavAdminStatus);
     window.addEventListener("storage", checkNavAdminStatus);
     window.addEventListener("recodex-inquiry-submitted", checkNavAdminStatus);
+    window.addEventListener("recodex-certificates-update", checkNavAdminStatus);
     return () => {
       window.removeEventListener("recodex-auth-update", checkNavAdminStatus);
       window.removeEventListener("storage", checkNavAdminStatus);
       window.removeEventListener("recodex-inquiry-submitted", checkNavAdminStatus);
+      window.removeEventListener("recodex-certificates-update", checkNavAdminStatus);
     };
   }, [isLoaded, userId, user]);
 
@@ -260,10 +338,15 @@ export default function Navbar() {
                 </Link>
               )}
 
-              {/* Profile Flyout Toggle Avatar Button */}
               <button
                 ref={profileButtonRef}
-                onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
+                onClick={() => {
+                  const next = !profileDropdownOpen;
+                  setProfileDropdownOpen(next);
+                  if (next) {
+                    window.dispatchEvent(new Event("recodex-certificates-update"));
+                  }
+                }}
                 className={`relative w-9 h-9 rounded-full p-[2px] transition-all duration-200 cursor-pointer group shrink-0 ${
                   profileDropdownOpen
                     ? "bg-gradient-to-tr from-primary to-blue-500 shadow-[0_0_15px_rgba(0,209,255,0.4)] scale-105"
