@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { useAuth, useUser } from "@clerk/clerk-react";
 import { getCertificatesApi, requestCertificateApi } from "../services/api";
+import CertificateViewerModal, { downloadCertificateFile } from "../components/CertificateViewerModal";
 import {
   Award, Shield, CheckCircle2, Download, Eye, XCircle, Printer,
   FileText, Sparkles, ArrowLeft, Search, Filter, ShieldCheck,
@@ -401,16 +402,26 @@ export default function Certificates() {
                     </button>
 
                     {cert.fileData && (
-                      <a
-                        href={cert.fileData}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        download={cert.fileName || `Certificate_${cert.id}.pdf`}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const isPdfCert = Boolean(
+                            cert.fileData?.toLowerCase().includes(".pdf") ||
+                            cert.fileType?.toLowerCase().includes("pdf") ||
+                            cert.fileName?.toLowerCase().endsWith(".pdf")
+                          );
+                          const safeExt = isPdfCert ? "pdf" : "png";
+                          downloadCertificateFile(
+                            cert.fileData!,
+                            cert.fileName || `Certificate_${cert.id}_${cert.studentName.replace(/\s+/g, "_")}.${safeExt}`
+                          );
+                        }}
                         className="p-2 rounded-xl bg-black/5 dark:bg-zinc-900 hover:bg-emerald-500/20 text-zinc-600 dark:text-zinc-300 hover:text-emerald-400 transition-all cursor-pointer"
-                        title="Download / Open Certificate File"
+                        title="Download Certificate File"
                       >
                         <Download size={16} />
-                      </a>
+                      </button>
                     )}
 
                     <button
@@ -428,105 +439,12 @@ export default function Certificates() {
         )}
       </main>
 
-      {/* DETAILED CERTIFICATE DOCUMENT VIEWER MODAL */}
+      {/* ROBUST CERTIFICATE VIEWER MODAL (PDF & IMAGES) */}
       {selectedCert && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200 select-text"
-          onClick={() => setSelectedCert(null)}
-        >
-          <div
-            className="relative w-full max-w-4xl bg-[#080b12] text-white border border-cyan-500/30 rounded-3xl p-6 sm:p-8 shadow-[0_0_80px_rgba(0,209,255,0.25)] max-h-[94vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-            ref={printRef}
-          >
-            {/* Modal Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-zinc-800 print:hidden">
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span className="text-xs font-mono uppercase tracking-widest text-zinc-300 font-bold">
-                  Official Certificate Document
-                </span>
-              </div>
-
-              <div className="flex items-center gap-2 flex-wrap">
-                {selectedCert.fileData && (
-                  <a
-                    href={selectedCert.fileData}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-3 py-1.5 bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-500/30 text-xs font-mono font-bold rounded-xl flex items-center gap-1.5 text-cyan-300 transition-colors cursor-pointer"
-                  >
-                    <ExternalLink size={13} />
-                    <span>Open in Cloudinary</span>
-                  </a>
-                )}
-
-                <button
-                  onClick={handlePrint}
-                  className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-xs font-mono font-bold rounded-xl flex items-center gap-1.5 text-zinc-200 transition-colors cursor-pointer"
-                >
-                  <Printer size={13} />
-                  <span>Print</span>
-                </button>
-
-                <button
-                  onClick={() => setSelectedCert(null)}
-                  className="p-1.5 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800 transition-colors cursor-pointer"
-                >
-                  <XCircle size={18} />
-                </button>
-              </div>
-            </div>
-
-            {/* REAL CLOUDINARY UPLOADED DOCUMENT VIEW */}
-            {selectedCert.fileData ? (
-              <div className="mt-6 space-y-4">
-                <div className="p-2 sm:p-4 rounded-2xl bg-zinc-950 border border-zinc-800 overflow-hidden flex flex-col items-center justify-center min-h-[420px]">
-                  {selectedCert.fileData.toLowerCase().includes(".pdf") || selectedCert.fileType === "application/pdf" || selectedCert.fileData.startsWith("data:application/pdf") ? (
-                    <iframe
-                      src={selectedCert.fileData}
-                      title={`Certificate ${selectedCert.id}`}
-                      className="w-full h-[620px] rounded-xl border border-zinc-800 bg-white"
-                    />
-                  ) : (
-                    <div className="w-full flex flex-col items-center">
-                      <img
-                        src={selectedCert.fileData}
-                        alt={`Certificate for ${selectedCert.studentName}`}
-                        className="max-h-[640px] w-auto max-w-full rounded-xl object-contain shadow-2xl border border-zinc-800/80"
-                      />
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 bg-zinc-900/60 rounded-2xl border border-zinc-800 text-xs font-mono">
-                  <div className="space-y-0.5 text-left">
-                    <p className="text-zinc-400">Recipient: <strong className="text-white">{selectedCert.studentName}</strong> ({selectedCert.userEmail})</p>
-                    <p className="text-zinc-500 text-[10px]">Project: {selectedCert.projectName} • Issued on: {selectedCert.issueDate}</p>
-                  </div>
-                  <a
-                    href={selectedCert.fileData}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    download={selectedCert.fileName || `Certificate_${selectedCert.studentName.replace(/\s+/g, "_")}.pdf`}
-                    className="px-4 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 font-bold rounded-xl flex items-center gap-2 uppercase tracking-wider transition-all"
-                  >
-                    <Download size={14} />
-                    <span>Download Official Certificate</span>
-                  </a>
-                </div>
-              </div>
-            ) : (
-              <div className="mt-6 p-8 text-center bg-zinc-950/60 border border-zinc-800 rounded-2xl space-y-3">
-                <FileText size={36} className="mx-auto text-zinc-500" />
-                <h3 className="text-sm font-bold text-white">Official Certificate #{selectedCert.id}</h3>
-                <p className="text-xs text-zinc-400 max-w-sm mx-auto">
-                  Certificate issued for <strong>{selectedCert.projectName}</strong>. The uploaded document is being synchronized by the administration.
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
+        <CertificateViewerModal
+          certificate={selectedCert}
+          onClose={() => setSelectedCert(null)}
+        />
       )}
 
       {/* REQUEST CERTIFICATE MESSAGE TO ADMIN MODAL */}

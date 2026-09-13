@@ -24,6 +24,7 @@ import {
 import { MOCK_PROJECTS } from "../data/mockData";
 import { subscribeToQuery, subscribeToGlobalQueriesFeed } from "../services/realtime";
 import { useTheme } from "../context/ThemeContext";
+import CertificateViewerModal, { downloadCertificateFile } from "../components/CertificateViewerModal";
 
 interface Deployment {
   id: string;
@@ -1645,20 +1646,41 @@ export default function Dashboard() {
     };
 
     try {
-      await saveCertificateApi(newCert);
+      const res = await saveCertificateApi(newCert);
+      if (res && (res.certificate || res.id)) {
+        const updated = res.certificate || res;
+        setCertificates((prev) => {
+          const existingIdx = prev.findIndex((c) => c.id === certId || (targetEmail && c.userEmail === targetEmail));
+          if (existingIdx >= 0) {
+            const copy = [...prev];
+            copy[existingIdx] = { ...newCert, ...updated };
+            return copy;
+          }
+          return [{ ...newCert, ...updated }, ...prev];
+        });
+      } else {
+        setCertificates((prev) => {
+          const existingIdx = prev.findIndex((c) => c.id === certId || (targetEmail && c.userEmail === targetEmail));
+          if (existingIdx >= 0) {
+            const copy = [...prev];
+            copy[existingIdx] = newCert;
+            return copy;
+          }
+          return [newCert, ...prev];
+        });
+      }
     } catch (apiErr) {
       console.warn("API save certificate fallback warning:", apiErr);
+      setCertificates((prev) => {
+        const existingIdx = prev.findIndex((c) => c.id === certId || (targetEmail && c.userEmail === targetEmail));
+        if (existingIdx >= 0) {
+          const copy = [...prev];
+          copy[existingIdx] = newCert;
+          return copy;
+        }
+        return [newCert, ...prev];
+      });
     }
-
-    setCertificates((prev) => {
-      const existingIdx = prev.findIndex((c) => c.id === certId || (targetEmail && c.userEmail === targetEmail));
-      if (existingIdx >= 0) {
-        const copy = [...prev];
-        copy[existingIdx] = newCert;
-        return copy;
-      }
-      return [newCert, ...prev];
-    });
 
     // Create & dispatch notification for target user
     try {
@@ -1718,12 +1740,16 @@ export default function Dashboard() {
 
   const handleDownloadCertFile = (cert: Certificate) => {
     if (cert.fileData) {
-      const link = document.createElement("a");
-      link.href = cert.fileData;
-      link.download = cert.fileName || `Certificate_${cert.studentName.replace(/\s+/g, "_")}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
+      const isPdfCert = Boolean(
+        cert.fileData.toLowerCase().includes(".pdf") ||
+        cert.fileType?.toLowerCase().includes("pdf") ||
+        cert.fileName?.toLowerCase().endsWith(".pdf")
+      );
+      const safeExt = isPdfCert ? "pdf" : "png";
+      downloadCertificateFile(
+        cert.fileData,
+        cert.fileName || `Certificate_${cert.id}_${cert.studentName.replace(/\s+/g, "_")}.${safeExt}`
+      );
     } else {
       const certText = `RECODEX VERIFIED CERTIFICATE OF COMPLETION\n============================================\nCertificate ID: ${cert.id}\nStudent/Developer Name: ${cert.studentName}\nProject Title: ${cert.projectName}\nIssue Date: ${cert.issueDate}\nStatus: VERIFIED & APPROVED\nIssuer: RecodeX Developer Marketplace & Software Solutions\nVerification Signature: ${Math.random().toString(36).substring(2, 15).toUpperCase()}\n`;
       const blob = new Blob([certText], { type: "text/plain" });
@@ -5397,38 +5423,45 @@ export default function Dashboard() {
       )}
 
       {/* Global View Certificate Details Modal */}
-      {selectedCertView && createPortal(
-        <div className="fixed top-0 left-0 w-screen h-screen bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-6 select-text animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-[#07090e] border border-black/10 dark:border-zinc-800 p-8 rounded-2xl w-full max-w-md shadow-2xl relative space-y-6 text-center">
-            <button onClick={() => setSelectedCertView(null)} className="absolute top-4 right-4 text-zinc-400 hover:text-foreground dark:hover:text-white cursor-pointer"><XCircle size={18} /></button>
-            <Award size={48} className="text-primary dark:text-[#00d1ff] mx-auto animate-pulse" />
-            <div className="space-y-1">
-              <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest block">RecodeX Verified Credential</span>
-              <h2 className="text-xl font-extrabold text-foreground dark:text-white font-sans">{selectedCertView.studentName}</h2>
-              <p className="text-xs text-zinc-500 font-sans">{selectedCertView.projectName}</p>
-            </div>
+      {selectedCertView && (
+        selectedCertView.fileData ? (
+          <CertificateViewerModal
+            certificate={selectedCertView}
+            onClose={() => setSelectedCertView(null)}
+          />
+        ) : createPortal(
+          <div className="fixed top-0 left-0 w-screen h-screen bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-6 select-text animate-in fade-in duration-200">
+            <div className="bg-white dark:bg-[#07090e] border border-black/10 dark:border-zinc-800 p-8 rounded-2xl w-full max-w-md shadow-2xl relative space-y-6 text-center">
+              <button onClick={() => setSelectedCertView(null)} className="absolute top-4 right-4 text-zinc-400 hover:text-foreground dark:hover:text-white cursor-pointer"><XCircle size={18} /></button>
+              <Award size={48} className="text-primary dark:text-[#00d1ff] mx-auto animate-pulse" />
+              <div className="space-y-1">
+                <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest block">RecodeX Verified Credential</span>
+                <h2 className="text-xl font-extrabold text-foreground dark:text-white font-sans">{selectedCertView.studentName}</h2>
+                <p className="text-xs text-zinc-500 font-sans">{selectedCertView.projectName}</p>
+              </div>
 
-            <div className="p-4 border border-dashed border-black/10 dark:border-zinc-800 rounded-xl space-y-1.5 font-mono text-[10px] text-zinc-500 uppercase text-left">
-              <div className="flex justify-between"><span>Certificate ID:</span> <strong className="text-primary dark:text-[#00d1ff]">{selectedCertView.id}</strong></div>
-              <div className="flex justify-between"><span>Issue Date:</span> <strong className="text-foreground dark:text-white">{selectedCertView.issueDate}</strong></div>
-              <div className="flex justify-between"><span>Verification Status:</span> <strong className="text-emerald-500">{selectedCertView.status}</strong></div>
-              {selectedCertView.fileName && (
-                <div className="flex justify-between"><span>Attached Document:</span> <strong className="text-zinc-700 dark:text-zinc-300 truncate max-w-[160px]">{selectedCertView.fileName}</strong></div>
-              )}
-            </div>
+              <div className="p-4 border border-dashed border-black/10 dark:border-zinc-800 rounded-xl space-y-1.5 font-mono text-[10px] text-zinc-500 uppercase text-left">
+                <div className="flex justify-between"><span>Certificate ID:</span> <strong className="text-primary dark:text-[#00d1ff]">{selectedCertView.id}</strong></div>
+                <div className="flex justify-between"><span>Issue Date:</span> <strong className="text-foreground dark:text-white">{selectedCertView.issueDate}</strong></div>
+                <div className="flex justify-between"><span>Verification Status:</span> <strong className="text-emerald-500">{selectedCertView.status}</strong></div>
+                {selectedCertView.fileName && (
+                  <div className="flex justify-between"><span>Attached Document:</span> <strong className="text-zinc-700 dark:text-zinc-300 truncate max-w-[160px]">{selectedCertView.fileName}</strong></div>
+                )}
+              </div>
 
-            <div className="flex gap-3">
-              <button
-                onClick={() => handleDownloadCertFile(selectedCertView)}
-                className="w-full py-2.5 bg-primary dark:bg-[#00d1ff] text-white dark:text-black font-extrabold rounded-xl text-xs uppercase flex items-center justify-center gap-2 hover:brightness-110 active:scale-95 transition-all cursor-pointer shadow-md"
-              >
-                <Download size={14} />
-                Download Certificate Document
-              </button>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => handleDownloadCertFile(selectedCertView)}
+                  className="w-full py-2.5 bg-primary dark:bg-[#00d1ff] text-white dark:text-black font-extrabold rounded-xl text-xs uppercase flex items-center justify-center gap-2 hover:brightness-110 active:scale-95 transition-all cursor-pointer shadow-md"
+                >
+                  <Download size={14} />
+                  Download Certificate Document
+                </button>
+              </div>
             </div>
-          </div>
-        </div>,
-        document.body
+          </div>,
+          document.body
+        )
       )}
 
       {/* Create Project Modal */}

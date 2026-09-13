@@ -1416,7 +1416,26 @@ export async function saveCertificateApi(cert: any): Promise<any> {
       body: JSON.stringify(cert),
     });
     if (response.ok) {
-      return await response.json();
+      const resData = await response.json();
+      const updated = resData.certificate || resData;
+      if (updated && (updated.id || updated.certificateId)) {
+        try {
+          const stored = localStorage.getItem("recodex_global_certificates");
+          const certs: any[] = stored ? JSON.parse(stored) : [];
+          const idx = certs.findIndex((c: any) => c.id === cert.id || c.id === updated.id || c.id === updated.certificateId);
+          if (idx >= 0) {
+            certs[idx] = { ...certs[idx], ...updated };
+          } else {
+            certs.unshift(updated);
+          }
+          localStorage.setItem("recodex_global_certificates", JSON.stringify(certs));
+          localStorage.setItem("recodex_synced_certificates", JSON.stringify(certs));
+          window.dispatchEvent(new Event("recodex-certificates-update"));
+        } catch (sErr) {
+          console.warn("Storage sync update note:", sErr);
+        }
+      }
+      return resData;
     }
   } catch (err) {
     console.warn("[CERTIFICATES API] Save backend warning (saved locally):", err);
@@ -1451,6 +1470,7 @@ export async function adminManualUploadCertificateApi(certData: any, token?: str
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
       "Accept": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     };
     if (token) {
       headers["Authorization"] = `Bearer ${token}`;
@@ -1464,6 +1484,21 @@ export async function adminManualUploadCertificateApi(certData: any, token?: str
 
     if (response.ok) {
       const data = await response.json();
+      const updated = data.certificate || data;
+      if (updated && (updated.id || updated.certificateId)) {
+        try {
+          const stored = localStorage.getItem("recodex_global_certificates");
+          const certs: any[] = stored ? JSON.parse(stored) : [];
+          const idx = certs.findIndex((c: any) => c.id === certData.id || c.id === updated.id || c.id === updated.certificateId);
+          if (idx >= 0) {
+            certs[idx] = { ...certs[idx], ...updated };
+          } else {
+            certs.unshift(updated);
+          }
+          localStorage.setItem("recodex_global_certificates", JSON.stringify(certs));
+          localStorage.setItem("recodex_synced_certificates", JSON.stringify(certs));
+        } catch (sErr) {}
+      }
       window.dispatchEvent(new Event("recodex-certificates-update"));
       return data;
     }

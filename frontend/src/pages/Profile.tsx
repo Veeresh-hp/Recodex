@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { useAuth, useUser, useClerk } from "@clerk/clerk-react";
 import { getUserProfile, getInquiries, getCertificatesApi, getPromotedAdminsApi } from "@/services/api";
+import { downloadCertificateFile } from "@/components/CertificateViewerModal";
 import {
   User as UserIcon, Shield, Mail, Phone, Cpu, ArrowLeft, ArrowRight,
   CheckCircle, ExternalLink, Camera, Upload, X, Check, CreditCard,
@@ -364,12 +365,16 @@ export default function Profile() {
 
   const handleDownloadUserCert = (cert: Certificate) => {
     if (cert.fileData) {
-      const link = document.createElement("a");
-      link.href = cert.fileData;
-      link.download = cert.fileName || `Certificate_${cert.studentName.replace(/\s+/g, "_")}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
+      const isPdfCert = Boolean(
+        cert.fileData.toLowerCase().includes(".pdf") ||
+        cert.fileType?.toLowerCase().includes("pdf") ||
+        cert.fileName?.toLowerCase().endsWith(".pdf")
+      );
+      const safeExt = isPdfCert ? "pdf" : "png";
+      downloadCertificateFile(
+        cert.fileData,
+        cert.fileName || `Certificate_${cert.id}_${cert.studentName.replace(/\s+/g, "_")}.${safeExt}`
+      );
     } else {
       const certText = `RECODEX VERIFIED CERTIFICATE OF COMPLETION\n============================================\nCertificate ID: ${cert.id}\nStudent/Developer Name: ${cert.studentName}\nProject Title: ${cert.projectName}\nIssue Date: ${cert.issueDate}\nStatus: VERIFIED & APPROVED\nIssuer: RecodeX Developer Marketplace & Software Solutions\nVerification Signature: ${Math.random().toString(36).substring(2, 15).toUpperCase()}\n`;
       const blob = new Blob([certText], { type: "text/plain" });
