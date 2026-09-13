@@ -17,8 +17,20 @@ import { submitInquiry, getInquiries } from "@/services/api";
 
 export default function Contact() {
   const { user } = useUser();
-  const userEmail = user?.primaryEmailAddress?.emailAddress || "";
   const [customerInquiries, setCustomerInquiries] = useState<any[]>([]);
+
+  const userEmail = (
+    user?.primaryEmailAddress?.emailAddress ||
+    user?.emailAddresses?.[0]?.emailAddress ||
+    ""
+  ).toLowerCase().trim();
+
+  const allUserEmails = (user?.emailAddresses || [])
+    .map((e) => (e.emailAddress || "").toLowerCase().trim())
+    .filter(Boolean);
+  if (userEmail && !allUserEmails.includes(userEmail)) {
+    allUserEmails.push(userEmail);
+  }
 
   const [formData, setFormData] = useState({
     name: "",
@@ -27,6 +39,16 @@ export default function Contact() {
     type: "",
     message: ""
   });
+
+  useEffect(() => {
+    if (user) {
+      setFormData((prev) => ({
+        ...prev,
+        name: prev.name || [user.firstName, user.lastName].filter(Boolean).join(" ") || user.fullName || user.username || "",
+        email: prev.email || user.primaryEmailAddress?.emailAddress || "",
+      }));
+    }
+  }, [user]);
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -36,8 +58,14 @@ export default function Contact() {
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
 
   const loadInquiries = async () => {
+    // STRICT PRIVACY: Unauthenticated users or users with no email must never see inquiry responses
+    if (allUserEmails.length === 0) {
+      setCustomerInquiries([]);
+      return;
+    }
+
     try {
-      const all = await getInquiries("");
+      const all = await getInquiries("", userEmail);
       const repliesMapRaw = typeof window !== "undefined" ? localStorage.getItem("recodex_inquiry_replies") : null;
       const repliesMap = repliesMapRaw ? JSON.parse(repliesMapRaw) : {};
 
@@ -46,10 +74,10 @@ export default function Contact() {
         return r ? { ...inq, reply: r } : inq;
       });
 
+      // ONLY display inquiries submitted by THIS authenticated user
       const userList = list.filter((inq: any) => {
-        if (inq.reply) return true;
-        if (!userEmail) return false;
-        return inq.email && inq.email.toLowerCase() === userEmail.toLowerCase();
+        const inqEmail = (inq.email || "").toLowerCase().trim();
+        return inqEmail && allUserEmails.includes(inqEmail);
       });
 
       setCustomerInquiries(userList);
@@ -66,7 +94,7 @@ export default function Contact() {
       window.removeEventListener("recodex-inquiry-replied", loadInquiries);
       window.removeEventListener("recodex-inquiry-submitted", loadInquiries);
     };
-  }, [userEmail]);
+  }, [userEmail, user]);
 
   const toggleFaq = (index: number) => {
     setActiveFaq(activeFaq === index ? null : index);
