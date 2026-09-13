@@ -416,8 +416,11 @@ export default function Certificates() {
                             cert.fileName?.toLowerCase().endsWith(".pdf")
                           );
                           const safeExt = isPdfCert ? "pdf" : "png";
+                          const targetSrc = cert.fileData!.includes("res.cloudinary.com")
+                            ? cert.fileData!.replace(/\.pdf(\?.*)?$/i, ".png$1").replace(/\/upload\//, "/upload/f_png,q_auto:best,w_1800/")
+                            : cert.fileData!;
                           downloadCertificateFile(
-                            cert.fileData!,
+                            targetSrc,
                             cert.fileName || `Certificate_${cert.id}_${cert.studentName.replace(/\s+/g, "_")}.${safeExt}`,
                             isPdfCert
                           );

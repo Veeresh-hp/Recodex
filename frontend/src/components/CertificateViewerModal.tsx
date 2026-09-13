@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   Award, Download, ExternalLink, Printer, XCircle, ZoomIn, ZoomOut,
-  RotateCw, Maximize2, Minimize2, ShieldCheck, CheckCircle2, FileText
+  RotateCw, Maximize2, Minimize2, ShieldCheck, CheckCircle2, FileText, Loader2
 } from "lucide-react";
 
 export interface CertificateItem {
@@ -27,89 +27,195 @@ interface Props {
 }
 
 /**
- * Robust file downloader that enforces true file downloads across origins
- * and Cloudinary CDN assets.
+ * Generates a valid standard PDF document (PDF 1.4) containing the certificate image.
+ * Runs 100% in browser so it bypasses Cloudinary's default raw PDF delivery block.
  */
-export async function downloadCertificateFile(url: string, filename: string, forcePdf: boolean = false) {
+export async function generatePdfBlobFromImageUrl(imageUrl: string): Promise<Blob> {
+  // Fetch as blob first if possible to prevent cross-origin canvas security errors
+  let localUrl = imageUrl;
+  let shouldRevoke = false;
   try {
-    let targetUrl = url;
-
-    // If Cloudinary URL, format for direct attachment download
-    if (targetUrl.includes("res.cloudinary.com")) {
-      if (forcePdf && !targetUrl.toLowerCase().includes(".pdf")) {
-        targetUrl = targetUrl.replace(/\.(png|jpe?g|webp)(\?.*)?$/i, ".pdf$1");
-      }
-      if (targetUrl.includes("/upload/")) {
-        targetUrl = targetUrl.replace(/\/upload\/(fl_attachment\/)?/, "/upload/fl_attachment/");
-      }
-      const a = document.createElement("a");
-      a.href = targetUrl;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      return;
+    const res = await fetch(imageUrl, { mode: "cors" });
+    if (res.ok) {
+      const b = await res.blob();
+      localUrl = URL.createObjectURL(b);
+      shouldRevoke = true;
     }
-
-    // Base64 or Blob URL direct download
-    if (targetUrl.startsWith("data:") || targetUrl.startsWith("blob:")) {
-      const a = document.createElement("a");
-      a.href = targetUrl;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      return;
-    }
-
-    // Fetch binary blob to enforce download across other origins
-    const res = await fetch(targetUrl, { mode: "cors" });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const blob = await res.blob();
-    const blobUrl = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = blobUrl;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(blobUrl), 3000);
-  } catch (err) {
-    const a = document.createElement("a");
-    a.href = url;
-    a.target = "_blank";
-    a.rel = "noopener noreferrer";
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+  } catch (e) {
+    // If fetch failed, fallback to direct URL
   }
+
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.naturalWidth || 1600;
+        canvas.height = img.naturalHeight || 1130;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) throw new Error("Canvas context failed");
+
+        // Clean white background
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0);
+
+        canvas.toBlob((jpegBlob) => {
+          if (shouldRevoke) URL.revokeObjectURL(localUrl);
+
+          if (!jpegBlob) {
+            reject(new Error("Failed to export canvas to JPEG"));
+            return;
+          }
+
+          const reader = new FileReader();
+          reader.onload = () => {
+            try {
+              const buffer = reader.result as ArrayBuffer;
+              const bytes = new Uint8Array(buffer);
+
+              const w = canvas.width;
+              const h = canvas.height;
+
+              // Scale pixels to standard 72 DPI PDF points
+              const pdfWidth = Math.round(w * 0.75);
+              const pdfHeight = Math.round(h * 0.75);
+
+              const header = `%PDF-1.4\n`;
+              const obj1 = `1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n`;
+              const obj2 = `2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n`;
+              const obj3 = `3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pdfWidth} ${pdfHeight}] /Resources << /XObject << /Im 4 0 R >> >> /Contents 5 0 R >>\nendobj\n`;
+              const obj4Header = `4 0 obj\n<< /Type /XObject /Subtype /Image /Width ${w} /Height ${h} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${bytes.length} >>\nstream\n`;
+              const obj4Footer = `\nendstream\nendobj\n`;
+              const streamContent = `q\n${pdfWidth} 0 0 ${pdfHeight} 0 0 cm\n/Im Do\nQ\n`;
+              const obj5 = `5 0 obj\n<< /Length ${streamContent.length} >>\nstream\n${streamContent}endstream\nendobj\n`;
+
+              const enc = new TextEncoder();
+              const hBytes = enc.encode(header);
+              const o1Bytes = enc.encode(obj1);
+              const o2Bytes = enc.encode(obj2);
+              const o3Bytes = enc.encode(obj3);
+              const o4HBytes = enc.encode(obj4Header);
+              const o4FBytes = enc.encode(obj4Footer);
+              const o5Bytes = enc.encode(obj5);
+
+              const offset1 = hBytes.length;
+              const offset2 = offset1 + o1Bytes.length;
+              const offset3 = offset2 + o2Bytes.length;
+              const offset4 = offset3 + o3Bytes.length;
+              const offset5 = offset4 + o4HBytes.length + bytes.length + o4FBytes.length;
+              const xrefOffset = offset5 + o5Bytes.length;
+
+              const pad = (n: number) => n.toString().padStart(10, "0");
+              const xref = `xref\n0 6\n0000000000 65535 f \n${pad(offset1)} 00000 n \n${pad(offset2)} 00000 n \n${pad(offset3)} 00000 n \n${pad(offset4)} 00000 n \n${pad(offset5)} 00000 n \n`;
+              const trailer = `trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`;
+              const trailerBytes = enc.encode(xref + trailer);
+
+              const totalSize =
+                hBytes.length +
+                o1Bytes.length +
+                o2Bytes.length +
+                o3Bytes.length +
+                o4HBytes.length +
+                bytes.length +
+                o4FBytes.length +
+                o5Bytes.length +
+                trailerBytes.length;
+
+              const pdfBytes = new Uint8Array(totalSize);
+
+              let cursor = 0;
+              pdfBytes.set(hBytes, cursor); cursor += hBytes.length;
+              pdfBytes.set(o1Bytes, cursor); cursor += o1Bytes.length;
+              pdfBytes.set(o2Bytes, cursor); cursor += o2Bytes.length;
+              pdfBytes.set(o3Bytes, cursor); cursor += o3Bytes.length;
+              pdfBytes.set(o4HBytes, cursor); cursor += o4HBytes.length;
+              pdfBytes.set(bytes, cursor); cursor += bytes.length;
+              pdfBytes.set(o4FBytes, cursor); cursor += o4FBytes.length;
+              pdfBytes.set(o5Bytes, cursor); cursor += o5Bytes.length;
+              pdfBytes.set(trailerBytes, cursor); cursor += trailerBytes.length;
+
+              const pdfBlob = new Blob([pdfBytes], { type: "application/pdf" });
+              resolve(pdfBlob);
+            } catch (err) {
+              reject(err);
+            }
+          };
+          reader.readAsArrayBuffer(jpegBlob);
+        }, "image/jpeg", 0.98);
+      } catch (err) {
+        if (shouldRevoke) URL.revokeObjectURL(localUrl);
+        reject(err);
+      }
+    };
+    img.onerror = () => {
+      if (shouldRevoke) URL.revokeObjectURL(localUrl);
+      reject(new Error("Image failed to load for PDF generation"));
+    };
+    img.src = localUrl;
+  });
 }
 
 /**
- * Opens document in a clean new browser tab.
+ * Downloads the certificate document either as a real vector PDF or as a high-res image.
  */
-export function openCertificateInNewTab(url: string, blobUrl?: string) {
-  const target = blobUrl || url;
-  if (target.startsWith("data:")) {
+export async function downloadCertificateFile(
+  imageUrl: string,
+  filename: string,
+  asPdf: boolean = true
+) {
+  if (asPdf) {
     try {
-      const parts = target.split(",");
-      const mime = parts[0].match(/:(.*?);/)?.[1] || "application/pdf";
-      const binary = atob(parts[1]);
-      const bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) {
-        bytes[i] = binary.charCodeAt(i);
-      }
-      const b = new Blob([bytes], { type: mime });
-      const bUrl = URL.createObjectURL(b);
-      window.open(bUrl, "_blank", "noopener,noreferrer");
-      setTimeout(() => URL.revokeObjectURL(bUrl), 60000);
+      const pdfBlob = await generatePdfBlobFromImageUrl(imageUrl);
+      const blobUrl = URL.createObjectURL(pdfBlob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      const pdfName = filename.toLowerCase().endsWith(".pdf")
+        ? filename
+        : `${filename.replace(/\.[^/.]+$/, "")}.pdf`;
+      a.download = pdfName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
       return;
     } catch (e) {
-      console.warn("Blob conversion failed, opening direct:", e);
+      console.warn("Client PDF generation fallback to image download:", e);
     }
   }
-  window.open(target, "_blank", "noopener,noreferrer");
+
+  // Fallback: direct image download
+  try {
+    const res = await fetch(imageUrl, { mode: "cors" });
+    if (res.ok) {
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+      return;
+    }
+  } catch (e) {}
+
+  const a = document.createElement("a");
+  a.href = imageUrl;
+  a.target = "_blank";
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+/**
+ * Opens image document in a new browser tab.
+ */
+export function openCertificateInNewTab(url: string) {
+  window.open(url, "_blank", "noopener,noreferrer");
 }
 
 export default function CertificateViewerModal({ certificate, onClose }: Props) {
@@ -121,7 +227,9 @@ export default function CertificateViewerModal({ certificate, onClose }: Props) 
   const issueDate = certificate.issueDate || "Verified";
   const certId = certificate.credentialId || certificate.id;
 
-  // Detect whether this was uploaded as a PDF
+  const [downloading, setDownloading] = useState(false);
+
+  // Detect whether this was originally uploaded as a PDF
   const isPdf = useMemo(() => {
     if (!fileData && !fileName && !fileType) return false;
     const fd = fileData.toLowerCase();
@@ -136,7 +244,7 @@ export default function CertificateViewerModal({ certificate, onClose }: Props) 
 
   const isCloudinary = Boolean(fileData && fileData.includes("res.cloudinary.com"));
 
-  // Cloudinary image transformation URL: renders the PDF page directly as a crisp PNG image
+  // Cloudinary image transformation URL: renders the PDF directly as a crystal-clear PNG image
   const cloudinaryPngUrl = useMemo(() => {
     if (!isCloudinary || !fileData) return "";
     let clean = fileData.replace(/\.pdf(\?.*)?$/i, ".png$1");
@@ -146,27 +254,13 @@ export default function CertificateViewerModal({ certificate, onClose }: Props) 
     return clean;
   }, [fileData, isCloudinary]);
 
-  // Convert base64 PDF data to Blob URL for direct PDF downloads
-  const [blobPdfUrl, setBlobPdfUrl] = useState<string>("");
-  // In-browser rendered image if base64 PDF is provided locally
+  // Local rendered image if base64 PDF is passed
   const [base64PdfImage, setBase64PdfImage] = useState<string>("");
 
   useEffect(() => {
-    let createdUrl = "";
     if (fileData && fileData.startsWith("data:application/pdf")) {
       try {
         const base64Data = fileData.split(",")[1] || fileData;
-        const binaryString = window.atob(base64Data);
-        const len = binaryString.length;
-        const bytes = new Uint8Array(len);
-        for (let i = 0; i < len; i++) {
-          bytes[i] = binaryString.charCodeAt(i);
-        }
-        const blob = new Blob([bytes], { type: "application/pdf" });
-        createdUrl = URL.createObjectURL(blob);
-        setBlobPdfUrl(createdUrl);
-
-        // Dynamically load PDF.js from CDN to render local base64 PDF directly to image canvas
         const renderLocalPdf = async () => {
           try {
             const pdfjsLib = (window as any).pdfjsLib;
@@ -206,29 +300,17 @@ export default function CertificateViewerModal({ certificate, onClose }: Props) 
               document.head.appendChild(script);
             }
           } catch (e) {
-            console.warn("Local PDF to image render note:", e);
+            console.warn("Local PDF render note:", e);
           }
         };
         renderLocalPdf();
       } catch (err) {
-        console.error("Failed to process PDF data:", err);
+        console.error("PDF data processing note:", err);
       }
-    } else {
-      setBlobPdfUrl("");
-      setBase64PdfImage("");
     }
-
-    return () => {
-      if (createdUrl) {
-        URL.revokeObjectURL(createdUrl);
-      }
-    };
   }, [fileData]);
 
-  // Primary image source to display in the viewer:
-  // 1) Cloudinary converted PNG image (super high resolution vector render)
-  // 2) Locally rendered base64 PDF image
-  // 3) fileData directly (for regular PNG/JPG/WEBP images)
+  // The primary image source to display in the viewer
   const displayImageSrc = useMemo(() => {
     if (isCloudinary && isPdf && cloudinaryPngUrl) {
       return cloudinaryPngUrl;
@@ -259,22 +341,19 @@ export default function CertificateViewerModal({ certificate, onClose }: Props) 
   const toggleFullscreen = () => setIsFullscreen(!isFullscreen);
   const handlePrint = () => window.print();
 
-  // The actual PDF download target (preserves .pdf extension and downloads the real PDF document)
-  const downloadPdfTarget = useMemo(() => {
-    if (isCloudinary && isPdf) {
-      // Ensure it points to the original .pdf asset, not .png
-      let pdfUrl = fileData;
-      if (!pdfUrl.toLowerCase().includes(".pdf")) {
-        pdfUrl = pdfUrl.replace(/\.(png|jpe?g|webp)(\?.*)?$/i, ".pdf$1");
-      }
-      return pdfUrl;
-    }
-    return blobPdfUrl || fileData;
-  }, [isCloudinary, isPdf, fileData, blobPdfUrl]);
-
   const safeDownloadFilename = fileName
     ? (isPdf && !fileName.toLowerCase().endsWith(".pdf") ? `${fileName.replace(/\.[^/.]+$/, "")}.pdf` : fileName)
     : `Certificate_${certId}_${studentName.replace(/\s+/g, "_")}.${isPdf ? "pdf" : "png"}`;
+
+  const handleDownload = async () => {
+    if (!displayImageSrc || downloading) return;
+    setDownloading(true);
+    try {
+      await downloadCertificateFile(displayImageSrc, safeDownloadFilename, isPdf);
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   return (
     <div
@@ -336,7 +415,7 @@ export default function CertificateViewerModal({ certificate, onClose }: Props) 
             </div>
           </div>
 
-          {/* Action Toolbar (Only Image Controls: Zoom, Rotate, External Link, Print, Fullscreen, Close) */}
+          {/* Action Toolbar */}
           <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap justify-end">
             {/* Zoom and Rotate Controls */}
             <div className="flex items-center bg-zinc-900/90 border border-zinc-800 rounded-xl p-0.5 text-xs font-mono">
@@ -374,13 +453,13 @@ export default function CertificateViewerModal({ certificate, onClose }: Props) 
               </button>
             </div>
 
-            {/* Open in External Asset Link / Cloudinary */}
-            {fileData && (
+            {/* Open in Cloudinary / New Tab */}
+            {displayImageSrc && (
               <button
                 type="button"
-                onClick={() => openCertificateInNewTab(displayImageSrc || fileData, blobPdfUrl)}
+                onClick={() => openCertificateInNewTab(displayImageSrc)}
                 className="px-3 py-1.5 bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-500/30 text-xs font-mono font-bold rounded-xl flex items-center gap-1.5 text-cyan-300 transition-colors cursor-pointer"
-                title={isCloudinary ? "Open asset in Cloudinary" : "Open document in new browser tab"}
+                title={isCloudinary ? "Open direct asset in Cloudinary" : "Open certificate in a clean new tab"}
               >
                 <ExternalLink size={13} />
                 <span>{isCloudinary ? "Open in Cloudinary" : "Open in New Tab"}</span>
@@ -420,7 +499,7 @@ export default function CertificateViewerModal({ certificate, onClose }: Props) 
           </div>
         </div>
 
-        {/* MAIN DOCUMENT VIEWPORT (ALWAYS PURE HIGH-RES IMAGE) */}
+        {/* MAIN DOCUMENT VIEWPORT (PURE HIGH-RES IMAGE) */}
         <div
           ref={containerRef}
           className="relative flex-1 mt-4 p-2 sm:p-4 rounded-2xl bg-zinc-950 border border-zinc-800/80 overflow-auto flex flex-col items-center justify-center min-h-[440px]"
@@ -465,11 +544,21 @@ export default function CertificateViewerModal({ certificate, onClose }: Props) 
           <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
             <button
               type="button"
-              onClick={() => downloadCertificateFile(downloadPdfTarget, safeDownloadFilename, isPdf)}
-              className="w-full sm:w-auto px-5 py-2.5 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 font-bold rounded-xl flex items-center justify-center gap-2 uppercase tracking-wider transition-all cursor-pointer shadow-lg hover:shadow-emerald-500/20"
+              onClick={handleDownload}
+              disabled={downloading}
+              className="w-full sm:w-auto px-5 py-2.5 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 font-bold rounded-xl flex items-center justify-center gap-2 uppercase tracking-wider transition-all cursor-pointer shadow-lg hover:shadow-emerald-500/20 disabled:opacity-50"
             >
-              <Download size={15} />
-              <span>Download Official {isPdf ? "PDF" : "Certificate"}</span>
+              {downloading ? (
+                <>
+                  <Loader2 size={15} className="animate-spin" />
+                  <span>Generating PDF...</span>
+                </>
+              ) : (
+                <>
+                  <Download size={15} />
+                  <span>Download Official {isPdf ? "PDF" : "Certificate"}</span>
+                </>
+              )}
             </button>
           </div>
         </div>
