@@ -6,7 +6,7 @@ import CertificateViewerModal, { downloadCertificateFile } from "../components/C
 import {
   Award, Shield, CheckCircle2, Download, Eye, XCircle, Printer,
   FileText, Sparkles, ArrowLeft, Search, Filter, ShieldCheck,
-  Share2, Check, ExternalLink, Calendar, Send
+  Share2, Check, ExternalLink, Calendar, Send, ShieldAlert, Lock
 } from "lucide-react";
 
 interface Certificate {
@@ -32,6 +32,7 @@ export default function Certificates() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCert, setSelectedCert] = useState<Certificate | null>(null);
+  const [revokedNoticeCert, setRevokedNoticeCert] = useState<Certificate | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<"ALL" | "Approved" | "Pending">("ALL");
   const [requestModalOpen, setRequestModalOpen] = useState(false);
@@ -65,21 +66,64 @@ export default function Certificates() {
 
   const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(" ") || user?.fullName || user?.username || "RecodeX Engineer";
 
+  const handleOpenRevokedEnquiry = (cert: Certificate) => {
+    setRevokedNoticeCert(cert);
+  };
+
+  const handleContactAdminForRevoked = (cert: Certificate) => {
+    setRequestProject(cert.projectName);
+    setRequestNotes(
+      `[Enquiry regarding revoked certificate ID: ${cert.credentialId || cert.id}]\nRecipient: ${cert.studentName} (${cert.userEmail || userEmail})\nHello Admin, my certificate for "${cert.projectName}" appears revoked. Could you please review this credential and provide guidance?`
+    );
+    setRevokedNoticeCert(null);
+    setRequestModalOpen(true);
+  };
+
   const fetchCerts = async () => {
     setLoading(true);
     try {
+      const deletedRaw = localStorage.getItem("recodex_deleted_certificates");
+      const deletedSet = new Set<string>(
+        deletedRaw ? JSON.parse(deletedRaw).map((s: string) => String(s).toLowerCase().trim()) : []
+      );
+
       const serverCerts: any[] = await getCertificatesApi(userEmail || undefined, userId || undefined);
       const localRaw1 = localStorage.getItem("recodex_global_certificates");
       const localRaw2 = localStorage.getItem("recodex_synced_certificates");
-      const localCerts1: any[] = localRaw1 ? JSON.parse(localRaw1) : [];
-      const localCerts2: any[] = localRaw2 ? JSON.parse(localRaw2) : [];
+      let localCerts1: any[] = localRaw1 ? JSON.parse(localRaw1) : [];
+      let localCerts2: any[] = localRaw2 ? JSON.parse(localRaw2) : [];
+
+      // Clean local caches if deleted certs exist
+      if (deletedSet.size > 0) {
+        const cleaned1 = localCerts1.filter((c: any) => {
+          const id1 = (c?.id || "").toLowerCase().trim();
+          const id2 = (c?.certificateId || "").toLowerCase().trim();
+          return !deletedSet.has(id1) && !deletedSet.has(id2);
+        });
+        if (cleaned1.length !== localCerts1.length) {
+          localStorage.setItem("recodex_global_certificates", JSON.stringify(cleaned1));
+          localCerts1 = cleaned1;
+        }
+
+        const cleaned2 = localCerts2.filter((c: any) => {
+          const id1 = (c?.id || "").toLowerCase().trim();
+          const id2 = (c?.certificateId || "").toLowerCase().trim();
+          return !deletedSet.has(id1) && !deletedSet.has(id2);
+        });
+        if (cleaned2.length !== localCerts2.length) {
+          localStorage.setItem("recodex_synced_certificates", JSON.stringify(cleaned2));
+          localCerts2 = cleaned2;
+        }
+      }
 
       // Combine and de-duplicate by ID
       const combinedMap = new Map<string, any>();
       [...serverCerts, ...localCerts1, ...localCerts2].forEach((c) => {
         if (c && (c.id || c.certificateId)) {
-          const key = c.id || c.certificateId;
-          combinedMap.set(key, c);
+          const key = (c.id || c.certificateId).toLowerCase().trim();
+          if (!deletedSet.has(key)) {
+            combinedMap.set(key, c);
+          }
         }
       });
 
@@ -89,6 +133,11 @@ export default function Certificates() {
       // Only display certificates assigned/uploaded by Admin for THIS authenticated user.
       const userCerts = allList.filter((c: any) => {
         if (!c) return false;
+        const cId = (c.id || "").toLowerCase().trim();
+        const cCertId = (c.certificateId || "").toLowerCase().trim();
+        if (deletedSet.has(cId) || deletedSet.has(cCertId)) return false;
+        if (c.status === "Deleted" || c.status === "DELETED") return false;
+
         // Filter out dummy/pending request placeholders
         if (c.id?.startsWith("CERT-REQ-") || c.credentialId?.startsWith("RCX-PEND-")) return false;
         if (["john doe", "alice vance", "sarah connor"].includes((c.studentName || c.recipientName || "").toLowerCase().trim())) return false;
@@ -292,13 +341,18 @@ export default function Certificates() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredCerts.map((cert) => {
-              const isApproved = cert.status === "Approved";
-              const isPending = cert.status === "Pending";
+              const isApproved = cert.status === "Approved" || cert.status === "ISSUED";
+              const isPending = cert.status === "Pending" || cert.status === "PENDING";
+              const isRevoked = cert.status === "Revoked" || cert.status === "REVOKED";
 
               return (
                 <div
                   key={cert.id}
-                  className="group relative bg-white/70 dark:bg-[#07090e]/80 backdrop-blur-xl border border-black/10 dark:border-zinc-800/90 hover:border-primary/50 dark:hover:border-primary/50 rounded-2xl p-6 transition-all duration-300 shadow-sm hover:shadow-[0_15px_35px_rgba(0,209,255,0.12)] flex flex-col justify-between"
+                  className={`group relative bg-white/70 dark:bg-[#07090e]/80 backdrop-blur-xl border ${
+                    isRevoked
+                      ? "border-rose-500/30 hover:border-rose-500/50 shadow-[0_0_20px_rgba(244,63,94,0.06)]"
+                      : "border-black/10 dark:border-zinc-800/90 hover:border-primary/50 dark:hover:border-primary/50 shadow-sm hover:shadow-[0_15px_35px_rgba(0,209,255,0.12)]"
+                  } rounded-2xl p-6 transition-all duration-300 flex flex-col justify-between`}
                 >
                   {/* Top Badge */}
                   <div>
@@ -308,9 +362,9 @@ export default function Certificates() {
                           ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/25"
                           : isPending
                           ? "bg-amber-500/10 text-amber-500 border-amber-500/25"
-                          : "bg-red-500/10 text-red-500 border-red-500/25"
+                          : "bg-rose-500/10 text-rose-500 border-rose-500/25"
                       }`}>
-                        {isApproved ? <CheckCircle2 size={12} /> : <Calendar size={12} />}
+                        {isApproved ? <CheckCircle2 size={12} /> : isRevoked ? <ShieldAlert size={12} /> : <Calendar size={12} />}
                         {cert.status}
                       </span>
 
@@ -321,11 +375,15 @@ export default function Certificates() {
 
                     {/* Certificate Title */}
                     <div className="flex items-center gap-3 mb-3">
-                      <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
-                        <Award size={22} />
+                      <div className={`w-10 h-10 rounded-xl ${
+                        isRevoked ? "bg-rose-500/10 text-rose-500" : "bg-primary/10 text-primary"
+                      } flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform`}>
+                        {isRevoked ? <ShieldAlert size={22} /> : <Award size={22} />}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <h3 className="text-base font-bold text-foreground dark:text-white truncate group-hover:text-primary transition-colors">
+                        <h3 className={`text-base font-bold text-foreground dark:text-white truncate ${
+                          isRevoked ? "group-hover:text-rose-400" : "group-hover:text-primary"
+                        } transition-colors`}>
                           {cert.projectName}
                         </h3>
                         <p className="text-xs font-mono text-zinc-500 dark:text-zinc-400 truncate">
@@ -334,8 +392,29 @@ export default function Certificates() {
                       </div>
                     </div>
 
-                    {/* Document Preview Thumbnail if uploaded */}
-                    {cert.fileData && (
+                    {/* Document Preview Thumbnail - BLOCKED IF REVOKED */}
+                    {isRevoked ? (
+                      <div 
+                        onClick={() => handleOpenRevokedEnquiry(cert)}
+                        className="mb-4 p-4 rounded-xl border border-rose-500/25 bg-rose-500/[0.04] hover:bg-rose-500/[0.08] transition-all cursor-pointer group/revoked flex flex-col items-center text-center justify-center space-y-2 min-h-[140px]"
+                        title="Document access revoked. Click to contact admin."
+                      >
+                        <div className="w-9 h-9 rounded-xl bg-rose-500/15 text-rose-500 flex items-center justify-center border border-rose-500/25 group-hover/revoked:scale-110 transition-transform">
+                          <ShieldAlert size={20} />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-rose-500 uppercase tracking-wide font-mono">
+                            Document Access Revoked
+                          </p>
+                          <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5 max-w-[240px] leading-tight">
+                            File is invalidated and cannot be opened.
+                          </p>
+                        </div>
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold text-rose-400 bg-rose-500/10 border border-rose-500/20 group-hover/revoked:bg-rose-500/20 transition-colors">
+                          <Send size={11} /> Contact Admin for Any Enquiry
+                        </span>
+                      </div>
+                    ) : cert.fileData ? (
                       <div 
                         onClick={() => setSelectedCert(cert)}
                         className="mb-4 rounded-xl overflow-hidden border border-black/10 dark:border-zinc-800 bg-black/5 dark:bg-zinc-950 flex items-center justify-center cursor-pointer hover:border-primary/50 transition-colors group/thumb"
@@ -375,7 +454,7 @@ export default function Certificates() {
                           </div>
                         )}
                       </div>
-                    )}
+                    ) : null}
 
                     {/* Description / Summary */}
                     <p className="text-xs text-zinc-600 dark:text-zinc-400 line-clamp-2 mb-4 leading-relaxed">
@@ -397,39 +476,63 @@ export default function Certificates() {
 
                   {/* Actions */}
                   <div className="flex items-center gap-2 pt-4 border-t border-black/5 dark:border-zinc-800/80">
-                    <button
-                      onClick={() => setSelectedCert(cert)}
-                      className="flex-1 py-2 px-3 rounded-xl bg-primary/10 hover:bg-primary text-primary hover:text-primary-foreground font-mono text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                    >
-                      <Eye size={14} />
-                      View Certificate
-                    </button>
+                    {isRevoked ? (
+                      <button
+                        onClick={() => handleOpenRevokedEnquiry(cert)}
+                        className="flex-1 py-2 px-3 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border border-rose-500/30 font-mono text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <ShieldAlert size={14} />
+                        Contact Admin for Enquiry
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => setSelectedCert(cert)}
+                        className="flex-1 py-2 px-3 rounded-xl bg-primary/10 hover:bg-primary text-primary hover:text-primary-foreground font-mono text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <Eye size={14} />
+                        View Certificate
+                      </button>
+                    )}
 
                     {cert.fileData && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const isPdfCert = Boolean(
-                            cert.fileData?.toLowerCase().includes(".pdf") ||
-                            cert.fileType?.toLowerCase().includes("pdf") ||
-                            cert.fileName?.toLowerCase().endsWith(".pdf")
-                          );
-                          const safeExt = isPdfCert ? "pdf" : "png";
-                          const targetSrc = cert.fileData!.includes("res.cloudinary.com")
-                            ? cert.fileData!.replace(/\.pdf(\?.*)?$/i, ".png$1").replace(/\/upload\//, "/upload/f_png,q_auto:best,w_1800/")
-                            : cert.fileData!;
-                          downloadCertificateFile(
-                            targetSrc,
-                            cert.fileName || `Certificate_${cert.id}_${cert.studentName.replace(/\s+/g, "_")}.${safeExt}`,
-                            isPdfCert
-                          );
-                        }}
-                        className="p-2 rounded-xl bg-black/5 dark:bg-zinc-900 hover:bg-emerald-500/20 text-zinc-600 dark:text-zinc-300 hover:text-emerald-400 transition-all cursor-pointer"
-                        title="Download Certificate File"
-                      >
-                        <Download size={16} />
-                      </button>
+                      isRevoked ? (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenRevokedEnquiry(cert);
+                          }}
+                          className="p-2 rounded-xl bg-black/5 dark:bg-zinc-900/60 text-zinc-400 hover:text-rose-500 transition-all cursor-pointer border border-rose-500/20"
+                          title="Downloads disabled for revoked certificate. Click to contact admin."
+                        >
+                          <Lock size={16} />
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const isPdfCert = Boolean(
+                              cert.fileData?.toLowerCase().includes(".pdf") ||
+                              cert.fileType?.toLowerCase().includes("pdf") ||
+                              cert.fileName?.toLowerCase().endsWith(".pdf")
+                            );
+                            const safeExt = isPdfCert ? "pdf" : "png";
+                            const targetSrc = cert.fileData!.includes("res.cloudinary.com")
+                              ? cert.fileData!.replace(/\.pdf(\?.*)?$/i, ".png$1").replace(/\/upload\//, "/upload/f_png,q_auto:best,w_1800/")
+                              : cert.fileData!;
+                            downloadCertificateFile(
+                              targetSrc,
+                              cert.fileName || `Certificate_${cert.id}_${cert.studentName.replace(/\s+/g, "_")}.${safeExt}`,
+                              isPdfCert
+                            );
+                          }}
+                          className="p-2 rounded-xl bg-black/5 dark:bg-zinc-900 hover:bg-emerald-500/20 text-zinc-600 dark:text-zinc-300 hover:text-emerald-400 transition-all cursor-pointer"
+                          title="Download Certificate File"
+                        >
+                          <Download size={16} />
+                        </button>
+                      )
                     )}
 
                     <button
@@ -453,6 +556,66 @@ export default function Certificates() {
           certificate={selectedCert}
           onClose={() => setSelectedCert(null)}
         />
+      )}
+
+      {/* REVOKED CERTIFICATE ENQUIRY MODAL */}
+      {revokedNoticeCert && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-150"
+          onClick={() => setRevokedNoticeCert(null)}
+        >
+          <div
+            className="w-full max-w-lg bg-white dark:bg-[#07090e] border border-rose-500/30 rounded-2xl p-6 sm:p-8 shadow-2xl space-y-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-4 border-b border-black/5 dark:border-zinc-800">
+              <div className="flex items-center gap-2 text-rose-500 font-mono text-xs font-bold uppercase tracking-wider">
+                <ShieldAlert size={18} />
+                <span>Certificate Credential Revoked</span>
+              </div>
+              <button
+                onClick={() => setRevokedNoticeCert(null)}
+                className="p-1 text-zinc-400 hover:text-foreground dark:hover:text-white cursor-pointer"
+              >
+                <XCircle size={18} />
+              </button>
+            </div>
+
+            <div className="text-center space-y-3 py-2">
+              <div className="w-14 h-14 rounded-2xl bg-rose-500/10 text-rose-500 border border-rose-500/25 flex items-center justify-center mx-auto shadow-[0_0_20px_rgba(244,63,94,0.15)]">
+                <ShieldAlert size={28} />
+              </div>
+              <h3 className="text-lg font-bold text-foreground dark:text-white">
+                Document Access Inactive
+              </h3>
+              <p className="text-xs text-zinc-600 dark:text-zinc-400 max-w-md mx-auto leading-relaxed">
+                The certificate credential for <strong className="text-foreground dark:text-zinc-200">"{revokedNoticeCert.projectName}"</strong> (ID: <span className="font-mono font-bold text-rose-500">{revokedNoticeCert.credentialId || revokedNoticeCert.id}</span>) has been marked as <strong>Revoked</strong> by RecodeX Administration.
+              </p>
+              <div className="p-3.5 rounded-xl bg-rose-500/5 border border-rose-500/20 text-[11px] text-zinc-600 dark:text-zinc-300 font-mono text-left leading-relaxed">
+                <span className="font-bold text-rose-500 block mb-1">Notice:</span>
+                The certificate document file has been invalidated and is not accessible for preview or download. Please contact administration for any enquiry or dispute regarding this credential.
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => handleContactAdminForRevoked(revokedNoticeCert)}
+                className="w-full sm:flex-1 py-2.5 px-4 rounded-xl bg-rose-500 hover:bg-rose-600 text-white text-xs font-mono font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(244,63,94,0.25)] cursor-pointer"
+              >
+                <Send size={14} />
+                Contact Admin for Any Enquiry
+              </button>
+              <button
+                type="button"
+                onClick={() => setRevokedNoticeCert(null)}
+                className="w-full sm:w-auto py-2.5 px-5 rounded-xl bg-black/5 dark:bg-zinc-900 hover:bg-black/10 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-300 text-xs font-mono font-bold transition-all cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* REQUEST CERTIFICATE MESSAGE TO ADMIN MODAL */}

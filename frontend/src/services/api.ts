@@ -1269,6 +1269,23 @@ export async function resolveInquiryApi(id: string, status: "Resolved" | "Pendin
  * Fetches all issued certificates from Express backend API with optional user filtering and localStorage fallback.
  */
 export async function getCertificatesApi(userEmail?: string, userId?: string): Promise<any[]> {
+  const deletedRaw = typeof window !== "undefined" ? localStorage.getItem("recodex_deleted_certificates") : null;
+  const deletedSet = new Set<string>(
+    deletedRaw ? JSON.parse(deletedRaw).map((s: string) => String(s).toLowerCase().trim()) : []
+  );
+
+  const filterDeleted = (list: any[]) => {
+    if (!Array.isArray(list)) return [];
+    return list.filter((c: any) => {
+      if (!c) return false;
+      const cId = (c.id || "").toLowerCase().trim();
+      const cCertId = (c.certificateId || "").toLowerCase().trim();
+      if (deletedSet.has(cId) || deletedSet.has(cCertId)) return false;
+      if (c.status === "Deleted" || c.status === "DELETED") return false;
+      return true;
+    });
+  };
+
   try {
     const queryParams = new URLSearchParams();
     if (userEmail) queryParams.set("email", userEmail.toLowerCase().trim());
@@ -1282,11 +1299,12 @@ export async function getCertificatesApi(userEmail?: string, userId?: string): P
     if (response.ok) {
       const data = await response.json();
       if (Array.isArray(data)) {
+        const cleanData = filterDeleted(data);
         if (!userEmail && !userId) {
-          localStorage.setItem("recodex_global_certificates", JSON.stringify(data));
-          localStorage.setItem("recodex_synced_certificates", JSON.stringify(data));
+          localStorage.setItem("recodex_global_certificates", JSON.stringify(cleanData));
+          localStorage.setItem("recodex_synced_certificates", JSON.stringify(cleanData));
         }
-        return data;
+        return cleanData;
       }
     }
   } catch (e) {
@@ -1299,9 +1317,14 @@ export async function getCertificatesApi(userEmail?: string, userId?: string): P
   const certs2: any[] = stored2 ? JSON.parse(stored2) : [];
   const combinedMap = new Map<string, any>();
   [...certs1, ...certs2].forEach((c) => {
-    if (c && c.id) combinedMap.set(c.id, c);
+    if (c && (c.id || c.certificateId)) {
+      const key = (c.id || c.certificateId).toLowerCase().trim();
+      if (!deletedSet.has(key)) {
+        combinedMap.set(key, c);
+      }
+    }
   });
-  const allCerts: any[] = Array.from(combinedMap.values());
+  const allCerts: any[] = filterDeleted(Array.from(combinedMap.values()));
 
   if (userEmail || userId) {
     const emailClean = (userEmail || "").toLowerCase().trim();
@@ -1514,23 +1537,67 @@ export async function adminManualUploadCertificateApi(certData: any, token?: str
  * Deletes/revokes a certificate via backend API and syncs to localStorage.
  */
 export async function deleteCertificateApi(id: string): Promise<boolean> {
+  const cleanId = (id || "").trim().toLowerCase();
+  if (!cleanId) return false;
+
+  // 1. Permanently track in recodex_deleted_certificates
+  try {
+    const storedDeleted = localStorage.getItem("recodex_deleted_certificates");
+    const deletedList: string[] = storedDeleted ? JSON.parse(storedDeleted) : [];
+    if (!deletedList.map((x) => String(x).toLowerCase().trim()).includes(cleanId)) {
+      deletedList.push(cleanId);
+      localStorage.setItem("recodex_deleted_certificates", JSON.stringify(deletedList));
+    }
+  } catch (e) {
+    console.warn("Deleted certificates tracking error:", e);
+  }
+
+  // 2. Remove immediately from recodex_global_certificates
   try {
     const stored = localStorage.getItem("recodex_global_certificates");
     if (stored) {
       let certs: any[] = JSON.parse(stored);
-      certs = certs.filter((c: any) => c.id !== id);
+      certs = certs.filter((c: any) => {
+        const cId = (c.id || "").trim().toLowerCase();
+        const cCertId = (c.certificateId || "").trim().toLowerCase();
+        return cId !== cleanId && cCertId !== cleanId;
+      });
       localStorage.setItem("recodex_global_certificates", JSON.stringify(certs));
-      window.dispatchEvent(new Event("recodex-certificates-update"));
     }
   } catch (e) {
     console.warn("Local cert delete error:", e);
   }
 
+  // 3. Remove immediately from recodex_synced_certificates
   try {
-    await fetch(`${API_BASE_URL}/certificates/${id}`, { method: "DELETE" });
+    const stored = localStorage.getItem("recodex_synced_certificates");
+    if (stored) {
+      let certs: any[] = JSON.parse(stored);
+      certs = certs.filter((c: any) => {
+        const cId = (c.id || "").trim().toLowerCase();
+        const cCertId = (c.certificateId || "").trim().toLowerCase();
+        return cId !== cleanId && cCertId !== cleanId;
+      });
+      localStorage.setItem("recodex_synced_certificates", JSON.stringify(certs));
+    }
+  } catch (e) {
+    console.warn("Synced cert delete error:", e);
+  }
+
+  // 4. Notify components and storage across tabs
+  window.dispatchEvent(new Event("recodex-certificates-update"));
+  window.dispatchEvent(new Event("storage"));
+
+  // 5. Send DELETE request to both backend endpoints
+  try {
+    await fetch(`${API_BASE_URL}/certificates/${encodeURIComponent(id.trim())}`, { method: "DELETE" });
   } catch (err) {
     console.warn("[CERTIFICATES API] Delete backend warning:", err);
   }
+  try {
+    await fetch(`${API_BASE_URL}/certificates/admin/${encodeURIComponent(id.trim())}`, { method: "DELETE" });
+  } catch (err) {}
+
   return true;
 }
 

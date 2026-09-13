@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   Award, Download, ExternalLink, Printer, XCircle, ZoomIn, ZoomOut,
-  RotateCw, Maximize2, Minimize2, ShieldCheck, CheckCircle2, FileText, Loader2
+  RotateCw, Maximize2, Minimize2, ShieldCheck, ShieldAlert, CheckCircle2, FileText, Loader2
 } from "lucide-react";
 
 export interface CertificateItem {
@@ -219,6 +219,32 @@ export function openCertificateInNewTab(url: string) {
 }
 
 export default function CertificateViewerModal({ certificate, onClose }: Props) {
+  const isRevoked = certificate.status === "Revoked" || certificate.status === "REVOKED";
+
+  if (isRevoked) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-150">
+        <div className="w-full max-w-md bg-white dark:bg-[#07090e] border border-rose-500/30 rounded-2xl p-6 sm:p-8 text-center space-y-4 shadow-2xl">
+          <div className="w-14 h-14 rounded-2xl bg-rose-500/10 text-rose-500 border border-rose-500/25 flex items-center justify-center mx-auto shadow-[0_0_20px_rgba(244,63,94,0.15)]">
+            <ShieldAlert size={28} />
+          </div>
+          <h3 className="text-lg font-bold text-foreground dark:text-white">Certificate Access Revoked</h3>
+          <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
+            This certificate document has been revoked by administration. The file cannot be opened. Please contact administration for any enquiry.
+          </p>
+          <div className="pt-2">
+            <button
+              onClick={onClose}
+              className="w-full py-2.5 px-4 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const fileData = certificate.fileData || "";
   const fileName = certificate.fileName || "";
   const fileType = certificate.fileType || "";

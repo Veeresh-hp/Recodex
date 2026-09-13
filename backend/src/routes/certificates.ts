@@ -367,6 +367,7 @@ router.delete("/admin/:certificateId", requireAuth, async (req: AuthenticatedReq
 
   try {
     const idClean = certificateId.trim();
+    const idLower = idClean.toLowerCase();
     
     // Delete associated audit logs
     await prisma.certificateAuditLog.deleteMany({
@@ -374,6 +375,7 @@ router.delete("/admin/:certificateId", requireAuth, async (req: AuthenticatedReq
         OR: [
           { certificateId: idClean },
           { certificateId: idClean.toUpperCase() },
+          { certificateId: idLower },
         ],
       },
     }).catch((e: any) => console.warn("Audit logs delete warning:", e));
@@ -384,14 +386,21 @@ router.delete("/admin/:certificateId", requireAuth, async (req: AuthenticatedReq
         OR: [
           { certificateId: idClean },
           { certificateId: idClean.toUpperCase() },
+          { certificateId: idLower },
           { id: idClean },
+          { id: idClean.toUpperCase() },
+          { id: idLower },
         ],
       },
     }).catch((e: any) => console.warn("Prisma certificate delete warning:", e));
 
     // Clean from legacy JSON file if present
     let certs = readCertificatesFile();
-    certs = certs.filter((c: any) => c.id !== idClean && c.certificateId !== idClean && c.certificateId !== idClean.toUpperCase());
+    certs = certs.filter((c: any) => {
+      const cId = (c.id || "").toLowerCase().trim();
+      const cCertId = (c.certificateId || "").toLowerCase().trim();
+      return cId !== idLower && cCertId !== idLower;
+    });
     writeCertificatesFile(certs);
 
     return res.json({ message: "Certificate permanently deleted." });
@@ -1171,21 +1180,37 @@ router.delete("/:id", async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const idClean = id.trim();
+    const idLower = idClean.toLowerCase();
 
     await prisma.certificateAuditLog.deleteMany({
       where: {
-        OR: [{ certificateId: idClean }, { certificateId: idClean.toUpperCase() }],
+        OR: [
+          { certificateId: idClean },
+          { certificateId: idClean.toUpperCase() },
+          { certificateId: idLower },
+        ],
       },
     }).catch((e: any) => console.warn("Audit logs delete warning:", e));
 
     await prisma.certificate.deleteMany({
       where: {
-        OR: [{ certificateId: idClean }, { certificateId: idClean.toUpperCase() }, { id: idClean }],
+        OR: [
+          { certificateId: idClean },
+          { certificateId: idClean.toUpperCase() },
+          { certificateId: idLower },
+          { id: idClean },
+          { id: idClean.toUpperCase() },
+          { id: idLower },
+        ],
       },
     }).catch((e: any) => console.warn("Prisma certificate delete warning:", e));
 
     let certs = readCertificatesFile();
-    certs = certs.filter((c: any) => c.id !== idClean && c.certificateId !== idClean && c.certificateId !== idClean.toUpperCase());
+    certs = certs.filter((c: any) => {
+      const cId = (c.id || "").toLowerCase().trim();
+      const cCertId = (c.certificateId || "").toLowerCase().trim();
+      return cId !== idLower && cCertId !== idLower;
+    });
     writeCertificatesFile(certs);
 
     return res.json({ message: "Certificate deleted successfully" });

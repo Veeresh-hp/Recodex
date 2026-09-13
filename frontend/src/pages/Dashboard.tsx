@@ -1724,9 +1724,10 @@ export default function Dashboard() {
 
   const handleDeleteCertificate = (certId: string) => {
     if (!window.confirm("Are you sure you want to delete this certificate record?")) return;
-    const certTarget = certificates.find((c) => c.id === certId);
+    const targetClean = (certId || "").trim().toLowerCase();
+    const certTarget = certificates.find((c) => (c.id || "").toLowerCase().trim() === targetClean || ((c as any).certificateId || "").toLowerCase().trim() === targetClean);
     deleteCertificateApi(certId);
-    setCertificates((prev) => prev.filter((c) => c.id !== certId));
+    setCertificates((prev) => prev.filter((c) => (c.id || "").toLowerCase().trim() !== targetClean && ((c as any).certificateId || "").toLowerCase().trim() !== targetClean));
     logAdminActivityApi({
       adminName: adminName || user?.fullName || (adminEmail.includes("uday") ? "Uday Kumar" : "Admin"),
       adminEmail: adminEmail || user?.primaryEmailAddress?.emailAddress || "",
@@ -1735,7 +1736,7 @@ export default function Dashboard() {
       details: certTarget ? `Removed certificate record for "${certTarget.projectName}"` : "Certificate deleted"
     });
     fetchAuditLogs();
-    setToast({ message: "Certificate record removed.", type: "success" });
+    setToast({ message: "Certificate record removed permanently.", type: "success" });
   };
 
   const handleDownloadCertFile = (cert: Certificate) => {
