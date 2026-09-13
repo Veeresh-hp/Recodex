@@ -789,6 +789,10 @@ router.patch("/:id", auth_1.requireAuth, async (req, res) => {
 router.delete("/:id", auth_1.requireAuth, async (req, res) => {
     const { id } = req.params;
     try {
+        await db_1.default.projectAssignment.deleteMany({ where: { projectId: id } }).catch(() => { });
+        await db_1.default.projectDev.deleteMany({ where: { projectId: id } }).catch(() => { });
+        await db_1.default.projectSubmission.deleteMany({ where: { projectId: id } }).catch(() => { });
+        await db_1.default.projectCompletion.deleteMany({ where: { projectId: id } }).catch(() => { });
         await db_1.default.project.delete({ where: { id } });
         return res.json({ message: "Project deleted successfully." });
     }

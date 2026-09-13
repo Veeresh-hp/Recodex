@@ -892,6 +892,10 @@ router.delete("/:id", requireAuth, async (req: AuthenticatedRequest, res: Respon
   const { id } = req.params;
 
   try {
+    await prisma.projectAssignment.deleteMany({ where: { projectId: id } }).catch(() => {});
+    await prisma.projectDev.deleteMany({ where: { projectId: id } }).catch(() => {});
+    await prisma.projectSubmission.deleteMany({ where: { projectId: id } }).catch(() => {});
+    await prisma.projectCompletion.deleteMany({ where: { projectId: id } }).catch(() => {});
     await prisma.project.delete({ where: { id } });
     return res.json({ message: "Project deleted successfully." });
   } catch (error: any) {

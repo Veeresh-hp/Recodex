@@ -201,11 +201,11 @@ export default function Navbar() {
           const clientProjs: any[] = clientProjRaw ? JSON.parse(clientProjRaw) : [];
           const userProjs = clientProjs.filter((p: any) => {
             if (!p) return false;
-            const pEmail = (p.userEmail || p.email || "").toLowerCase().trim();
-            const pUserId = (p.userId || "").trim();
+            const pEmail = (p.userEmail || p.email || p.assignedEmail || "").toLowerCase().trim();
+            const pUserId = (p.userId || p.assignedUserId || "").trim();
             return (pEmail && allEmails.includes(pEmail)) || (userId && pUserId && pUserId === userId);
           });
-          setProjectCount(userProjs.length > 0 ? userProjs.length : clientProjs.length);
+          setProjectCount(userProjs.length);
         } catch (e) {
           console.warn("Telemetry load warning:", e);
         }
@@ -244,11 +244,17 @@ export default function Navbar() {
     window.addEventListener("storage", checkNavAdminStatus);
     window.addEventListener("recodex-inquiry-submitted", checkNavAdminStatus);
     window.addEventListener("recodex-certificates-update", checkNavAdminStatus);
+    window.addEventListener("recodex-project-deleted", checkNavAdminStatus);
+    window.addEventListener("recodex-project-created", checkNavAdminStatus);
+    window.addEventListener("recodex-project-updated", checkNavAdminStatus);
     return () => {
       window.removeEventListener("recodex-auth-update", checkNavAdminStatus);
       window.removeEventListener("storage", checkNavAdminStatus);
       window.removeEventListener("recodex-inquiry-submitted", checkNavAdminStatus);
       window.removeEventListener("recodex-certificates-update", checkNavAdminStatus);
+      window.removeEventListener("recodex-project-deleted", checkNavAdminStatus);
+      window.removeEventListener("recodex-project-created", checkNavAdminStatus);
+      window.removeEventListener("recodex-project-updated", checkNavAdminStatus);
     };
   }, [isLoaded, userId, user]);
 

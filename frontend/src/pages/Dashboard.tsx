@@ -758,8 +758,8 @@ export default function Dashboard() {
         status: controlStatus,
         progress: Number(controlProgress),
         expectedDate: updatedExpDate,
-        assignedEmail: controlAssignedEmail.trim() || undefined,
-        assignedUserName: controlAssignedUserName.trim() || undefined,
+        assignedEmail: controlAssignedEmail.trim() ? controlAssignedEmail.trim() : null,
+        assignedUserName: controlAssignedUserName.trim() ? controlAssignedUserName.trim() : null,
       };
 
       await updateProjectStatusApi(editingProjectControl.id, payload, token, adminEmail);
@@ -768,6 +768,22 @@ export default function Dashboard() {
         ...p,
         ...payload,
       } : p));
+
+      if (!controlAssignedEmail.trim()) {
+        try {
+          const stored = localStorage.getItem("recodex_client_projects");
+          if (stored) {
+            const parsed: any[] = JSON.parse(stored);
+            const cleaned = parsed.filter(
+              (cp: any) => cp.id !== editingProjectControl.id && cp.contractId !== editingProjectControl.contractId && cp.title !== editingProjectControl.title
+            );
+            localStorage.setItem("recodex_client_projects", JSON.stringify(cleaned));
+          }
+        } catch (e) {}
+        window.dispatchEvent(new CustomEvent("recodex-project-deleted", { detail: { id: editingProjectControl.id } }));
+      } else {
+        window.dispatchEvent(new CustomEvent("recodex-project-updated", { detail: { id: editingProjectControl.id } }));
+      }
 
       setEditingProjectControl(null);
     } catch (err) {
@@ -2149,28 +2165,56 @@ export default function Dashboard() {
     }
   };
 
-  const handleRemoveProject = (projId: string) => {
-    const projToRecycle = dbProjects.find((p) => p.id === projId);
-    if (!projToRecycle) return;
+  const handleRemoveProject = async (projId: string) => {
+    const projToDelete = dbProjects.find((p) => p.id === projId);
+    if (!projToDelete) return;
 
-    const recycled = {
-      id: `proj-${projId}-${Date.now()}`,
-      name: projToRecycle.title,
-      type: "Project",
-      originalData: projToRecycle,
-      deletedAt: new Date().toLocaleTimeString()
-    };
-    setSoftDeletedProjectIds((prev) => [...prev, projId]);
-    setRecycleBin((prev) => [recycled, ...prev]);
-    logAdminActivityApi({
-      adminName: adminName || user?.fullName || (adminEmail.includes("uday") ? "Uday Kumar" : "Admin"),
-      adminEmail: adminEmail || user?.primaryEmailAddress?.emailAddress || "",
-      action: "MOVED PROJECT TO RECYCLE BIN",
-      target: `${projToRecycle.title} (ID: ${projId})`,
-      details: "Project archived in Recycle Bin"
-    });
-    fetchAuditLogs();
-    setToast({ message: "Project moved to Recycle Bin.", type: "success" });
+    if (!window.confirm(`Are you sure you want to delete project "${projToDelete.title}"? This will permanently delete it from the database and remove it from user workspaces.`)) {
+      return;
+    }
+
+    try {
+      const token = await getAuthToken();
+      // 1. Delete from backend database
+      try {
+        await deleteProject(projId, token);
+      } catch (apiErr) {
+        console.warn("API project deletion error:", apiErr);
+      }
+
+      // 2. Remove from dbProjects state & softDeletedProjectIds
+      setDbProjects((prev) => prev.filter((p) => p.id !== projId));
+      setSoftDeletedProjectIds((prev) => prev.filter((id) => id !== projId));
+
+      // 3. Clear from local client cache
+      try {
+        const stored = localStorage.getItem("recodex_client_projects");
+        if (stored) {
+          const parsed: any[] = JSON.parse(stored);
+          const cleaned = parsed.filter(
+            (cp: any) => cp.id !== projId && cp.contractId !== projToDelete.contractId && cp.title !== projToDelete.title
+          );
+          localStorage.setItem("recodex_client_projects", JSON.stringify(cleaned));
+        }
+      } catch (e) {}
+
+      // 4. Dispatch global deletion event for cross-tab sync
+      window.dispatchEvent(new CustomEvent("recodex-project-deleted", { detail: { id: projId, title: projToDelete.title } }));
+
+      logAdminActivityApi({
+        adminName: adminName || user?.fullName || (adminEmail.includes("uday") ? "Uday Kumar" : "Admin"),
+        adminEmail: adminEmail || user?.primaryEmailAddress?.emailAddress || "",
+        action: "DELETED PROJECT",
+        target: `${projToDelete.title} (ID: ${projId})`,
+        details: `Deleted project allotted to ${projToDelete.assignedEmail || projToDelete.assignedUserName || "Client"}`
+      });
+      fetchAuditLogs();
+      fetchProjects();
+      setToast({ message: `Project "${projToDelete.title}" deleted from database and user workspaces.`, type: "success" });
+    } catch (error) {
+      console.error("Failed to delete project:", error);
+      setToast({ message: "Failed to delete project.", type: "error" });
+    }
   };
 
   const handleRestoreItem = (item: any) => {
@@ -2203,7 +2247,7 @@ export default function Dashboard() {
           fetchUsers();
         }
       } else if (item.type === "Project") {
-        const projId = item.originalData?.id;
+        const projId = item.originalData?.id || item.id;
         if (projId) {
           try {
             await deleteProject(projId, token);
@@ -2211,6 +2255,16 @@ export default function Dashboard() {
             console.warn("API project deletion failed, cleaning up local state anyway:", apiErr);
           }
           setSoftDeletedProjectIds((prev) => prev.filter((id) => id !== projId));
+          setDbProjects((prev) => prev.filter((p) => p.id !== projId));
+          try {
+            const stored = localStorage.getItem("recodex_client_projects");
+            if (stored) {
+              const parsed: any[] = JSON.parse(stored);
+              const cleaned = parsed.filter((cp: any) => cp.id !== projId && cp.title !== item.name);
+              localStorage.setItem("recodex_client_projects", JSON.stringify(cleaned));
+            }
+          } catch (e) {}
+          window.dispatchEvent(new CustomEvent("recodex-project-deleted", { detail: { id: projId, title: item.name } }));
           fetchProjects();
         }
       }

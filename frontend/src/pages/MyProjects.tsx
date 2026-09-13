@@ -59,46 +59,19 @@ export default function MyProjects() {
         const apiProjects = await getMyProjectsApi(token || undefined, userEmail || undefined);
 
         if (isMounted) {
-          if (Array.isArray(apiProjects) && apiProjects.length > 0) {
+          if (Array.isArray(apiProjects)) {
+            // Authoritative server truth: if deleted or user has 0 projects, apiProjects is []
             setClientProjects(apiProjects);
             localStorage.setItem("recodex_client_projects", JSON.stringify(apiProjects));
           } else {
-            // Check local fallback with strict user/email matching
-            const stored = localStorage.getItem("recodex_client_projects");
-            if (stored) {
-              const parsed: any[] = JSON.parse(stored);
-              const isAdmin = userEmail === "veereshhp2004@gmail.com" || userEmail.includes("admin") || localStorage.getItem("recodex_admin_user") === "true";
-              const userFiltered = isAdmin
-                ? parsed
-                : parsed.filter((p: any) => {
-                    const matchEmail = p.assignedEmail && p.assignedEmail.toLowerCase().trim() === userEmail;
-                    const matchId = p.assignedUserId && p.assignedUserId === userId;
-                    return matchEmail || matchId;
-                  });
-              setClientProjects(userFiltered);
-            } else {
-              setClientProjects([]);
-            }
+            setClientProjects([]);
+            localStorage.setItem("recodex_client_projects", JSON.stringify([]));
           }
         }
       } catch (err) {
         console.warn("API load failed for my-projects:", err);
         if (isMounted) {
-          const stored = localStorage.getItem("recodex_client_projects");
-          if (stored) {
-            const parsed: any[] = JSON.parse(stored);
-            const isAdmin = userEmail === "veereshhp2004@gmail.com" || userEmail.includes("admin") || localStorage.getItem("recodex_admin_user") === "true";
-            const userFiltered = isAdmin
-              ? parsed
-              : parsed.filter((p: any) => {
-                  const matchEmail = p.assignedEmail && p.assignedEmail.toLowerCase().trim() === userEmail;
-                  const matchId = p.assignedUserId && p.assignedUserId === userId;
-                  return matchEmail || matchId;
-                });
-            setClientProjects(userFiltered);
-          } else {
-            setClientProjects([]);
-          }
+          setClientProjects([]);
         }
       } finally {
         if (isMounted) setLoading(false);
@@ -106,7 +79,29 @@ export default function MyProjects() {
     };
 
     loadProjects();
-    return () => { isMounted = false; };
+
+    const handleSync = () => {
+      loadProjects();
+    };
+
+    window.addEventListener("recodex-project-deleted", handleSync);
+    window.addEventListener("recodex-project-created", handleSync);
+    window.addEventListener("recodex-project-updated", handleSync);
+    window.addEventListener("storage", (e) => {
+      if (e.key === "recodex_client_projects") {
+        try {
+          const updated = e.newValue ? JSON.parse(e.newValue) : [];
+          if (isMounted) setClientProjects(updated);
+        } catch (err) {}
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener("recodex-project-deleted", handleSync);
+      window.removeEventListener("recodex-project-created", handleSync);
+      window.removeEventListener("recodex-project-updated", handleSync);
+    };
   }, [isLoaded, userId, userEmail]);
 
   const filteredProjects = clientProjects.filter((p) => {

@@ -2388,9 +2388,9 @@ export async function updateProjectStatusApi(
     progress?: number;
     expectedDate?: string;
     startDate?: string;
-    assignedEmail?: string;
-    assignedUserId?: string;
-    assignedUserName?: string;
+    assignedEmail?: string | null;
+    assignedUserId?: string | null;
+    assignedUserName?: string | null;
     repoUrl?: string;
     liveUrl?: string;
     title?: string;
