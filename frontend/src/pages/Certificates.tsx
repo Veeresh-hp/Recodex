@@ -340,7 +340,7 @@ export default function Certificates() {
                         onClick={() => setSelectedCert(cert)}
                         className="mb-4 rounded-xl overflow-hidden border border-black/10 dark:border-zinc-800 bg-black/5 dark:bg-zinc-950 flex items-center justify-center cursor-pointer hover:border-primary/50 transition-colors group/thumb"
                       >
-                        {cert.fileData.toLowerCase().includes(".pdf") || cert.fileType === "application/pdf" || cert.fileData.startsWith("data:application/pdf") ? (
+                        {cert.fileData.startsWith("data:application/pdf") ? (
                           <div className="py-4 px-3.5 flex items-center gap-3 w-full bg-red-500/5 hover:bg-red-500/10 transition-colors">
                             <div className="w-9 h-9 rounded-lg bg-red-500/10 text-red-500 flex items-center justify-center shrink-0">
                               <FileText size={20} />
@@ -359,7 +359,11 @@ export default function Certificates() {
                         ) : (
                           <div className="relative w-full h-36 bg-black/20 flex items-center justify-center overflow-hidden">
                             <img
-                              src={cert.fileData}
+                              src={
+                                cert.fileData.includes("res.cloudinary.com")
+                                  ? cert.fileData.replace(/\.pdf(\?.*)?$/i, ".png$1").replace(/\/upload\//, "/upload/f_png,q_auto,w_600/")
+                                  : cert.fileData
+                              }
                               alt={cert.projectName}
                               className="w-full h-full object-cover group-hover/thumb:scale-105 transition-transform duration-300"
                             />
@@ -414,7 +418,8 @@ export default function Certificates() {
                           const safeExt = isPdfCert ? "pdf" : "png";
                           downloadCertificateFile(
                             cert.fileData!,
-                            cert.fileName || `Certificate_${cert.id}_${cert.studentName.replace(/\s+/g, "_")}.${safeExt}`
+                            cert.fileName || `Certificate_${cert.id}_${cert.studentName.replace(/\s+/g, "_")}.${safeExt}`,
+                            isPdfCert
                           );
                         }}
                         className="p-2 rounded-xl bg-black/5 dark:bg-zinc-900 hover:bg-emerald-500/20 text-zinc-600 dark:text-zinc-300 hover:text-emerald-400 transition-all cursor-pointer"

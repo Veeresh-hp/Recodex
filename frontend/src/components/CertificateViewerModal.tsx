@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   Award, Download, ExternalLink, Printer, XCircle, ZoomIn, ZoomOut,
-  RotateCw, Maximize2, Minimize2, Eye, FileText, Image as ImageIcon,
-  CheckCircle2, ShieldCheck, RefreshCw, AlertCircle, FileCheck, Layers
+  RotateCw, Maximize2, Minimize2, ShieldCheck, CheckCircle2, FileText
 } from "lucide-react";
 
 export interface CertificateItem {
@@ -28,13 +27,23 @@ interface Props {
 }
 
 /**
- * Robust file downloader that bypasses cross-origin download restrictions.
+ * Robust file downloader that enforces true file downloads across origins
+ * and Cloudinary CDN assets.
  */
-export async function downloadCertificateFile(url: string, filename: string) {
+export async function downloadCertificateFile(url: string, filename: string, forcePdf: boolean = false) {
   try {
-    if (url.startsWith("data:") || url.startsWith("blob:")) {
+    let targetUrl = url;
+
+    // If Cloudinary URL, format for direct attachment download
+    if (targetUrl.includes("res.cloudinary.com")) {
+      if (forcePdf && !targetUrl.toLowerCase().includes(".pdf")) {
+        targetUrl = targetUrl.replace(/\.(png|jpe?g|webp)(\?.*)?$/i, ".pdf$1");
+      }
+      if (targetUrl.includes("/upload/")) {
+        targetUrl = targetUrl.replace(/\/upload\/(fl_attachment\/)?/, "/upload/fl_attachment/");
+      }
       const a = document.createElement("a");
-      a.href = url;
+      a.href = targetUrl;
       a.download = filename;
       document.body.appendChild(a);
       a.click();
@@ -42,8 +51,19 @@ export async function downloadCertificateFile(url: string, filename: string) {
       return;
     }
 
-    // Try fetching binary blob to guarantee download attribute works across origins
-    const res = await fetch(url, { mode: "cors" });
+    // Base64 or Blob URL direct download
+    if (targetUrl.startsWith("data:") || targetUrl.startsWith("blob:")) {
+      const a = document.createElement("a");
+      a.href = targetUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      return;
+    }
+
+    // Fetch binary blob to enforce download across other origins
+    const res = await fetch(targetUrl, { mode: "cors" });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const blob = await res.blob();
     const blobUrl = URL.createObjectURL(blob);
@@ -53,9 +73,8 @@ export async function downloadCertificateFile(url: string, filename: string) {
     document.body.appendChild(a);
     a.click();
     a.remove();
-    setTimeout(() => URL.revokeObjectURL(blobUrl), 2000);
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 3000);
   } catch (err) {
-    // Direct link fallback
     const a = document.createElement("a");
     a.href = url;
     a.target = "_blank";
@@ -68,8 +87,7 @@ export async function downloadCertificateFile(url: string, filename: string) {
 }
 
 /**
- * Safely opens document in new tab, converting base64 data URIs to blob URLs
- * so modern Chromium won't block top-level navigation.
+ * Opens document in a clean new browser tab.
  */
 export function openCertificateInNewTab(url: string, blobUrl?: string) {
   const target = blobUrl || url;
@@ -88,7 +106,7 @@ export function openCertificateInNewTab(url: string, blobUrl?: string) {
       setTimeout(() => URL.revokeObjectURL(bUrl), 60000);
       return;
     } catch (e) {
-      console.warn("Blob conversion failed, attempting direct window.open:", e);
+      console.warn("Blob conversion failed, opening direct:", e);
     }
   }
   window.open(target, "_blank", "noopener,noreferrer");
@@ -100,10 +118,10 @@ export default function CertificateViewerModal({ certificate, onClose }: Props) 
   const fileType = certificate.fileType || "";
   const studentName = certificate.studentName || certificate.recipientName || "Student Developer";
   const projectName = certificate.projectName || certificate.projectTitle || "Software Engineering Project";
-  const issueDate = certificate.issueDate || "Issued by RecodeX";
+  const issueDate = certificate.issueDate || "Verified";
   const certId = certificate.credentialId || certificate.id;
 
-  // Detect whether this is a PDF or an image
+  // Detect whether this was uploaded as a PDF
   const isPdf = useMemo(() => {
     if (!fileData && !fileName && !fileType) return false;
     const fd = fileData.toLowerCase();
@@ -116,22 +134,9 @@ export default function CertificateViewerModal({ certificate, onClose }: Props) 
     return false;
   }, [fileData, fileName, fileType]);
 
-  const isImage = useMemo(() => {
-    if (!fileData && !fileName && !fileType) return false;
-    if (isPdf) return false;
-    const fd = fileData.toLowerCase();
-    const fn = fileName.toLowerCase();
-    const ft = fileType.toLowerCase();
-    if (ft.startsWith("image/")) return true;
-    if (fd.startsWith("data:image/")) return true;
-    if (/\.(png|jpe?g|webp|gif|svg|avif)(\?|$)/i.test(fn)) return true;
-    if (/\.(png|jpe?g|webp|gif|svg|avif)(\?|$)/i.test(fd)) return true;
-    return true; // Default fallback to image if non-PDF document
-  }, [fileData, fileName, fileType, isPdf]);
-
   const isCloudinary = Boolean(fileData && fileData.includes("res.cloudinary.com"));
 
-  // Cloudinary image transformation URL for PDF (converts PDF page 1 to crisp PNG)
+  // Cloudinary image transformation URL: renders the PDF page directly as a crisp PNG image
   const cloudinaryPngUrl = useMemo(() => {
     if (!isCloudinary || !fileData) return "";
     let clean = fileData.replace(/\.pdf(\?.*)?$/i, ".png$1");
@@ -141,14 +146,11 @@ export default function CertificateViewerModal({ certificate, onClose }: Props) 
     return clean;
   }, [fileData, isCloudinary]);
 
-  // Google Docs Viewer fallback for remote public PDFs
-  const googleDocsViewerUrl = useMemo(() => {
-    if (!fileData || fileData.startsWith("data:") || fileData.startsWith("blob:")) return "";
-    return `https://docs.google.com/viewer?url=${encodeURIComponent(fileData)}&embedded=true`;
-  }, [fileData]);
-
-  // Convert base64 PDF data URL to local Blob URL so Chrome won't block the iframe
+  // Convert base64 PDF data to Blob URL for direct PDF downloads
   const [blobPdfUrl, setBlobPdfUrl] = useState<string>("");
+  // In-browser rendered image if base64 PDF is provided locally
+  const [base64PdfImage, setBase64PdfImage] = useState<string>("");
+
   useEffect(() => {
     let createdUrl = "";
     if (fileData && fileData.startsWith("data:application/pdf")) {
@@ -163,11 +165,57 @@ export default function CertificateViewerModal({ certificate, onClose }: Props) 
         const blob = new Blob([bytes], { type: "application/pdf" });
         createdUrl = URL.createObjectURL(blob);
         setBlobPdfUrl(createdUrl);
+
+        // Dynamically load PDF.js from CDN to render local base64 PDF directly to image canvas
+        const renderLocalPdf = async () => {
+          try {
+            const pdfjsLib = (window as any).pdfjsLib;
+            if (pdfjsLib) {
+              const loadingTask = pdfjsLib.getDocument({ data: atob(base64Data) });
+              const pdf = await loadingTask.promise;
+              const page = await pdf.getPage(1);
+              const viewport = page.getViewport({ scale: 2.0 });
+              const canvas = document.createElement("canvas");
+              const context = canvas.getContext("2d");
+              canvas.height = viewport.height;
+              canvas.width = viewport.width;
+              if (context) {
+                await page.render({ canvasContext: context, viewport }).promise;
+                setBase64PdfImage(canvas.toDataURL("image/png"));
+              }
+            } else {
+              const script = document.createElement("script");
+              script.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+              script.onload = async () => {
+                const lib = (window as any).pdfjsLib;
+                if (!lib) return;
+                lib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+                const loadingTask = lib.getDocument({ data: atob(base64Data) });
+                const pdf = await loadingTask.promise;
+                const page = await pdf.getPage(1);
+                const viewport = page.getViewport({ scale: 2.0 });
+                const canvas = document.createElement("canvas");
+                const context = canvas.getContext("2d");
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+                if (context) {
+                  await page.render({ canvasContext: context, viewport }).promise;
+                  setBase64PdfImage(canvas.toDataURL("image/png"));
+                }
+              };
+              document.head.appendChild(script);
+            }
+          } catch (e) {
+            console.warn("Local PDF to image render note:", e);
+          }
+        };
+        renderLocalPdf();
       } catch (err) {
-        console.error("Failed to generate PDF blob URL:", err);
+        console.error("Failed to process PDF data:", err);
       }
     } else {
       setBlobPdfUrl("");
+      setBase64PdfImage("");
     }
 
     return () => {
@@ -177,16 +225,24 @@ export default function CertificateViewerModal({ certificate, onClose }: Props) 
     };
   }, [fileData]);
 
-  // The primary PDF source to render in iframe/object
-  const activePdfSource = blobPdfUrl || fileData;
+  // Primary image source to display in the viewer:
+  // 1) Cloudinary converted PNG image (super high resolution vector render)
+  // 2) Locally rendered base64 PDF image
+  // 3) fileData directly (for regular PNG/JPG/WEBP images)
+  const displayImageSrc = useMemo(() => {
+    if (isCloudinary && isPdf && cloudinaryPngUrl) {
+      return cloudinaryPngUrl;
+    }
+    if (base64PdfImage) {
+      return base64PdfImage;
+    }
+    if (cloudinaryPngUrl) {
+      return cloudinaryPngUrl;
+    }
+    return fileData;
+  }, [isCloudinary, isPdf, cloudinaryPngUrl, base64PdfImage, fileData]);
 
-  // Viewer modes:
-  // "document" -> native iframe/object PDF viewer
-  // "image"    -> rendered PNG image (Cloudinary or image view)
-  // "gdocs"    -> Google Docs embedded viewer
-  const [pdfViewMode, setPdfViewMode] = useState<"document" | "image" | "gdocs">("document");
-
-  // Image viewer zoom & pan state
+  // Image zoom and rotate controls
   const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -200,15 +256,25 @@ export default function CertificateViewerModal({ certificate, onClose }: Props) 
   };
   const handleRotate = () => setRotation((prev) => (prev + 90) % 360);
 
-  const toggleFullscreen = () => {
-    setIsFullscreen(!isFullscreen);
-  };
+  const toggleFullscreen = () => setIsFullscreen(!isFullscreen);
+  const handlePrint = () => window.print();
 
-  const handlePrint = () => {
-    window.print();
-  };
+  // The actual PDF download target (preserves .pdf extension and downloads the real PDF document)
+  const downloadPdfTarget = useMemo(() => {
+    if (isCloudinary && isPdf) {
+      // Ensure it points to the original .pdf asset, not .png
+      let pdfUrl = fileData;
+      if (!pdfUrl.toLowerCase().includes(".pdf")) {
+        pdfUrl = pdfUrl.replace(/\.(png|jpe?g|webp)(\?.*)?$/i, ".pdf$1");
+      }
+      return pdfUrl;
+    }
+    return blobPdfUrl || fileData;
+  }, [isCloudinary, isPdf, fileData, blobPdfUrl]);
 
-  const safeDownloadFilename = fileName || `Certificate_${certId}_${studentName.replace(/\s+/g, "_")}.${isPdf ? "pdf" : "png"}`;
+  const safeDownloadFilename = fileName
+    ? (isPdf && !fileName.toLowerCase().endsWith(".pdf") ? `${fileName.replace(/\.[^/.]+$/, "")}.pdf` : fileName)
+    : `Certificate_${certId}_${studentName.replace(/\s+/g, "_")}.${isPdf ? "pdf" : "png"}`;
 
   return (
     <div
@@ -242,10 +308,6 @@ export default function CertificateViewerModal({ certificate, onClose }: Props) 
             max-height: 100vh !important;
             object-fit: contain !important;
           }
-          #recodex-print-certificate iframe, #recodex-print-certificate object {
-            width: 100vw !important;
-            height: 100vh !important;
-          }
         }
       `}</style>
 
@@ -264,8 +326,8 @@ export default function CertificateViewerModal({ certificate, onClose }: Props) 
                 <span className="text-xs font-mono uppercase tracking-widest text-zinc-200 font-bold">
                   Official Certificate Document
                 </span>
-                <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold uppercase tracking-wider bg-cyan-500/10 border border-cyan-500/30 text-cyan-400">
-                  {isPdf ? "PDF Document" : "Official Image"}
+                <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold uppercase tracking-wider bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
+                  Verified Credential
                 </span>
               </div>
               <p className="text-[11px] font-mono text-zinc-400 truncate max-w-sm mt-0.5">
@@ -274,104 +336,51 @@ export default function CertificateViewerModal({ certificate, onClose }: Props) 
             </div>
           </div>
 
-          {/* Action Toolbar */}
+          {/* Action Toolbar (Only Image Controls: Zoom, Rotate, External Link, Print, Fullscreen, Close) */}
           <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap justify-end">
-            {/* PDF View Mode Switchers */}
-            {isPdf && (
-              <div className="flex items-center bg-zinc-900/90 border border-zinc-800 rounded-xl p-0.5 text-xs font-mono">
-                <button
-                  type="button"
-                  onClick={() => setPdfViewMode("document")}
-                  className={`px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1 cursor-pointer ${
-                    pdfViewMode === "document"
-                      ? "bg-cyan-500 text-black font-bold shadow-sm"
-                      : "text-zinc-400 hover:text-white"
-                  }`}
-                  title="Native PDF Document Viewer"
-                >
-                  <FileText size={12} />
-                  <span>PDF</span>
-                </button>
+            {/* Zoom and Rotate Controls */}
+            <div className="flex items-center bg-zinc-900/90 border border-zinc-800 rounded-xl p-0.5 text-xs font-mono">
+              <button
+                type="button"
+                onClick={handleZoomIn}
+                className="p-1.5 text-zinc-400 hover:text-cyan-400 hover:bg-zinc-800 rounded-lg transition-colors cursor-pointer"
+                title="Zoom In"
+              >
+                <ZoomIn size={14} />
+              </button>
+              <button
+                type="button"
+                onClick={handleZoomOut}
+                className="p-1.5 text-zinc-400 hover:text-cyan-400 hover:bg-zinc-800 rounded-lg transition-colors cursor-pointer"
+                title="Zoom Out"
+              >
+                <ZoomOut size={14} />
+              </button>
+              <button
+                type="button"
+                onClick={handleResetZoom}
+                className="px-2 py-1 text-[11px] text-zinc-300 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors cursor-pointer font-bold"
+                title="Reset Zoom to 100%"
+              >
+                {Math.round(zoom * 100)}%
+              </button>
+              <button
+                type="button"
+                onClick={handleRotate}
+                className="p-1.5 text-zinc-400 hover:text-cyan-400 hover:bg-zinc-800 rounded-lg transition-colors cursor-pointer"
+                title="Rotate 90°"
+              >
+                <RotateCw size={14} />
+              </button>
+            </div>
 
-                {cloudinaryPngUrl && (
-                  <button
-                    type="button"
-                    onClick={() => setPdfViewMode("image")}
-                    className={`px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1 cursor-pointer ${
-                      pdfViewMode === "image"
-                        ? "bg-cyan-500 text-black font-bold shadow-sm"
-                        : "text-zinc-400 hover:text-white"
-                    }`}
-                    title="Rendered Crisp Image View"
-                  >
-                    <ImageIcon size={12} />
-                    <span>Image</span>
-                  </button>
-                )}
-
-                {googleDocsViewerUrl && (
-                  <button
-                    type="button"
-                    onClick={() => setPdfViewMode("gdocs")}
-                    className={`px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1 cursor-pointer ${
-                      pdfViewMode === "gdocs"
-                        ? "bg-cyan-500 text-black font-bold shadow-sm"
-                        : "text-zinc-400 hover:text-white"
-                    }`}
-                    title="Google Docs Cloud Viewer"
-                  >
-                    <Layers size={12} />
-                    <span>Cloud</span>
-                  </button>
-                )}
-              </div>
-            )}
-
-            {/* Image Viewer Zoom/Rotate Controls */}
-            {(isImage || (isPdf && pdfViewMode === "image")) && (
-              <div className="flex items-center bg-zinc-900/90 border border-zinc-800 rounded-xl p-0.5 text-xs font-mono">
-                <button
-                  type="button"
-                  onClick={handleZoomIn}
-                  className="p-1.5 text-zinc-400 hover:text-cyan-400 hover:bg-zinc-800 rounded-lg transition-colors cursor-pointer"
-                  title="Zoom In"
-                >
-                  <ZoomIn size={14} />
-                </button>
-                <button
-                  type="button"
-                  onClick={handleZoomOut}
-                  className="p-1.5 text-zinc-400 hover:text-cyan-400 hover:bg-zinc-800 rounded-lg transition-colors cursor-pointer"
-                  title="Zoom Out"
-                >
-                  <ZoomOut size={14} />
-                </button>
-                <button
-                  type="button"
-                  onClick={handleResetZoom}
-                  className="px-1.5 py-1 text-[10px] text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors cursor-pointer"
-                  title="Reset Zoom"
-                >
-                  {Math.round(zoom * 100)}%
-                </button>
-                <button
-                  type="button"
-                  onClick={handleRotate}
-                  className="p-1.5 text-zinc-400 hover:text-cyan-400 hover:bg-zinc-800 rounded-lg transition-colors cursor-pointer"
-                  title="Rotate 90°"
-                >
-                  <RotateCw size={14} />
-                </button>
-              </div>
-            )}
-
-            {/* Open in External / New Tab */}
+            {/* Open in External Asset Link / Cloudinary */}
             {fileData && (
               <button
                 type="button"
-                onClick={() => openCertificateInNewTab(fileData, blobPdfUrl)}
+                onClick={() => openCertificateInNewTab(displayImageSrc || fileData, blobPdfUrl)}
                 className="px-3 py-1.5 bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-500/30 text-xs font-mono font-bold rounded-xl flex items-center gap-1.5 text-cyan-300 transition-colors cursor-pointer"
-                title={isCloudinary ? "Open direct asset in Cloudinary" : "Open document in a clean new browser tab"}
+                title={isCloudinary ? "Open asset in Cloudinary" : "Open document in new browser tab"}
               >
                 <ExternalLink size={13} />
                 <span>{isCloudinary ? "Open in Cloudinary" : "Open in New Tab"}</span>
@@ -383,7 +392,7 @@ export default function CertificateViewerModal({ certificate, onClose }: Props) 
               type="button"
               onClick={handlePrint}
               className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-xs font-mono font-bold rounded-xl flex items-center gap-1.5 text-zinc-200 transition-colors cursor-pointer"
-              title="Print Certificate"
+              title="Print Certificate Document"
             >
               <Printer size={13} />
               <span className="hidden sm:inline">Print</span>
@@ -411,93 +420,23 @@ export default function CertificateViewerModal({ certificate, onClose }: Props) 
           </div>
         </div>
 
-        {/* MAIN DOCUMENT VIEWPORT */}
+        {/* MAIN DOCUMENT VIEWPORT (ALWAYS PURE HIGH-RES IMAGE) */}
         <div
           ref={containerRef}
           className="relative flex-1 mt-4 p-2 sm:p-4 rounded-2xl bg-zinc-950 border border-zinc-800/80 overflow-auto flex flex-col items-center justify-center min-h-[440px]"
         >
-          {fileData ? (
-            <div id="recodex-print-certificate" className="w-full h-full flex flex-col items-center justify-center">
-              {/* --- 1. PDF DOCUMENT VIEWER --- */}
-              {isPdf && pdfViewMode === "document" && (
-                <div className="w-full h-full flex flex-col items-center">
-                  <object
-                    data={activePdfSource}
-                    type="application/pdf"
-                    className="w-full h-[580px] sm:h-[620px] rounded-xl border border-zinc-800 bg-white"
-                  >
-                    <iframe
-                      src={activePdfSource}
-                      title={`Certificate ${certId}`}
-                      className="w-full h-[580px] sm:h-[620px] rounded-xl border border-zinc-800 bg-white"
-                    />
-                  </object>
-
-                  {/* Fallback help bar if browser struggles with native PDF embed */}
-                  <div className="w-full mt-3 p-2.5 bg-zinc-900/80 border border-zinc-800 rounded-xl flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono text-zinc-400 print:hidden">
-                    <div className="flex items-center gap-1.5">
-                      <AlertCircle size={14} className="text-cyan-400 shrink-0" />
-                      <span>Viewing difficulties? Try alternate viewers or open directly:</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {cloudinaryPngUrl && (
-                        <button
-                          type="button"
-                          onClick={() => setPdfViewMode("image")}
-                          className="px-2 py-1 bg-cyan-950 hover:bg-cyan-900 border border-cyan-500/30 text-cyan-300 font-bold rounded-lg transition-colors cursor-pointer"
-                        >
-                          Switch to Image View
-                        </button>
-                      )}
-                      {googleDocsViewerUrl && (
-                        <button
-                          type="button"
-                          onClick={() => setPdfViewMode("gdocs")}
-                          className="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg transition-colors cursor-pointer"
-                        >
-                          Google Viewer
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => openCertificateInNewTab(fileData, blobPdfUrl)}
-                        className="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
-                      >
-                        <ExternalLink size={11} />
-                        New Tab
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* --- 2. GOOGLE DOCS VIEWER (For remote URLs) --- */}
-              {isPdf && pdfViewMode === "gdocs" && googleDocsViewerUrl && (
-                <iframe
-                  src={googleDocsViewerUrl}
-                  title={`Certificate ${certId} Cloud Viewer`}
-                  className="w-full h-[580px] sm:h-[620px] rounded-xl border border-zinc-800 bg-white"
-                />
-              )}
-
-              {/* --- 3. IMAGE VIEWER (For Images OR Cloudinary PDF Image View) --- */}
-              {(isImage || (isPdf && pdfViewMode === "image")) && (
-                <div
-                  className="w-full h-full min-h-[480px] flex items-center justify-center overflow-auto p-4 cursor-grab active:cursor-grabbing"
-                  style={{ touchAction: "none" }}
-                >
-                  <img
-                    src={pdfViewMode === "image" && cloudinaryPngUrl ? cloudinaryPngUrl : fileData}
-                    alt={`Certificate for ${studentName}`}
-                    style={{
-                      transform: `scale(${zoom}) rotate(${rotation}deg)`,
-                      transition: "transform 0.2s ease-out",
-                    }}
-                    className="max-h-[620px] w-auto max-w-full rounded-xl object-contain shadow-2xl border border-zinc-800/80 pointer-events-auto"
-                    draggable={false}
-                  />
-                </div>
-              )}
+          {displayImageSrc ? (
+            <div id="recodex-print-certificate" className="w-full h-full flex items-center justify-center overflow-auto p-2 sm:p-4">
+              <img
+                src={displayImageSrc}
+                alt={`Certificate for ${studentName}`}
+                style={{
+                  transform: `scale(${zoom}) rotate(${rotation}deg)`,
+                  transition: "transform 0.2s ease-out",
+                }}
+                className="max-h-[620px] w-auto max-w-full rounded-xl object-contain shadow-2xl border border-zinc-800/80 pointer-events-auto select-none"
+                draggable={false}
+              />
             </div>
           ) : (
             <div className="p-8 text-center space-y-3">
@@ -526,10 +465,10 @@ export default function CertificateViewerModal({ certificate, onClose }: Props) 
           <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
             <button
               type="button"
-              onClick={() => downloadCertificateFile(blobPdfUrl || fileData, safeDownloadFilename)}
-              className="w-full sm:w-auto px-4 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 font-bold rounded-xl flex items-center justify-center gap-2 uppercase tracking-wider transition-all cursor-pointer shadow-lg hover:shadow-emerald-500/20"
+              onClick={() => downloadCertificateFile(downloadPdfTarget, safeDownloadFilename, isPdf)}
+              className="w-full sm:w-auto px-5 py-2.5 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 font-bold rounded-xl flex items-center justify-center gap-2 uppercase tracking-wider transition-all cursor-pointer shadow-lg hover:shadow-emerald-500/20"
             >
-              <Download size={14} />
+              <Download size={15} />
               <span>Download Official {isPdf ? "PDF" : "Certificate"}</span>
             </button>
           </div>
