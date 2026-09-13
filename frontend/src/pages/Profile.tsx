@@ -179,7 +179,7 @@ const getDynamicProjectData = (projectId: string, title: string, category: strin
       { title: "Milestone 4: Final QA Audits & Vercel Cloud Deployment", completed: milestone4Completed }
     ],
     updates: [
-      { date: update1Date, msg: `Core database sync has been successfully migrated to Supabase serverless. Milestone 3 is ${Math.min(95, Math.floor(completionPct * 1.15))}% complete.` },
+      { date: update1Date, msg: `Core database sync has been successfully migrated to cloud cluster database. Milestone 3 is ${Math.min(95, Math.floor(completionPct * 1.15))}% complete.` },
       { date: update2Date, msg: "Milestone 2 successfully validated by QA team. All OAuth channels active." }
     ],
     chatHistory: [
@@ -238,7 +238,48 @@ export default function Profile() {
     return () => clearInterval(interval);
   }, [settings.slaTelemetry]);
 
+  const playAudioFeedback = (type: "bell" | "click" | "success" = "bell") => {
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      if (type === "bell") {
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(784, ctx.currentTime); // G5
+        osc.frequency.exponentialRampToValueAtTime(523.25, ctx.currentTime + 0.3); // C5
+        gain.gain.setValueAtTime(0.12, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.3);
+      } else if (type === "click") {
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(580, ctx.currentTime);
+        gain.gain.setValueAtTime(0.06, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.08);
+      } else if (type === "success") {
+        osc.type = "triangle";
+        osc.frequency.setValueAtTime(523.25, ctx.currentTime); // C5
+        osc.frequency.setValueAtTime(659.25, ctx.currentTime + 0.1); // E5
+        osc.frequency.setValueAtTime(783.99, ctx.currentTime + 0.2); // G5
+        gain.gain.setValueAtTime(0.1, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.35);
+      }
+    } catch (e) {
+      // Audio playback fails gracefully if unpermitted by browser policy
+    }
+  };
+
   const toggleSetting = (key: "ticketAlerts" | "milestoneAlerts" | "securityAlerts" | "slaTelemetry") => {
+    playAudioFeedback("click");
     setSettings((prev: any) => {
       const updated = { ...prev, [key]: !prev[key] };
       localStorage.setItem("recodex_user_preferences", JSON.stringify(updated));
@@ -250,6 +291,7 @@ export default function Profile() {
   };
 
   const updateSetting = (key: string, value: any) => {
+    playAudioFeedback("click");
     setSettings((prev: any) => {
       const updated = { ...prev, [key]: value };
       localStorage.setItem("recodex_user_preferences", JSON.stringify(updated));
@@ -265,30 +307,49 @@ export default function Profile() {
   };
 
   const triggerTestAlert = () => {
+    playAudioFeedback("bell");
     const active = [];
     if (settings.ticketAlerts) active.push("Support Desk");
     if (settings.milestoneAlerts) active.push("Milestone Engine");
     if (settings.securityAlerts) active.push("Auth Shield");
 
     if (active.length === 0) {
-      setTestNotificationToast("All alert channels are currently muted. Turn on at least one notification toggle above.");
+      setTestNotificationToast("All alert channels are currently muted. Turn on at least one notification toggle above to receive live alerts.");
     } else {
       setTestNotificationToast(`Simulated Alert: Active dispatch channels verified [${active.join(", ")}]. Protocol live.`);
     }
     setTimeout(() => setTestNotificationToast(null), 4000);
   };
 
+  const handleOpenClerkSecurity = () => {
+    try {
+      if (clerk && typeof clerk.openUserProfile === "function") {
+        clerk.openUserProfile();
+      } else {
+        setShowSecurityModal(true);
+      }
+    } catch (e) {
+      console.warn("Clerk openUserProfile direct open fallback:", e);
+      setShowSecurityModal(true);
+    }
+  };
+
   const handleExportUserData = () => {
-    if (!profile) return;
+    playAudioFeedback("success");
+    const exportName = profile?.name || user?.fullName || "Developer";
+    const exportEmail = profile?.email || user?.primaryEmailAddress?.emailAddress || "user@recodex.in";
+    const exportId = profile?.id || user?.id || "usr_recodex";
+
     const exportData = {
       userProfile: {
-        id: profile.id,
-        name: profile.name,
-        email: profile.email,
-        phone: profile.phone,
-        role: profile.role,
-        domainSpecialization: settings.developerRole,
-        isGoogleUser: profile.isGoogleUser
+        id: exportId,
+        name: exportName,
+        email: exportEmail,
+        phone: profile?.phone || user?.primaryPhoneNumber?.phoneNumber || "No phone linked",
+        role: profile?.role || "client",
+        domainSpecialization: settings.developerRole || "Full-Stack Engineer",
+        editorSyntaxTheme: settings.editorTheme || "RecodeX Cyber Dark",
+        isGoogleUser: Boolean(profile?.isGoogleUser || user?.externalAccounts?.some((acc: any) => acc.provider === "google"))
       },
       preferences: settings,
       systemTelemetry: {
@@ -299,18 +360,24 @@ export default function Profile() {
         cryptographicSignature: `RECODEX-SEC-AUTH-${Date.now().toString(36).toUpperCase()}`
       }
     };
+
     const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `RecodeX_Profile_${profile.name.replace(/\s+/g, "_")}_Telemetry.json`;
+    const safeFilename = exportName.replace(/[^a-zA-Z0-9_-]/g, "_");
+    a.download = `RecodeX_Profile_${safeFilename}_Telemetry.json`;
     document.body.appendChild(a);
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
+
+    setSettingsSavedToast(true);
+    setTimeout(() => setSettingsSavedToast(false), 2200);
   };
 
   const handleConfirmPurgeCache = () => {
+    playAudioFeedback("click");
     localStorage.removeItem("recodex_user_preferences");
     localStorage.removeItem("recodex_submitted_inquiries");
     localStorage.removeItem("recodex_editor_theme");
@@ -842,56 +909,78 @@ export default function Profile() {
                 </div>
                 <button
                   onClick={triggerTestAlert}
-                  className="px-2.5 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 border border-amber-500/20 rounded-lg text-[10px] font-mono font-bold uppercase transition-all cursor-pointer"
+                  className="px-2.5 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 border border-amber-500/20 rounded-lg text-[10px] font-mono font-bold uppercase transition-all cursor-pointer active:scale-95"
+                  title="Simulate and test alert delivery"
                 >
                   Test Alert
                 </button>
               </div>
 
-              <div className="space-y-4">
-                <div className="flex items-center justify-between gap-4">
+              <div className="space-y-2">
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => toggleSetting("ticketAlerts")}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleSetting("ticketAlerts"); } }}
+                  className="flex items-center justify-between gap-4 p-2.5 -mx-2.5 rounded-xl hover:bg-black/5 dark:hover:bg-zinc-800/40 transition-colors cursor-pointer select-none group"
+                >
                   <div>
-                    <p className="text-xs font-bold text-foreground dark:text-white">Support Ticket Updates</p>
+                    <p className="text-xs font-bold text-foreground dark:text-white group-hover:text-primary transition-colors">Support Ticket Updates</p>
                     <p className="text-[11px] text-zinc-500">Receive alerts when admins respond to your queries</p>
                   </div>
-                  <button
-                    onClick={() => toggleSetting("ticketAlerts")}
-                    className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer ${
+                  <div
+                    role="switch"
+                    aria-checked={settings.ticketAlerts}
+                    className={`shrink-0 w-11 h-6 flex items-center rounded-full p-1 transition-colors ${
                       settings.ticketAlerts ? "bg-primary justify-end" : "bg-zinc-300 dark:bg-zinc-800 justify-start"
                     }`}
                   >
                     <div className="w-4 h-4 rounded-full bg-white dark:bg-[#07090e] shadow-md transition-all" />
-                  </button>
+                  </div>
                 </div>
 
-                <div className="flex items-center justify-between gap-4 pt-3 border-t border-black/5 dark:border-zinc-900">
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => toggleSetting("milestoneAlerts")}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleSetting("milestoneAlerts"); } }}
+                  className="flex items-center justify-between gap-4 p-2.5 -mx-2.5 rounded-xl hover:bg-black/5 dark:hover:bg-zinc-800/40 transition-colors cursor-pointer select-none pt-3 border-t border-black/5 dark:border-zinc-900 group"
+                >
                   <div>
-                    <p className="text-xs font-bold text-foreground dark:text-white">Milestone Deliverables</p>
+                    <p className="text-xs font-bold text-foreground dark:text-white group-hover:text-primary transition-colors">Milestone Deliverables</p>
                     <p className="text-[11px] text-zinc-500">Real-time alerts on project commits and releases</p>
                   </div>
-                  <button
-                    onClick={() => toggleSetting("milestoneAlerts")}
-                    className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer ${
+                  <div
+                    role="switch"
+                    aria-checked={settings.milestoneAlerts}
+                    className={`shrink-0 w-11 h-6 flex items-center rounded-full p-1 transition-colors ${
                       settings.milestoneAlerts ? "bg-primary justify-end" : "bg-zinc-300 dark:bg-zinc-800 justify-start"
                     }`}
                   >
                     <div className="w-4 h-4 rounded-full bg-white dark:bg-[#07090e] shadow-md transition-all" />
-                  </button>
+                  </div>
                 </div>
 
-                <div className="flex items-center justify-between gap-4 pt-3 border-t border-black/5 dark:border-zinc-900">
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => toggleSetting("securityAlerts")}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleSetting("securityAlerts"); } }}
+                  className="flex items-center justify-between gap-4 p-2.5 -mx-2.5 rounded-xl hover:bg-black/5 dark:hover:bg-zinc-800/40 transition-colors cursor-pointer select-none pt-3 border-t border-black/5 dark:border-zinc-900 group"
+                >
                   <div>
-                    <p className="text-xs font-bold text-foreground dark:text-white">Security & Login Alerts</p>
+                    <p className="text-xs font-bold text-foreground dark:text-white group-hover:text-primary transition-colors">Security & Login Alerts</p>
                     <p className="text-[11px] text-zinc-500">Instant notification for new browser sessions</p>
                   </div>
-                  <button
-                    onClick={() => toggleSetting("securityAlerts")}
-                    className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer ${
+                  <div
+                    role="switch"
+                    aria-checked={settings.securityAlerts}
+                    className={`shrink-0 w-11 h-6 flex items-center rounded-full p-1 transition-colors ${
                       settings.securityAlerts ? "bg-primary justify-end" : "bg-zinc-300 dark:bg-zinc-800 justify-start"
                     }`}
                   >
                     <div className="w-4 h-4 rounded-full bg-white dark:bg-[#07090e] shadow-md transition-all" />
-                  </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -913,11 +1002,11 @@ export default function Profile() {
                     onChange={(e) => updateSetting("developerRole", e.target.value)}
                     className="w-full px-3 py-2 bg-black/5 dark:bg-zinc-900/90 border border-black/10 dark:border-zinc-800 rounded-xl text-xs font-mono text-foreground dark:text-zinc-200 outline-none focus:border-primary/50 transition-colors cursor-pointer"
                   >
-                    <option value="Full-Stack Engineer">Full-Stack Engineer</option>
-                    <option value="Frontend Specialist">Frontend Specialist</option>
-                    <option value="Backend Architect">Backend Architect</option>
-                    <option value="DevOps & Cloud Engineer">DevOps & Cloud Engineer</option>
-                    <option value="Client / Stakeholder">Client / Stakeholder</option>
+                    <option className="bg-white dark:bg-[#07090e] text-zinc-900 dark:text-zinc-100" value="Full-Stack Engineer">Full-Stack Engineer</option>
+                    <option className="bg-white dark:bg-[#07090e] text-zinc-900 dark:text-zinc-100" value="Frontend Specialist">Frontend Specialist</option>
+                    <option className="bg-white dark:bg-[#07090e] text-zinc-900 dark:text-zinc-100" value="Backend Architect">Backend Architect</option>
+                    <option className="bg-white dark:bg-[#07090e] text-zinc-900 dark:text-zinc-100" value="DevOps & Cloud Engineer">DevOps & Cloud Engineer</option>
+                    <option className="bg-white dark:bg-[#07090e] text-zinc-900 dark:text-zinc-100" value="Client / Stakeholder">Client / Stakeholder</option>
                   </select>
                 </div>
 
@@ -930,27 +1019,34 @@ export default function Profile() {
                     onChange={(e) => updateSetting("editorTheme", e.target.value)}
                     className="w-full px-3 py-2 bg-black/5 dark:bg-zinc-900/90 border border-black/10 dark:border-zinc-800 rounded-xl text-xs font-mono text-foreground dark:text-zinc-200 outline-none focus:border-primary/50 transition-colors cursor-pointer"
                   >
-                    <option value="RecodeX Cyber Dark">RecodeX Cyber Dark (Default)</option>
-                    <option value="Monokai Pro">Monokai Pro</option>
-                    <option value="One Dark Pro">One Dark Pro</option>
-                    <option value="Dracula Official">Dracula Official</option>
-                    <option value="GitHub Dark Dimmed">GitHub Dark Dimmed</option>
+                    <option className="bg-white dark:bg-[#07090e] text-zinc-900 dark:text-zinc-100" value="RecodeX Cyber Dark">RecodeX Cyber Dark (Default)</option>
+                    <option className="bg-white dark:bg-[#07090e] text-zinc-900 dark:text-zinc-100" value="Monokai Pro">Monokai Pro</option>
+                    <option className="bg-white dark:bg-[#07090e] text-zinc-900 dark:text-zinc-100" value="One Dark Pro">One Dark Pro</option>
+                    <option className="bg-white dark:bg-[#07090e] text-zinc-900 dark:text-zinc-100" value="Dracula Official">Dracula Official</option>
+                    <option className="bg-white dark:bg-[#07090e] text-zinc-900 dark:text-zinc-100" value="GitHub Dark Dimmed">GitHub Dark Dimmed</option>
                   </select>
                 </div>
 
-                <div className="flex items-center justify-between gap-4 pt-3 border-t border-black/5 dark:border-zinc-900">
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => toggleSetting("slaTelemetry")}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleSetting("slaTelemetry"); } }}
+                  className="flex items-center justify-between gap-4 p-2.5 -mx-2.5 rounded-xl hover:bg-black/5 dark:hover:bg-zinc-800/40 transition-colors cursor-pointer select-none pt-3 border-t border-black/5 dark:border-zinc-900 group"
+                >
                   <div>
-                    <p className="text-xs font-bold text-foreground dark:text-white">Live SLA Telemetry</p>
+                    <p className="text-xs font-bold text-foreground dark:text-white group-hover:text-primary transition-colors">Live SLA Telemetry</p>
                     <p className="text-[11px] text-zinc-500">Show floating ping and response latency metrics</p>
                   </div>
-                  <button
-                    onClick={() => toggleSetting("slaTelemetry")}
-                    className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer ${
+                  <div
+                    role="switch"
+                    aria-checked={settings.slaTelemetry}
+                    className={`shrink-0 w-11 h-6 flex items-center rounded-full p-1 transition-colors ${
                       settings.slaTelemetry ? "bg-primary justify-end" : "bg-zinc-300 dark:bg-zinc-800 justify-start"
                     }`}
                   >
                     <div className="w-4 h-4 rounded-full bg-white dark:bg-[#07090e] shadow-md transition-all" />
-                  </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -985,10 +1081,10 @@ export default function Profile() {
               </div>
 
               <button
-                onClick={() => setShowSecurityModal(true)}
-                className="w-full mt-2 py-2 px-3 bg-black/5 dark:bg-zinc-900 hover:bg-black/10 dark:hover:bg-zinc-800 border border-black/10 dark:border-zinc-800 rounded-xl text-xs font-mono font-bold text-foreground dark:text-white flex items-center justify-center gap-2 transition-all cursor-pointer"
+                onClick={handleOpenClerkSecurity}
+                className="w-full mt-2 py-2 px-3 bg-black/5 dark:bg-zinc-900 hover:bg-black/10 dark:hover:bg-zinc-800 border border-black/10 dark:border-zinc-800 rounded-xl text-xs font-mono font-bold text-foreground dark:text-white flex items-center justify-center gap-2 transition-all cursor-pointer group active:scale-[0.99]"
               >
-                <Key size={13} className="text-amber-500" />
+                <Key size={13} className="text-amber-500 group-hover:rotate-12 transition-transform" />
                 Manage Password & 2FA via Clerk
               </button>
             </div>
@@ -1010,7 +1106,7 @@ export default function Profile() {
               <div className="pt-2 flex flex-col sm:flex-row gap-3">
                 <button
                   onClick={handleExportUserData}
-                  className="flex-1 py-2 px-3 bg-black/5 dark:bg-zinc-900 hover:bg-black/10 dark:hover:bg-zinc-800 border border-black/10 dark:border-zinc-800 rounded-xl text-xs font-mono font-bold text-zinc-700 dark:text-zinc-300 flex items-center justify-center gap-2 transition-all cursor-pointer"
+                  className="flex-1 py-2 px-3 bg-black/5 dark:bg-zinc-900 hover:bg-black/10 dark:hover:bg-zinc-800 border border-black/10 dark:border-zinc-800 rounded-xl text-xs font-mono font-bold text-zinc-700 dark:text-zinc-300 flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-95"
                 >
                   <Download size={13} className="text-primary" />
                   Export Telemetry JSON
@@ -1018,7 +1114,7 @@ export default function Profile() {
 
                 <button
                   onClick={() => setShowPurgeModal(true)}
-                  className="flex-1 py-2 px-3 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 rounded-xl text-xs font-mono font-bold text-rose-500 flex items-center justify-center gap-2 transition-all cursor-pointer"
+                  className="flex-1 py-2 px-3 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 rounded-xl text-xs font-mono font-bold text-rose-500 flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-95"
                 >
                   <Trash2 size={13} />
                   Purge Cache
@@ -1036,6 +1132,7 @@ export default function Profile() {
           <button
             onClick={() => setSlaMetricsOpen(!slaMetricsOpen)}
             className="flex items-center gap-2.5 px-3 py-1.5 bg-black/80 dark:bg-zinc-900/90 backdrop-blur-xl border border-black/20 dark:border-zinc-700 text-zinc-300 rounded-full shadow-2xl hover:border-emerald-500/50 transition-all cursor-pointer text-xs font-mono"
+            title="Click to inspect live node SLA and telemetry"
           >
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
             <span className="text-[11px] font-bold text-emerald-400">{livePing}ms</span>
@@ -1043,16 +1140,19 @@ export default function Profile() {
           </button>
 
           {slaMetricsOpen && (
-            <div className="absolute bottom-10 right-0 w-72 p-4 bg-white dark:bg-[#07090e] border border-black/10 dark:border-zinc-800 rounded-2xl shadow-2xl space-y-3 font-mono text-xs animate-fade-in">
+            <div className="absolute bottom-12 right-0 w-72 p-4 bg-white dark:bg-[#07090e] border border-black/10 dark:border-zinc-800 rounded-2xl shadow-2xl space-y-3 font-mono text-xs animate-fade-in z-50">
               <div className="flex items-center justify-between pb-2 border-b border-black/5 dark:border-zinc-800">
-                <span className="font-bold text-foreground dark:text-white">Live Node Telemetry</span>
-                <span className="text-[10px] text-emerald-400 font-bold">99.99% SLA</span>
+                <span className="font-bold text-foreground dark:text-white flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  Live Node Telemetry
+                </span>
+                <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">99.99% SLA</span>
               </div>
               <div className="space-y-1.5 text-[11px] text-zinc-500">
-                <div className="flex justify-between"><span>Active Gateway:</span><span className="text-zinc-300">AWS us-east-1</span></div>
-                <div className="flex justify-between"><span>SSL Handshake:</span><span className="text-emerald-400">TLS 1.3 Validated</span></div>
-                <div className="flex justify-between"><span>Database Pool:</span><span className="text-zinc-300">Supabase PG Active</span></div>
-                <div className="flex justify-between"><span>Latency Variance:</span><span className="text-zinc-300">&plusmn;2.4ms</span></div>
+                <div className="flex justify-between"><span>Active Gateway:</span><span className="text-zinc-700 dark:text-zinc-300">AWS us-east-1</span></div>
+                <div className="flex justify-between"><span>SSL Handshake:</span><span className="text-emerald-500 dark:text-emerald-400 font-medium">TLS 1.3 / AES-256</span></div>
+                <div className="flex justify-between"><span>Database Pool:</span><span className="text-emerald-500 dark:text-emerald-400 font-medium">MongoDB Atlas Active</span></div>
+                <div className="flex justify-between"><span>Latency Variance:</span><span className="text-zinc-700 dark:text-zinc-300">&plusmn;1.8ms</span></div>
               </div>
             </div>
           )}
