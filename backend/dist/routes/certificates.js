@@ -348,17 +348,18 @@ router.delete("/admin/:certificateId", auth_1.requireAuth, async (req, res) => {
                 ],
             },
         }).catch((e) => console.warn("Audit logs delete warning:", e));
-        // Delete certificate from Prisma
+        // Delete certificate from Prisma safely without malformed ObjectId errors
+        const certOrConditions = [
+            { certificateId: idClean },
+            { certificateId: idClean.toUpperCase() },
+            { certificateId: idLower },
+        ];
+        if (/^[0-9a-fA-F]{24}$/.test(idClean)) {
+            certOrConditions.push({ id: idClean });
+        }
         await db_1.default.certificate.deleteMany({
             where: {
-                OR: [
-                    { certificateId: idClean },
-                    { certificateId: idClean.toUpperCase() },
-                    { certificateId: idLower },
-                    { id: idClean },
-                    { id: idClean.toUpperCase() },
-                    { id: idLower },
-                ],
+                OR: certOrConditions,
             },
         }).catch((e) => console.warn("Prisma certificate delete warning:", e));
         // Clean from legacy JSON file if present
@@ -563,6 +564,7 @@ router.post("/admin/manual-upload", async (req, res) => {
                         category: finalCategory,
                         imageUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&q=80",
                         files: {},
+                        isPrivate: true,
                     },
                 }).catch(() => null);
             }
@@ -728,6 +730,7 @@ router.post("/request", async (req, res) => {
                         category: req.body.category || "Software Engineering",
                         imageUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&q=80",
                         files: {},
+                        isPrivate: true,
                     },
                 }).catch(() => null);
             }
@@ -789,9 +792,16 @@ router.put("/:id/approve", async (req, res) => {
         let baseCert = existingIdx >= 0 ? certs[existingIdx] : null;
         if (!baseCert) {
             try {
+                const findConditions = [
+                    { certificateId: idClean },
+                    { certificateId: idClean.toUpperCase() },
+                ];
+                if (/^[0-9a-fA-F]{24}$/.test(idClean)) {
+                    findConditions.push({ id: idClean });
+                }
                 const dbCert = await db_1.default.certificate.findFirst({
                     where: {
-                        OR: [{ certificateId: idClean }, { id: idClean }],
+                        OR: findConditions,
                     },
                 });
                 if (dbCert)
@@ -834,9 +844,17 @@ router.put("/:id/approve", async (req, res) => {
         writeCertificatesFile(certs);
         // Persist to MongoDB Prisma
         try {
+            const updateConditions = [
+                { certificateId: idClean },
+                { certificateId: idClean.toUpperCase() },
+                { certificateId: officialCertId },
+            ];
+            if (/^[0-9a-fA-F]{24}$/.test(idClean)) {
+                updateConditions.push({ id: idClean });
+            }
             await db_1.default.certificate.updateMany({
                 where: {
-                    OR: [{ certificateId: idClean }, { certificateId: officialCertId }, { id: idClean }],
+                    OR: updateConditions,
                 },
                 data: {
                     certificateId: officialCertId,
@@ -1016,6 +1034,7 @@ router.post("/", async (req, res) => {
                         category: cert.category || "Software Engineering",
                         imageUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&q=80",
                         files: {},
+                        isPrivate: true,
                     },
                 }).catch(() => null);
             }
@@ -1082,6 +1101,7 @@ router.delete("/:id", async (req, res) => {
         const { id } = req.params;
         const idClean = id.trim();
         const idLower = idClean.toLowerCase();
+        const emailParam = (req.query.email || req.body?.email || "").toString().trim().toLowerCase();
         await db_1.default.certificateAuditLog.deleteMany({
             where: {
                 OR: [
@@ -1091,18 +1111,25 @@ router.delete("/:id", async (req, res) => {
                 ],
             },
         }).catch((e) => console.warn("Audit logs delete warning:", e));
-        await db_1.default.certificate.deleteMany({
+        const certOrConditions = [
+            { certificateId: idClean },
+            { certificateId: idClean.toUpperCase() },
+            { certificateId: idLower },
+        ];
+        if (/^[0-9a-fA-F]{24}$/.test(idClean)) {
+            certOrConditions.push({ id: idClean });
+        }
+        if (emailParam) {
+            certOrConditions.push({ recipientEmail: emailParam });
+        }
+        const deleteResult = await db_1.default.certificate.deleteMany({
             where: {
-                OR: [
-                    { certificateId: idClean },
-                    { certificateId: idClean.toUpperCase() },
-                    { certificateId: idLower },
-                    { id: idClean },
-                    { id: idClean.toUpperCase() },
-                    { id: idLower },
-                ],
+                OR: certOrConditions,
             },
-        }).catch((e) => console.warn("Prisma certificate delete warning:", e));
+        }).catch((e) => {
+            console.warn("Prisma certificate delete warning:", e);
+            return { count: 0 };
+        });
         let certs = readCertificatesFile();
         certs = certs.filter((c) => {
             const cId = (c.id || "").toLowerCase().trim();
@@ -1110,7 +1137,7 @@ router.delete("/:id", async (req, res) => {
             return cId !== idLower && cCertId !== idLower;
         });
         writeCertificatesFile(certs);
-        return res.json({ message: "Certificate deleted successfully" });
+        return res.json({ message: "Certificate deleted successfully", deletedCount: deleteResult.count });
     }
     catch (err) {
         return res.status(500).json({ error: err.message || "Failed to delete certificate" });

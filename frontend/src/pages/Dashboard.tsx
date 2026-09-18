@@ -1738,12 +1738,20 @@ export default function Dashboard() {
     setCertFileTypeVal("");
   };
 
-  const handleDeleteCertificate = (certId: string) => {
+  const handleDeleteCertificate = (certId: string, userEmail?: string) => {
     if (!window.confirm("Are you sure you want to delete this certificate record?")) return;
     const targetClean = (certId || "").trim().toLowerCase();
     const certTarget = certificates.find((c) => (c.id || "").toLowerCase().trim() === targetClean || ((c as any).certificateId || "").toLowerCase().trim() === targetClean);
-    deleteCertificateApi(certId);
-    setCertificates((prev) => prev.filter((c) => (c.id || "").toLowerCase().trim() !== targetClean && ((c as any).certificateId || "").toLowerCase().trim() !== targetClean));
+    const targetEmail = userEmail || certTarget?.userEmail || (certTarget as any)?.recipientEmail;
+    deleteCertificateApi(certId, targetEmail);
+    setCertificates((prev) => prev.filter((c) => {
+      const cId = (c.id || "").toLowerCase().trim();
+      const cCertId = ((c as any).certificateId || "").toLowerCase().trim();
+      const cEmail = (c.userEmail || (c as any).recipientEmail || "").toLowerCase().trim();
+      const matchesId = cId === targetClean || cCertId === targetClean;
+      const matchesEmail = targetEmail && cEmail === targetEmail.toLowerCase().trim();
+      return !matchesId && !matchesEmail;
+    }));
     logAdminActivityApi({
       adminName: adminName || user?.fullName || (adminEmail.includes("uday") ? "Uday Kumar" : "Admin"),
       adminEmail: adminEmail || user?.primaryEmailAddress?.emailAddress || "",
@@ -4484,7 +4492,7 @@ export default function Dashboard() {
                               {cert && (
                                 <button
                                   title="Delete Certificate Record"
-                                  onClick={() => handleDeleteCertificate(cert.id)}
+                                  onClick={() => handleDeleteCertificate(cert.id, row.userEmail)}
                                   className="p-1.5 text-zinc-400 hover:text-rose-500 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
                                 >
                                   <Trash2 size={15} />

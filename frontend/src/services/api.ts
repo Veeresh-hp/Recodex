@@ -1536,7 +1536,7 @@ export async function adminManualUploadCertificateApi(certData: any, token?: str
 /**
  * Deletes/revokes a certificate via backend API and syncs to localStorage.
  */
-export async function deleteCertificateApi(id: string): Promise<boolean> {
+export async function deleteCertificateApi(id: string, userEmail?: string): Promise<boolean> {
   const cleanId = (id || "").trim().toLowerCase();
   if (!cleanId) return false;
 
@@ -1560,7 +1560,10 @@ export async function deleteCertificateApi(id: string): Promise<boolean> {
       certs = certs.filter((c: any) => {
         const cId = (c.id || "").trim().toLowerCase();
         const cCertId = (c.certificateId || "").trim().toLowerCase();
-        return cId !== cleanId && cCertId !== cleanId;
+        const cEmail = (c.userEmail || c.recipientEmail || "").trim().toLowerCase();
+        const matchesId = cId === cleanId || cCertId === cleanId;
+        const matchesEmail = userEmail && cEmail === userEmail.trim().toLowerCase();
+        return !matchesId && !matchesEmail;
       });
       localStorage.setItem("recodex_global_certificates", JSON.stringify(certs));
     }
@@ -1576,7 +1579,10 @@ export async function deleteCertificateApi(id: string): Promise<boolean> {
       certs = certs.filter((c: any) => {
         const cId = (c.id || "").trim().toLowerCase();
         const cCertId = (c.certificateId || "").trim().toLowerCase();
-        return cId !== cleanId && cCertId !== cleanId;
+        const cEmail = (c.userEmail || c.recipientEmail || "").trim().toLowerCase();
+        const matchesId = cId === cleanId || cCertId === cleanId;
+        const matchesEmail = userEmail && cEmail === userEmail.trim().toLowerCase();
+        return !matchesId && !matchesEmail;
       });
       localStorage.setItem("recodex_synced_certificates", JSON.stringify(certs));
     }
@@ -1589,13 +1595,14 @@ export async function deleteCertificateApi(id: string): Promise<boolean> {
   window.dispatchEvent(new Event("storage"));
 
   // 5. Send DELETE request to both backend endpoints
+  const emailQuery = userEmail ? `?email=${encodeURIComponent(userEmail.trim())}` : "";
   try {
-    await fetch(`${API_BASE_URL}/certificates/${encodeURIComponent(id.trim())}`, { method: "DELETE" });
+    await fetch(`${API_BASE_URL}/certificates/${encodeURIComponent(id.trim())}${emailQuery}`, { method: "DELETE" });
   } catch (err) {
     console.warn("[CERTIFICATES API] Delete backend warning:", err);
   }
   try {
-    await fetch(`${API_BASE_URL}/certificates/admin/${encodeURIComponent(id.trim())}`, { method: "DELETE" });
+    await fetch(`${API_BASE_URL}/certificates/admin/${encodeURIComponent(id.trim())}${emailQuery}`, { method: "DELETE" });
   } catch (err) {}
 
   return true;

@@ -380,17 +380,19 @@ router.delete("/admin/:certificateId", requireAuth, async (req: AuthenticatedReq
       },
     }).catch((e: any) => console.warn("Audit logs delete warning:", e));
 
-    // Delete certificate from Prisma
+    // Delete certificate from Prisma safely without malformed ObjectId errors
+    const certOrConditions: any[] = [
+      { certificateId: idClean },
+      { certificateId: idClean.toUpperCase() },
+      { certificateId: idLower },
+    ];
+    if (/^[0-9a-fA-F]{24}$/.test(idClean)) {
+      certOrConditions.push({ id: idClean });
+    }
+
     await prisma.certificate.deleteMany({
       where: {
-        OR: [
-          { certificateId: idClean },
-          { certificateId: idClean.toUpperCase() },
-          { certificateId: idLower },
-          { id: idClean },
-          { id: idClean.toUpperCase() },
-          { id: idLower },
-        ],
+        OR: certOrConditions,
       },
     }).catch((e: any) => console.warn("Prisma certificate delete warning:", e));
 
@@ -879,9 +881,16 @@ router.put("/:id/approve", async (req: Request, res: Response) => {
     let baseCert = existingIdx >= 0 ? certs[existingIdx] : null;
     if (!baseCert) {
       try {
+        const findConditions: any[] = [
+          { certificateId: idClean },
+          { certificateId: idClean.toUpperCase() },
+        ];
+        if (/^[0-9a-fA-F]{24}$/.test(idClean)) {
+          findConditions.push({ id: idClean });
+        }
         const dbCert = await prisma.certificate.findFirst({
           where: {
-            OR: [{ certificateId: idClean }, { id: idClean }],
+            OR: findConditions,
           },
         });
         if (dbCert) baseCert = formatPrismaCertificate(dbCert);
@@ -926,9 +935,17 @@ router.put("/:id/approve", async (req: Request, res: Response) => {
 
     // Persist to MongoDB Prisma
     try {
+      const updateConditions: any[] = [
+        { certificateId: idClean },
+        { certificateId: idClean.toUpperCase() },
+        { certificateId: officialCertId },
+      ];
+      if (/^[0-9a-fA-F]{24}$/.test(idClean)) {
+        updateConditions.push({ id: idClean });
+      }
       await prisma.certificate.updateMany({
         where: {
-          OR: [{ certificateId: idClean }, { certificateId: officialCertId }, { id: idClean }],
+          OR: updateConditions,
         },
         data: {
           certificateId: officialCertId,
@@ -1185,6 +1202,8 @@ router.delete("/:id", async (req: Request, res: Response) => {
     const idClean = id.trim();
     const idLower = idClean.toLowerCase();
 
+    const emailParam = (req.query.email || req.body?.email || "").toString().trim().toLowerCase();
+
     await prisma.certificateAuditLog.deleteMany({
       where: {
         OR: [
@@ -1195,18 +1214,26 @@ router.delete("/:id", async (req: Request, res: Response) => {
       },
     }).catch((e: any) => console.warn("Audit logs delete warning:", e));
 
-    await prisma.certificate.deleteMany({
+    const certOrConditions: any[] = [
+      { certificateId: idClean },
+      { certificateId: idClean.toUpperCase() },
+      { certificateId: idLower },
+    ];
+    if (/^[0-9a-fA-F]{24}$/.test(idClean)) {
+      certOrConditions.push({ id: idClean });
+    }
+    if (emailParam) {
+      certOrConditions.push({ recipientEmail: emailParam });
+    }
+
+    const deleteResult = await prisma.certificate.deleteMany({
       where: {
-        OR: [
-          { certificateId: idClean },
-          { certificateId: idClean.toUpperCase() },
-          { certificateId: idLower },
-          { id: idClean },
-          { id: idClean.toUpperCase() },
-          { id: idLower },
-        ],
+        OR: certOrConditions,
       },
-    }).catch((e: any) => console.warn("Prisma certificate delete warning:", e));
+    }).catch((e: any) => {
+      console.warn("Prisma certificate delete warning:", e);
+      return { count: 0 };
+    });
 
     let certs = readCertificatesFile();
     certs = certs.filter((c: any) => {
@@ -1216,7 +1243,7 @@ router.delete("/:id", async (req: Request, res: Response) => {
     });
     writeCertificatesFile(certs);
 
-    return res.json({ message: "Certificate deleted successfully" });
+    return res.json({ message: "Certificate deleted successfully", deletedCount: deleteResult.count });
   } catch (err: any) {
     return res.status(500).json({ error: err.message || "Failed to delete certificate" });
   }
