@@ -134,7 +134,18 @@ function ProjectsContent() {
     return parseNum(a) - parseNum(b);
   });
 
-  const filteredProjects = sortedProjects.filter((p) => {
+  const isSuiteProject = (p: Project) => {
+    if ((p as any).isPrivate) return false;
+    return Boolean(
+      (p.dir && /^\d+/.test(p.dir)) ||
+      /^\d+-/.test(p.id) ||
+      MOCK_PROJECTS.some((m) => m.id === p.id)
+    );
+  };
+
+  const suiteProjects = sortedProjects.filter(isSuiteProject);
+
+  const filteredProjects = suiteProjects.filter((p) => {
     if (softDeletedProjectIds.includes(p.id)) return false;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
@@ -192,7 +203,7 @@ function ProjectsContent() {
                       : "bg-zinc-100 dark:bg-black/30 text-zinc-600 dark:text-zinc-400 border-zinc-200 dark:border-white/10 hover:text-zinc-950 dark:hover:text-white hover:bg-zinc-200 dark:hover:bg-white/10"
                   }`}
                 >
-                  {cat === "All" ? `All (${projects.length})` : cat.toUpperCase()}
+                  {cat === "All" ? `All (${suiteProjects.filter(p => !softDeletedProjectIds.includes(p.id)).length})` : cat.toUpperCase()}
                 </button>
               ))}
             </div>

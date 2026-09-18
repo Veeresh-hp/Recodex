@@ -640,6 +640,7 @@ router.post("/admin/manual-upload", async (req: Request, res: Response) => {
             category: finalCategory,
             imageUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&q=80",
             files: {},
+            isPrivate: true,
           },
         }).catch(() => null);
       }
@@ -811,6 +812,7 @@ router.post("/request", async (req: Request, res: Response) => {
             category: req.body.category || "Software Engineering",
             imageUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&q=80",
             files: {},
+            isPrivate: true,
           },
         }).catch(() => null);
       }
@@ -1114,6 +1116,7 @@ router.post("/", async (req: Request, res: Response) => {
             category: cert.category || "Software Engineering",
             imageUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&q=80",
             files: {},
+            isPrivate: true,
           },
         }).catch(() => null);
       }
