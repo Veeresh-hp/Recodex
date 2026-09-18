@@ -1,96 +1,223 @@
-<html>
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
   <head>
-    <title>Blogs</title>
-    <link
-      rel="stylesheet"
-      href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css"
-      integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm"
-      crossorigin="anonymous"
-    />
-    <style>
-      body {
-        background: rgb(89, 233, 137);
-      }
-      h1 {
-        text-align: center;
-      }
-      footer {
-        position: relative;
-  text-align: center;
-  padding: 3px;
-  background-color: DarkSalmon;
-  color: white;
-}
-    </style>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DevPulse — Modern Tech Publishing & Admin Studio</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="style.css" />
   </head>
   <body>
-    <h1>Your Blogs Page</h1>
-    <div class="container mt-2">
-      <div class="card">
-        <div class="card-body">
-          <form id="post-form">
-            <center><h3>Make A Blog</h3></center>
-            <textarea
-              id="post"
-              class="form-control"
-              placeholder="What's on your mind..."
-            ></textarea>
-            <input
-              type="file"
-              class="form-control"
-              id="image"
-              accept="images/*"
-            />
-            <div class="text-center">
-              <button type="button" class="btn btn-success" onclick="upload()">
-                Upload
-              </button>
+    <div class="blog-app">
+      
+      <!-- App Header & Navigation -->
+      <header class="blog-header">
+        <div class="nav-container">
+          <div class="brand-group">
+            <div class="logo-mark">
+              <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
             </div>
-          </form>
+            <div>
+              <h1 class="brand-name">DevPulse <span class="badge">CMS</span></h1>
+              <span class="brand-sub">The Engineering & Web Systems Journal</span>
+            </div>
+          </div>
+
+          <!-- Header Right Actions -->
+          <div class="header-right">
+            <!-- Mode Switcher: Reader vs Admin -->
+            <div class="mode-switch-pill">
+              <button id="view-reader-btn" class="view-btn active">Reader</button>
+              <button id="view-admin-btn" class="view-btn">Admin Studio</button>
+            </div>
+
+            <!-- Theme Toggle -->
+            <button id="theme-toggle" class="circle-btn" title="Toggle Theme">
+              <svg viewBox="0 0 24 24"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-.46-.04-.92-.1-1.36-.98 1.37-2.58 2.26-4.4 2.26-3.03 0-5.5-2.47-5.5-5.5 0-1.82.89-3.42 2.26-4.4-.44-.06-.9-.1-1.36-.1z"/></svg>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <!-- ================= VIEW 1: PUBLIC READER VIEW ================= -->
+      <div id="reader-view" class="view-container">
+        
+        <!-- Hero Featured Post Banner -->
+        <section id="hero-banner" class="hero-banner">
+          <!-- Dynamically Injected Featured Article -->
+        </section>
+
+        <!-- Search & Category Filters -->
+        <div class="filter-bar">
+          <div class="search-box">
+            <svg class="search-icon" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+            <input type="text" id="article-search" placeholder="Search articles by title, tags, or topic..." />
+          </div>
+
+          <div class="category-pills" id="category-pills">
+            <button class="cat-pill active" data-cat="All">All Topics</button>
+            <button class="cat-pill" data-cat="Engineering">Engineering</button>
+            <button class="cat-pill" data-cat="WebDev">WebDev</button>
+            <button class="cat-pill" data-cat="AI & ML">AI & ML</button>
+            <button class="cat-pill" data-cat="Cloud">Cloud</button>
+            <button class="cat-pill" data-cat="UI/UX">UI/UX</button>
+          </div>
+        </div>
+
+        <!-- Articles Grid -->
+        <section id="articles-grid" class="articles-grid">
+          <!-- Dynamically Rendered Articles -->
+        </section>
+
+      </div>
+
+      <!-- ================= VIEW 2: ADMIN STUDIO CMS ================= -->
+      <div id="admin-view" class="view-container hidden">
+        
+        <!-- Admin Studio Header & Metrics -->
+        <section class="admin-overview">
+          <div class="overview-header">
+            <h2>Admin Publishing Studio</h2>
+            <p>Manage, compose, and deploy articles across your developer ecosystem.</p>
+          </div>
+
+          <div class="metrics-row">
+            <div class="metric-card">
+              <span class="metric-label">Total Articles</span>
+              <span id="metric-total" class="metric-val">0</span>
+            </div>
+            <div class="metric-card">
+              <span class="metric-label">Published</span>
+              <span id="metric-published" class="metric-val text-success">0</span>
+            </div>
+            <div class="metric-card">
+              <span class="metric-label">Drafts</span>
+              <span id="metric-drafts" class="metric-val text-warning">0</span>
+            </div>
+            <div class="metric-card">
+              <span class="metric-label">Total Reads</span>
+              <span id="metric-reads" class="metric-val text-info">24.5K</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Post Form + Post Manager Split -->
+        <div class="admin-split">
+          
+          <!-- Post Composer Card -->
+          <section class="admin-card post-form-card">
+            <h3 id="form-title">Compose New Article</h3>
+            <form id="post-form">
+              <input type="hidden" id="post-id" />
+
+              <div class="form-group">
+                <label for="post-title">Article Title *</label>
+                <input type="text" id="post-title" placeholder="e.g. Building High-Performance Distributed WebSockets" required />
+              </div>
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="post-category">Category</label>
+                  <select id="post-category">
+                    <option value="Engineering">Engineering</option>
+                    <option value="WebDev">WebDev</option>
+                    <option value="AI & ML">AI & ML</option>
+                    <option value="Cloud">Cloud</option>
+                    <option value="UI/UX">UI/UX</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="post-readtime">Est. Read Time</label>
+                  <input type="text" id="post-readtime" placeholder="e.g. 5 min read" value="5 min read" />
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="post-image">Cover Image URL</label>
+                <input type="url" id="post-image" placeholder="https://images.unsplash.com/..." />
+                <div id="form-img-preview" class="form-img-preview hidden"></div>
+              </div>
+
+              <div class="form-group">
+                <label for="post-excerpt">Short Summary / Excerpt *</label>
+                <textarea id="post-excerpt" rows="2" placeholder="A brief one-two sentence preview of the article..." required></textarea>
+              </div>
+
+              <div class="form-group">
+                <label for="post-content">Full Article Content *</label>
+                <textarea id="post-content" rows="6" placeholder="Write full article body paragraphs here..." required></textarea>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="post-status">Status</label>
+                  <select id="post-status">
+                    <option value="Published">Published</option>
+                    <option value="Draft">Draft</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="post-author">Author</label>
+                  <input type="text" id="post-author" value="Veeresh H P" />
+                </div>
+              </div>
+
+              <div class="form-actions">
+                <button type="button" id="cancel-edit-btn" class="btn btn-secondary hidden">Cancel Edit</button>
+                <button type="submit" id="save-post-btn" class="btn btn-primary">Publish Article</button>
+              </div>
+            </form>
+          </section>
+
+          <!-- Post Management Table Card -->
+          <section class="admin-card post-table-card">
+            <h3>Published & Draft Articles</h3>
+            <div class="table-responsive">
+              <table class="posts-table">
+                <thead>
+                  <tr>
+                    <th>Article</th>
+                    <th>Category</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="posts-table-body">
+                  <!-- Injected Table Rows -->
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+        </div>
+
+      </div>
+
+      <!-- Footer -->
+      <footer class="app-footer">
+        <p>© 2026 DevPulse Studio · Designed with Vanilla Web Standards · RecodeX Platform</p>
+      </footer>
+
+    </div>
+
+    <!-- ================= MODAL: FULL ARTICLE READER ================= -->
+    <div id="article-modal" class="modal-backdrop hidden">
+      <div class="article-modal-card">
+        <header class="modal-header">
+          <button id="close-article-modal" class="close-btn">&times;</button>
+        </header>
+        <div class="article-modal-scroll" id="article-modal-content">
+          <!-- Dynamically Injected Full Article View -->
         </div>
       </div>
-      <div class="row mt-4" id="posts"></div>
     </div>
-    <footer>
-      <p>Author: Veeresh H P<br>
-      <a href="mailto:veereshhp@gmail.com">veereshhp@gmail.com</a></p>
-    </footer>
 
-    <!-- The core Firebase JS SDK is always required and must be listed first...make sure you remove -app from below line -->
-    <script src="https://www.gstatic.com/firebasejs/7.14.2/firebase.js"></script>
+    <!-- Global Toast -->
+    <div id="toast" class="toast hidden"></div>
 
-    <script>
-      // Your web app's Firebase configuration
-      var firebaseConfig = {
-        apiKey: "AIzaSyDfQal5qQ3zS3DA21oeTrRAonislCWuX68",
-        authDomain: "blogs-233c7.firebaseapp.com",
-        databaseURL: "https://blogs-233c7.firebaseio.com",
-        projectId: "blogs-233c7",
-        storageBucket: "blogs-233c7.appspot.com",
-        messagingSenderId: "960693622725",
-        appId: "1:960693622725:web:325e29579c6c3dc4d91dac",
-        measurementId: "G-3MPBFX087D",
-      };
-      // Initialize Firebase
-      firebase.initializeApp(firebaseConfig);
-      firebase.analytics();
-    </script>
-
-    <script
-      src="https://code.jquery.com/jquery-3.2.1.slim.min.js"
-      integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN"
-      crossorigin="anonymous"
-    ></script>
-    <script
-      src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js"
-      integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q"
-      crossorigin="anonymous"
-    ></script>
-    <script
-      src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js"
-      integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl"
-      crossorigin="anonymous"
-    ></script>
+    <script src="script.js"></script>
     <script src="defualt.js"></script>
   </body>
 </html>

@@ -1,44 +1,134 @@
 <!DOCTYPE html>
-<!-- YouTube & Website - CodingLab -->
-<html lang="en">
+<html lang="en" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Calculator in HTML CSS & JavaScript</title>
+    <title>NeoCalc Studio — Standard & Scientific Calculator</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
-    <div class="container">
-      <input type="text" class="display" />
+    <div class="calculator-app">
+      
+      <!-- Calculator Body -->
+      <main class="calculator-container">
+        
+        <!-- Header Toolbar -->
+        <header class="calc-header">
+          <div class="brand">
+            <span class="brand-badge">PRO</span>
+            <span class="brand-title">NeoCalc</span>
+          </div>
+          <div class="header-controls">
+            <!-- Mode Switch: Standard / Scientific -->
+            <button id="mode-toggle" class="control-btn" title="Toggle Scientific Mode">
+              <span class="mode-label">SCI</span>
+            </button>
+            <!-- Audio Click Toggle -->
+            <button id="sound-toggle" class="control-btn active" title="Toggle Haptic Sound">
+              <svg viewBox="0 0 24 24" class="icon"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+            </button>
+            <!-- Theme Toggle -->
+            <button id="theme-toggle" class="control-btn" title="Toggle Theme">
+              <svg viewBox="0 0 24 24" class="icon"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-.46-.04-.92-.1-1.36-.98 1.37-2.58 2.26-4.4 2.26-3.03 0-5.5-2.47-5.5-5.5 0-1.82.89-3.42 2.26-4.4-.44-.06-.9-.1-1.36-.1z"/></svg>
+            </button>
+            <!-- History Tape Drawer Toggle -->
+            <button id="history-toggle" class="control-btn" title="Calculation History">
+              <svg viewBox="0 0 24 24" class="icon"><path d="M13 3a9 9 0 0 0-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42A8.954 8.954 0 0 0 13 21a9 9 0 0 0 0-18zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>
+            </button>
+          </div>
+        </header>
 
-      <div class="buttons">
-        <button class="operator" data-value="AC">AC</button>
-        <button class="operator" data-value="DEL">DEL</button>
-        <button class="operator" data-value="%">%</button>
-        <button class="operator" data-value="/">/</button>
+        <!-- Display Unit -->
+        <section class="calc-display-section">
+          <!-- Expression / Formula Line -->
+          <div class="expression-row">
+            <span id="deg-rad-indicator" class="mode-badge hidden">DEG</span>
+            <span id="expression-display" class="expression-text"></span>
+          </div>
+          <!-- Primary Number Display -->
+          <div class="primary-row">
+            <span id="primary-display" class="primary-text">0</span>
+            <button id="copy-btn" class="copy-btn" title="Copy result">
+              <svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+            </button>
+          </div>
+        </section>
 
-        <button data-value="7">7</button>
-        <button data-value="8">8</button>
-        <button data-value="9">9</button>
-        <button class="operator" data-value="*">*</button>
+        <!-- Scientific Panel (Collapsible) -->
+        <div id="scientific-panel" class="scientific-panel collapsed">
+          <button class="key key-sci" data-action="deg-rad">RAD</button>
+          <button class="key key-sci" data-action="sin">sin</button>
+          <button class="key key-sci" data-action="cos">cos</button>
+          <button class="key key-sci" data-action="tan">tan</button>
+          <button class="key key-sci" data-action="pi">π</button>
+          <button class="key key-sci" data-action="e">e</button>
+          <button class="key key-sci" data-action="sqrt">√x</button>
+          <button class="key key-sci" data-action="sqr">x²</button>
+          <button class="key key-sci" data-action="pow">xʸ</button>
+          <button class="key key-sci" data-action="log">log</button>
+          <button class="key key-sci" data-action="ln">ln</button>
+          <button class="key key-sci" data-action="factorial">n!</button>
+          <button class="key key-sci" data-action="open-paren">(</button>
+          <button class="key key-sci" data-action="close-paren">)</button>
+          <button class="key key-sci" data-action="inv">1/x</button>
+        </div>
 
-        <button data-value="4">4</button>
-        <button data-value="5">5</button>
-        <button data-value="6">6</button>
-        <button class="operator" data-value="-">-</button>
+        <!-- Standard Keypad -->
+        <div class="standard-keypad">
+          <!-- Row 1 -->
+          <button class="key key-function" data-action="clear">AC</button>
+          <button class="key key-function" data-action="delete">DEL</button>
+          <button class="key key-function" data-action="percent">%</button>
+          <button class="key key-operator" data-action="operator" data-val="÷">÷</button>
 
-        <button data-value="1">1</button>
-        <button data-value="2">2</button>
-        <button data-value="3">3</button>
-        <button class="operator" data-value="+">+</button>
+          <!-- Row 2 -->
+          <button class="key key-num" data-val="7">7</button>
+          <button class="key key-num" data-val="8">8</button>
+          <button class="key key-num" data-val="9">9</button>
+          <button class="key key-operator" data-action="operator" data-val="×">×</button>
 
-        <button data-value="0">0</button>
-        <button data-value="00">00</button>
-        <button data-value=".">.</button>
-        <button class="operator" data-value="=">=</button>
-      </div>
+          <!-- Row 3 -->
+          <button class="key key-num" data-val="4">4</button>
+          <button class="key key-num" data-val="5">5</button>
+          <button class="key key-num" data-val="6">6</button>
+          <button class="key key-operator" data-action="operator" data-val="−">−</button>
+
+          <!-- Row 4 -->
+          <button class="key key-num" data-val="1">1</button>
+          <button class="key key-num" data-val="2">2</button>
+          <button class="key key-num" data-val="3">3</button>
+          <button class="key key-operator" data-action="operator" data-val="+">+</button>
+
+          <!-- Row 5 -->
+          <button class="key key-function" data-action="sign">±</button>
+          <button class="key key-num" data-val="0">0</button>
+          <button class="key key-num" data-val=".">.</button>
+          <button class="key key-equals" data-action="calculate">=</button>
+        </div>
+
+      </main>
+
+      <!-- History Tape Drawer -->
+      <aside id="history-drawer" class="history-drawer hidden">
+        <div class="drawer-header">
+          <h3>History Tape</h3>
+          <div class="drawer-actions">
+            <button id="clear-history-btn" class="drawer-btn" title="Clear History">Clear</button>
+            <button id="close-history-btn" class="drawer-btn">&times;</button>
+          </div>
+        </div>
+        <div id="history-list" class="history-list">
+          <!-- Dynamically Rendered History Items -->
+        </div>
+      </aside>
+
     </div>
+
+    <!-- Toast Notification -->
+    <div id="calc-toast" class="calc-toast hidden"></div>
 
     <script src="script.js"></script>
   </body>

@@ -1,23 +1,161 @@
-<!DOCTYPE  html>
-<!-- Coding By CodingNepal - youtube.com/codingnepal -->
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Drag & Drop or Browse: File Upload | CodingNepal</title>
-    <link rel="stylesheet" href="style.css">
-    <script src="https://kit.fontawesome.com/a076d05399.js"></script>
-</head>
-<body>
-  <div class="drag-area">
-    <div class="icon"><i class="fas fa-cloud-upload-alt"></i></div>
-    <header>Drag & Drop to Upload File</header>
-    <span>OR</span>
-    <button>Browse File</button>
-    <input type="file" hidden>
-  </div>
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PixelDrop Pro — Next-Gen Asset Uploader & Studio</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="uploader-app">
+      
+      <!-- Top Navigation -->
+      <header class="app-header">
+        <div class="logo-area">
+          <div class="logo-icon">
+            <svg viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/></svg>
+          </div>
+          <div>
+            <h1 class="app-title">PixelDrop <span class="badge">PRO</span></h1>
+            <p class="app-subtitle">High-speed client-side image processor & studio</p>
+          </div>
+        </div>
 
-  <script src="script.js"></script>
+        <div class="header-actions">
+          <button id="theme-toggle" class="header-btn" title="Toggle Theme">
+            <svg viewBox="0 0 24 24"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-.46-.04-.92-.1-1.36-.98 1.37-2.58 2.26-4.4 2.26-3.03 0-5.5-2.47-5.5-5.5 0-1.82.89-3.42 2.26-4.4-.44-.06-.9-.1-1.36-.1z"/></svg>
+          </button>
+        </div>
+      </header>
 
-</body>
+      <!-- Main Upload Area -->
+      <main class="main-container">
+        
+        <!-- Interactive Dropzone -->
+        <div id="drop-zone" class="drop-zone">
+          <input type="file" id="file-input" multiple accept="image/*" hidden />
+          
+          <div class="drop-zone-content">
+            <div class="cloud-icon-wrapper">
+              <svg class="cloud-icon" viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/></svg>
+            </div>
+            <h2 class="drop-title">Drag & drop files here</h2>
+            <p class="drop-desc">or click to browse from your device</p>
+            
+            <div class="format-badges">
+              <span class="badge-item">PNG</span>
+              <span class="badge-item">JPEG</span>
+              <span class="badge-item">WEBP</span>
+              <span class="badge-item">SVG</span>
+              <span class="badge-item">GIF</span>
+            </div>
+
+            <button type="button" id="browse-btn" class="browse-btn">
+              Browse Files
+            </button>
+          </div>
+        </div>
+
+        <!-- Toolbar & Statistics -->
+        <section class="gallery-toolbar hidden" id="gallery-toolbar">
+          <div class="stats-counter">
+            <span class="stats-label">Uploaded Assets:</span>
+            <span id="files-count-badge" class="stats-pill">0 files</span>
+            <span id="total-size-badge" class="stats-pill">0 MB</span>
+          </div>
+
+          <div class="toolbar-actions">
+            <button id="sample-btn" class="tb-btn secondary-btn" title="Add Sample Images">
+              Load Sample Images
+            </button>
+            <button id="clear-all-btn" class="tb-btn danger-btn" title="Clear all assets">
+              Clear All
+            </button>
+          </div>
+        </section>
+
+        <!-- Gallery Grid -->
+        <section id="assets-grid" class="assets-grid">
+          <!-- Dynamically Rendered Uploaded Cards -->
+        </section>
+
+      </main>
+
+    </div>
+
+    <!-- Image Studio / Inspection Modal -->
+    <div id="studio-modal" class="modal-backdrop hidden">
+      <div class="studio-card">
+        <header class="studio-header">
+          <div class="studio-title-meta">
+            <h3 id="studio-filename">image.png</h3>
+            <span id="studio-dimensions" class="studio-dim-badge">1920 x 1080</span>
+          </div>
+          <button id="close-studio-btn" class="close-btn">&times;</button>
+        </header>
+
+        <div class="studio-body">
+          <!-- Live Preview Canvas / Image -->
+          <div class="preview-stage">
+            <img id="studio-img" src="" alt="Studio Preview" />
+          </div>
+
+          <!-- Studio Adjustment Controls -->
+          <aside class="controls-sidebar">
+            <h4 class="controls-heading">Image Adjustments</h4>
+            
+            <div class="control-slider">
+              <div class="slider-label"><span>Brightness</span><span id="val-brightness">100%</span></div>
+              <input type="range" id="slider-brightness" min="0" max="200" value="100" />
+            </div>
+
+            <div class="control-slider">
+              <div class="slider-label"><span>Contrast</span><span id="val-contrast">100%</span></div>
+              <input type="range" id="slider-contrast" min="0" max="200" value="100" />
+            </div>
+
+            <div class="control-slider">
+              <div class="slider-label"><span>Saturation</span><span id="val-saturate">100%</span></div>
+              <input type="range" id="slider-saturate" min="0" max="200" value="100" />
+            </div>
+
+            <div class="control-slider">
+              <div class="slider-label"><span>Grayscale</span><span id="val-grayscale">0%</span></div>
+              <input type="range" id="slider-grayscale" min="0" max="100" value="0" />
+            </div>
+
+            <div class="control-slider">
+              <div class="slider-label"><span>Sepia</span><span id="val-sepia">0%</span></div>
+              <input type="range" id="slider-sepia" min="0" max="100" value="0" />
+            </div>
+
+            <div class="control-slider">
+              <div class="slider-label"><span>Blur</span><span id="val-blur">0px</span></div>
+              <input type="range" id="slider-blur" min="0" max="20" value="0" />
+            </div>
+
+            <div class="filter-presets">
+              <button class="preset-btn" data-preset="vintage">Vintage</button>
+              <button class="preset-btn" data-preset="bw">B&W</button>
+              <button class="preset-btn" data-preset="vivid">Vivid</button>
+              <button class="preset-btn" data-preset="reset">Reset</button>
+            </div>
+
+            <div class="studio-actions">
+              <button id="copy-base64-btn" class="studio-btn primary-outline">Copy Base64</button>
+              <button id="download-filtered-btn" class="studio-btn primary-fill">Download</button>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </div>
+
+    <!-- Global Toast Notification -->
+    <div id="toast" class="toast hidden"></div>
+
+    <script src="script.js"></script>
+  </body>
 </html>
