@@ -31,6 +31,12 @@ router.get("/", async (req, res) => {
       filters.isPrivate = { not: true };
     }
 
+    // Exclude synthetic certificate shadow stubs from project listings
+    filters.NOT = [
+      { id: { startsWith: "proj_cert_" } },
+      { description: { startsWith: "Certified project:" } }
+    ];
+
     if (category) {
       filters.category = String(category);
     }

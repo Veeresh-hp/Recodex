@@ -649,7 +649,10 @@ export default function Dashboard() {
     try {
       const data = await getProjects(undefined, undefined, true);
       if (Array.isArray(data) && data.length > 0) {
-        setDbProjects(data);
+        const cleanProjects = data.filter(
+          (p) => !p.id?.startsWith("proj_cert_") && !p.description?.startsWith("Certified project:")
+        );
+        setDbProjects(cleanProjects.length > 0 ? cleanProjects : MOCK_PROJECTS);
       } else {
         setDbProjects(MOCK_PROJECTS);
       }
@@ -1135,15 +1138,29 @@ export default function Dashboard() {
       }
 
       // 2. Compute Real Category Breakdown
-      const activeProjects = dbProjects.filter((p) => !softDeletedProjectIds.includes(p.id));
-      const webCount = activeProjects.filter((p) => (p.category || "").toLowerCase().includes("web")).length;
-      const aiCount = activeProjects.filter((p) => (p.category || "").toLowerCase().includes("ai") || (p.category || "").toLowerCase().includes("intel")).length;
-      const blockCount = activeProjects.filter((p) => (p.category || "").toLowerCase().includes("block") || (p.category || "").toLowerCase().includes("web3")).length;
-      const shellCount = activeProjects.filter((p) => (p.category || "").toLowerCase().includes("shell") || (p.category || "").toLowerCase().includes("system")).length;
-      const otherCount = Math.max(0, activeProjects.length - (webCount + aiCount + blockCount + shellCount));
+      const activeProjects = dbProjects.filter(
+        (p) => !softDeletedProjectIds.includes(p.id) && !p.id?.startsWith("proj_cert_") && !p.description?.startsWith("Certified project:")
+      );
+      const webToolsCount = activeProjects.filter((p) => {
+        const cat = (p.category || "").toLowerCase();
+        return cat.includes("web") || cat.includes("tool");
+      }).length;
+      const landingCount = activeProjects.filter((p) => {
+        const cat = (p.category || "").toLowerCase();
+        return cat.includes("landing") || cat.includes("portfolio") || cat.includes("site");
+      }).length;
+      const gamesCount = activeProjects.filter((p) => {
+        const cat = (p.category || "").toLowerCase();
+        return cat.includes("game");
+      }).length;
+      const utilitiesCount = activeProjects.filter((p) => {
+        const cat = (p.category || "").toLowerCase();
+        return cat.includes("util");
+      }).length;
+      const otherCount = Math.max(0, activeProjects.length - (webToolsCount + landingCount + gamesCount + utilitiesCount));
 
       const dataValues = activeProjects.length > 0
-        ? [webCount, aiCount, blockCount, shellCount + otherCount]
+        ? [webToolsCount, landingCount, gamesCount, utilitiesCount + otherCount]
         : [1, 1, 1, 1];
 
       // Category Chart (Doughnut)
@@ -1159,13 +1176,13 @@ export default function Dashboard() {
           categoryChartInstance.current = new Chart(catCtx, {
             type: "doughnut",
             data: {
-              labels: ["Web Systems", "AI & Intelligence", "Blockchain & Web3", "Shells & Systems"],
+              labels: ["Web Apps & Tools", "Landing Pages & Portfolios", "Games", "Utilities"],
               datasets: [{
                 data: dataValues,
                 backgroundColor: [
                   "#00d1ff",
-                  "#22d3ee",
                   "#818cf8",
+                  "#22d3ee",
                   "#a855f7"
                 ],
                 borderWidth: 0,
@@ -2344,7 +2361,7 @@ export default function Dashboard() {
                   <div>
                     <p className="text-xs font-mono font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-1">Active Projects</p>
                     <h3 className="text-3xl font-extrabold font-mono text-zinc-900 dark:text-white tracking-tight">
-                      {dbProjects.filter(p => !softDeletedProjectIds.includes(p.id)).length}
+                      {dbProjects.filter(p => !softDeletedProjectIds.includes(p.id) && !p.id?.startsWith("proj_cert_") && !p.description?.startsWith("Certified project:")).length}
                     </h3>
                   </div>
                   <div className="p-3 bg-cyan-500/10 rounded-xl text-cyan-400 border border-cyan-500/20 group-hover:bg-cyan-400 group-hover:text-black transition-all">
@@ -2511,7 +2528,7 @@ export default function Dashboard() {
                   <canvas ref={categoryChartRef}></canvas>
                   <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                     <span className="text-2xl font-extrabold font-mono text-zinc-900 dark:text-white">
-                      {dbProjects.filter(p => !softDeletedProjectIds.includes(p.id)).length}
+                      {dbProjects.filter(p => !softDeletedProjectIds.includes(p.id) && !p.id?.startsWith("proj_cert_") && !p.description?.startsWith("Certified project:")).length}
                     </span>
                     <span className="text-[9px] font-mono uppercase tracking-widest text-zinc-500">Total Projects</span>
                   </div>
@@ -2519,19 +2536,19 @@ export default function Dashboard() {
                 <div className="mt-4 grid grid-cols-2 gap-2 pt-2 border-t border-black/5 dark:border-white/5">
                   <div className="flex items-center gap-2">
                     <div className="w-2.5 h-2.5 rounded-full bg-[#00d1ff]"></div>
-                    <span className="text-xs text-zinc-400 font-mono">Web Systems</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-2.5 h-2.5 rounded-full bg-[#22d3ee]"></div>
-                    <span className="text-xs text-zinc-400 font-mono">AI Models</span>
+                    <span className="text-xs text-zinc-400 font-mono">Web Apps & Tools</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-2.5 h-2.5 rounded-full bg-[#818cf8]"></div>
-                    <span className="text-xs text-zinc-400 font-mono">Blockchain</span>
+                    <span className="text-xs text-zinc-400 font-mono">Landing Pages</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-full bg-[#22d3ee]"></div>
+                    <span className="text-xs text-zinc-400 font-mono">Games</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-2.5 h-2.5 rounded-full bg-[#a855f7]"></div>
-                    <span className="text-xs text-zinc-400 font-mono">Shells & Sys</span>
+                    <span className="text-xs text-zinc-400 font-mono">Utilities</span>
                   </div>
                 </div>
               </div>
@@ -2651,7 +2668,10 @@ export default function Dashboard() {
                     <button onClick={() => setActiveSidebarTab("Projects")} className="p-1 text-zinc-400 hover:text-primary dark:hover:text-[#00d1ff] transition-colors"><span className="material-symbols-outlined text-[18px]">arrow_forward</span></button>
                   </div>
                   <div className="space-y-3">
-                    {dbProjects.filter(p => !softDeletedProjectIds.includes(p.id)).slice(0, 3).map((p) => (
+                    {dbProjects
+                      .filter(p => !softDeletedProjectIds.includes(p.id) && !p.id?.startsWith("proj_cert_") && !p.description?.startsWith("Certified project:"))
+                      .slice(0, 3)
+                      .map((p) => (
                       <div key={p.id} className="flex gap-3 items-center p-3 rounded-xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/5 dark:border-white/5 hover:border-primary/30 transition-all cursor-pointer">
                         <div className="w-9 h-9 rounded-lg bg-primary/10 text-primary border border-primary/20 flex items-center justify-center shrink-0">
                           <span className="material-symbols-outlined text-[18px]">smart_toy</span>
@@ -3125,7 +3145,9 @@ export default function Dashboard() {
           );
         };
 
-        const totalActiveProjects = dbProjects.filter((p) => !softDeletedProjectIds.includes(p.id));
+        const totalActiveProjects = dbProjects.filter(
+          (p) => !softDeletedProjectIds.includes(p.id) && !p.id?.startsWith("proj_cert_") && !p.description?.startsWith("Certified project:")
+        );
         const allAssignedProjectsCount = totalActiveProjects.filter(isProjectAssigned).length;
         const allProjectsCount = totalActiveProjects.length;
 
