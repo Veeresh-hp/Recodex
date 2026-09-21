@@ -1195,7 +1195,7 @@ router.post("/", async (req: Request, res: Response) => {
   }
 });
 
-// DELETE /api/certificates/:id (Persistent Delete)
+// DELETE /api/certificates/:id (Persistent Delete & Unassign)
 router.delete("/:id", async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -1203,47 +1203,94 @@ router.delete("/:id", async (req: Request, res: Response) => {
     const idLower = idClean.toLowerCase();
 
     const emailParam = (req.query.email || req.body?.email || "").toString().trim().toLowerCase();
+    const userIdParam = (req.query.userId || req.body?.userId || "").toString().trim();
 
-    await prisma.certificateAuditLog.deleteMany({
-      where: {
-        OR: [
-          { certificateId: idClean },
-          { certificateId: idClean.toUpperCase() },
-          { certificateId: idLower },
-        ],
-      },
-    }).catch((e: any) => console.warn("Audit logs delete warning:", e));
+    // Delete associated audit logs
+    const auditOr: any[] = [];
+    if (idClean && idClean !== "--" && idClean !== "unassign") {
+      auditOr.push(
+        { certificateId: idClean },
+        { certificateId: idClean.toUpperCase() },
+        { certificateId: idLower }
+      );
+    }
+    if (userIdParam) auditOr.push({ userId: userIdParam });
 
-    const certOrConditions: any[] = [
-      { certificateId: idClean },
-      { certificateId: idClean.toUpperCase() },
-      { certificateId: idLower },
-    ];
-    if (/^[0-9a-fA-F]{24}$/.test(idClean)) {
-      certOrConditions.push({ id: idClean });
+    if (auditOr.length > 0) {
+      await prisma.certificateAuditLog.deleteMany({
+        where: { OR: auditOr },
+      }).catch((e: any) => console.warn("Audit logs delete warning:", e));
+    }
+
+    // Build conditions for certificate deletion
+    const certOrConditions: any[] = [];
+    if (idClean && idClean !== "--" && idClean !== "unassign") {
+      certOrConditions.push(
+        { certificateId: idClean },
+        { certificateId: idClean.toUpperCase() },
+        { certificateId: idLower }
+      );
+      if (/^[0-9a-fA-F]{24}$/.test(idClean)) {
+        certOrConditions.push({ id: idClean });
+      }
     }
     if (emailParam) {
-      certOrConditions.push({ recipientEmail: emailParam });
+      certOrConditions.push({ recipientEmail: { equals: emailParam, mode: "insensitive" } });
+    }
+    if (userIdParam) {
+      certOrConditions.push({ userId: userIdParam });
     }
 
-    const deleteResult = await prisma.certificate.deleteMany({
-      where: {
-        OR: certOrConditions,
-      },
-    }).catch((e: any) => {
-      console.warn("Prisma certificate delete warning:", e);
-      return { count: 0 };
-    });
+    let deleteResult = { count: 0 };
+    if (certOrConditions.length > 0) {
+      deleteResult = await prisma.certificate.deleteMany({
+        where: {
+          OR: certOrConditions,
+        },
+      }).catch((e: any) => {
+        console.warn("Prisma certificate delete warning:", e);
+        return { count: 0 };
+      });
 
+      // Also reset projectAssignment and projectCompletion link
+      const assignmentOr: any[] = [];
+      if (idClean && idClean !== "--" && idClean !== "unassign") {
+        assignmentOr.push({ certificateId: idClean }, { certificateId: idClean.toUpperCase() });
+      }
+      if (userIdParam) assignmentOr.push({ userId: userIdParam });
+      if (assignmentOr.length > 0) {
+        await prisma.projectAssignment.updateMany({
+          where: { OR: assignmentOr },
+          data: { certificateId: null, certificateStatus: "NOT_ELIGIBLE" },
+        }).catch(() => {});
+
+        await prisma.projectCompletion.updateMany({
+          where: { OR: assignmentOr },
+          data: { certificateId: null, certificateIssued: false },
+        }).catch(() => {});
+      }
+    }
+
+    // Clean from legacy JSON file if present
     let certs = readCertificatesFile();
     certs = certs.filter((c: any) => {
       const cId = (c.id || "").toLowerCase().trim();
       const cCertId = (c.certificateId || "").toLowerCase().trim();
-      return cId !== idLower && cCertId !== idLower;
+      const cEmail = (c.userEmail || c.recipientEmail || "").toLowerCase().trim();
+      const cUid = String(c.userId || "").trim();
+
+      const matchesId = (idClean !== "--" && idClean !== "unassign") && (cId === idLower || cCertId === idLower);
+      const matchesEmail = emailParam && cEmail === emailParam;
+      const matchesUser = userIdParam && cUid === userIdParam;
+
+      return !matchesId && !matchesEmail && !matchesUser;
     });
     writeCertificatesFile(certs);
 
-    return res.json({ message: "Certificate deleted successfully", deletedCount: deleteResult.count });
+    return res.json({
+      message: "Certificate deleted / unassigned successfully",
+      deletedCount: deleteResult.count,
+    });
   } catch (err: any) {
     return res.status(500).json({ error: err.message || "Failed to delete certificate" });
   }

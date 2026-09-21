@@ -82,60 +82,12 @@ export default function Certificates() {
   const fetchCerts = async () => {
     setLoading(true);
     try {
-      const deletedRaw = localStorage.getItem("recodex_deleted_certificates");
-      const deletedSet = new Set<string>(
-        deletedRaw ? JSON.parse(deletedRaw).map((s: string) => String(s).toLowerCase().trim()) : []
-      );
-
       const serverCerts: any[] = await getCertificatesApi(userEmail || undefined, userId || undefined);
-      const localRaw1 = localStorage.getItem("recodex_global_certificates");
-      const localRaw2 = localStorage.getItem("recodex_synced_certificates");
-      let localCerts1: any[] = localRaw1 ? JSON.parse(localRaw1) : [];
-      let localCerts2: any[] = localRaw2 ? JSON.parse(localRaw2) : [];
-
-      // Clean local caches if deleted certs exist
-      if (deletedSet.size > 0) {
-        const cleaned1 = localCerts1.filter((c: any) => {
-          const id1 = (c?.id || "").toLowerCase().trim();
-          const id2 = (c?.certificateId || "").toLowerCase().trim();
-          return !deletedSet.has(id1) && !deletedSet.has(id2);
-        });
-        if (cleaned1.length !== localCerts1.length) {
-          localStorage.setItem("recodex_global_certificates", JSON.stringify(cleaned1));
-          localCerts1 = cleaned1;
-        }
-
-        const cleaned2 = localCerts2.filter((c: any) => {
-          const id1 = (c?.id || "").toLowerCase().trim();
-          const id2 = (c?.certificateId || "").toLowerCase().trim();
-          return !deletedSet.has(id1) && !deletedSet.has(id2);
-        });
-        if (cleaned2.length !== localCerts2.length) {
-          localStorage.setItem("recodex_synced_certificates", JSON.stringify(cleaned2));
-          localCerts2 = cleaned2;
-        }
-      }
-
-      // Combine and de-duplicate by ID
-      const combinedMap = new Map<string, any>();
-      [...serverCerts, ...localCerts1, ...localCerts2].forEach((c) => {
-        if (c && (c.id || c.certificateId)) {
-          const key = (c.id || c.certificateId).toLowerCase().trim();
-          if (!deletedSet.has(key)) {
-            combinedMap.set(key, c);
-          }
-        }
-      });
-
-      const allList = Array.from(combinedMap.values());
 
       // STRICT USER PRIVACY FILTER:
-      // Only display certificates assigned/uploaded by Admin for THIS authenticated user.
-      const userCerts = allList.filter((c: any) => {
+      // Only display certificates officially issued by Admin for THIS authenticated user.
+      const userCerts = (serverCerts || []).filter((c: any) => {
         if (!c) return false;
-        const cId = (c.id || "").toLowerCase().trim();
-        const cCertId = (c.certificateId || "").toLowerCase().trim();
-        if (deletedSet.has(cId) || deletedSet.has(cCertId)) return false;
         if (c.status === "Deleted" || c.status === "DELETED") return false;
 
         // Filter out dummy/pending request placeholders
@@ -157,9 +109,28 @@ export default function Certificates() {
         return matchEmail || matchUserId;
       });
 
+      // If user has no active certificates on server, clean any stale cached entries for this user from localStorage
+      if (userCerts.length === 0) {
+        try {
+          const stored = localStorage.getItem("recodex_global_certificates");
+          if (stored) {
+            let localCerts: any[] = JSON.parse(stored);
+            localCerts = localCerts.filter((c: any) => {
+              const cEmail = (c.userEmail || c.recipientEmail || "").toLowerCase().trim();
+              const cUid = String(c.userId || "").trim();
+              const matchesThisUser = (userEmail && cEmail === userEmail) || (allUserEmails.includes(cEmail)) || (userId && cUid === userId);
+              return !matchesThisUser;
+            });
+            localStorage.setItem("recodex_global_certificates", JSON.stringify(localCerts));
+            localStorage.setItem("recodex_synced_certificates", JSON.stringify(localCerts));
+          }
+        } catch (sErr) {}
+      }
+
       setCertificates(userCerts);
     } catch (err) {
       console.error("Failed to load certificates:", err);
+      setCertificates([]);
     } finally {
       setLoading(false);
     }

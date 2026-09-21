@@ -124,31 +124,18 @@ export default function Navbar() {
         ].filter(Boolean);
 
         // Load dynamic telemetry counts for this user
-        const calculateCertTelemetry = (extraCerts: any[] = []) => {
+        const calculateCertTelemetry = (sourceCerts?: any[]) => {
           try {
-            const deletedRaw = localStorage.getItem("recodex_deleted_certificates");
-            const deletedSet = new Set<string>(
-              deletedRaw ? JSON.parse(deletedRaw).map((s: string) => String(s).toLowerCase().trim()) : []
-            );
+            let certsToInspect: any[] = [];
+            if (Array.isArray(sourceCerts)) {
+              certsToInspect = sourceCerts;
+            } else {
+              const stored = localStorage.getItem("recodex_global_certificates");
+              certsToInspect = stored ? JSON.parse(stored) : [];
+            }
 
-            const localRaw1 = localStorage.getItem("recodex_global_certificates");
-            const localRaw2 = localStorage.getItem("recodex_synced_certificates");
-            const localCerts1: any[] = localRaw1 ? JSON.parse(localRaw1) : [];
-            const localCerts2: any[] = localRaw2 ? JSON.parse(localRaw2) : [];
-
-            const combinedMap = new Map<string, any>();
-            [...localCerts1, ...localCerts2, ...extraCerts].forEach((c) => {
-              if (c && (c.id || c.certificateId)) {
-                const key = (c.id || c.certificateId).toLowerCase().trim();
-                if (!deletedSet.has(key)) combinedMap.set(key, c);
-              }
-            });
-
-            const matchedCerts = Array.from(combinedMap.values()).filter((c: any) => {
+            const matchedCerts = certsToInspect.filter((c: any) => {
               if (!c) return false;
-              const cId = (c.id || "").toLowerCase().trim();
-              const cCertId = (c.certificateId || "").toLowerCase().trim();
-              if (deletedSet.has(cId) || deletedSet.has(cCertId)) return false;
               if (c.status === "Deleted" || c.status === "DELETED") return false;
 
               if (c.id?.startsWith("CERT-REQ-") || c.credentialId?.startsWith("RCX-PEND-")) return false;
@@ -157,16 +144,11 @@ export default function Navbar() {
 
               const certEmail = (c.userEmail || c.recipientEmail || "").toLowerCase().trim();
               const certUserId = (c.userId || "").trim();
-              const certStudent = (c.studentName || c.recipientName || "").toLowerCase().trim();
 
               const matchEmail = allEmails.length > 0 && certEmail && allEmails.includes(certEmail);
               const matchUserId = Boolean(userId && certUserId && certUserId === userId);
-              const matchName = Boolean(
-                certStudent &&
-                nameAliases.some((alias) => certStudent === alias || certStudent.includes(alias) || alias.includes(certStudent))
-              );
 
-              return matchEmail || matchUserId || matchName;
+              return matchEmail || matchUserId;
             });
 
             setCertCount(matchedCerts.length);
@@ -175,17 +157,14 @@ export default function Navbar() {
           }
         };
 
-        // 1. Calculate immediately from local caches for instant UI update
-        calculateCertTelemetry();
-
-        // 2. Fetch from backend API to ensure server-synced certificates are also included
+        // Fetch from backend API to ensure server-synced certificates are strictly loaded
         getCertificatesApi(email, userId)
           .then((serverCerts) => {
             if (Array.isArray(serverCerts)) {
               calculateCertTelemetry(serverCerts);
             }
           })
-          .catch(() => {});
+          .catch(() => calculateCertTelemetry());
 
         try {
           const inqsRaw = localStorage.getItem("recodex_submitted_inquiries");

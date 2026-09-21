@@ -488,17 +488,18 @@ export default function Dashboard() {
     return () => clearInterval(timer);
   }, []);
 
-  useEffect(() => {
-    const fetchCerts = async () => {
-      try {
-        const certs = await getCertificatesApi();
-        if (certs && certs.length > 0) {
-          setCertificates(certs);
-        }
-      } catch (e) {
-        console.warn("Failed to fetch certs from API:", e);
+  const fetchCerts = async () => {
+    try {
+      const certs = await getCertificatesApi();
+      if (Array.isArray(certs)) {
+        setCertificates(certs);
       }
-    };
+    } catch (e) {
+      console.warn("Failed to fetch certs from API:", e);
+    }
+  };
+
+  useEffect(() => {
     fetchCerts();
   }, []);
 
@@ -833,7 +834,7 @@ export default function Dashboard() {
   const handleRefreshSystem = async () => {
     setIsRefreshing(true);
     try {
-      const promises: Promise<any>[] = [fetchUsers(), fetchProjects()];
+      const promises: Promise<any>[] = [fetchUsers(), fetchProjects(), fetchCerts()];
       if (activeSidebarTab === "Inquiries") {
         promises.push(fetchInquiries());
       }
@@ -854,6 +855,7 @@ export default function Dashboard() {
     fetchProjects();
     fetchUsers();
     fetchInquiries();
+    fetchCerts();
   }, [userId]);
 
   // Live user registration, inquiries sync & telemetry polling
@@ -1755,29 +1757,34 @@ export default function Dashboard() {
     setCertFileTypeVal("");
   };
 
-  const handleDeleteCertificate = (certId: string, userEmail?: string) => {
-    if (!window.confirm("Are you sure you want to delete this certificate record?")) return;
+  const handleDeleteCertificate = async (certId: string, userEmail?: string) => {
+    if (!window.confirm("Are you sure you want to unassign and delete this certificate record?")) return;
     const targetClean = (certId || "").trim().toLowerCase();
     const certTarget = certificates.find((c) => (c.id || "").toLowerCase().trim() === targetClean || ((c as any).certificateId || "").toLowerCase().trim() === targetClean);
     const targetEmail = userEmail || certTarget?.userEmail || (certTarget as any)?.recipientEmail;
-    deleteCertificateApi(certId, targetEmail);
+    const targetUserId = certTarget?.userId;
+
+    await deleteCertificateApi(certId, targetEmail, targetUserId);
+
     setCertificates((prev) => prev.filter((c) => {
       const cId = (c.id || "").toLowerCase().trim();
       const cCertId = ((c as any).certificateId || "").toLowerCase().trim();
       const cEmail = (c.userEmail || (c as any).recipientEmail || "").toLowerCase().trim();
-      const matchesId = cId === targetClean || cCertId === targetClean;
+      const matchesId = targetClean && targetClean !== "--" && (cId === targetClean || cCertId === targetClean);
       const matchesEmail = targetEmail && cEmail === targetEmail.toLowerCase().trim();
-      return !matchesId && !matchesEmail;
+      const matchesUser = targetUserId && c.userId === targetUserId;
+      return !matchesId && !matchesEmail && !matchesUser;
     }));
+
     logAdminActivityApi({
       adminName: adminName || user?.fullName || (adminEmail.includes("uday") ? "Uday Kumar" : "Admin"),
       adminEmail: adminEmail || user?.primaryEmailAddress?.emailAddress || "",
-      action: "DELETED CERTIFICATE CREDENTIAL",
+      action: "UNASSIGNED & DELETED CERTIFICATE",
       target: certTarget ? `${certTarget.studentName} (${certTarget.id})` : `Certificate ID: ${certId}`,
-      details: certTarget ? `Removed certificate record for "${certTarget.projectName}"` : "Certificate deleted"
+      details: certTarget ? `Removed and unassigned certificate for "${certTarget.projectName}"` : "Certificate unassigned"
     });
     fetchAuditLogs();
-    setToast({ message: "Certificate record removed permanently.", type: "success" });
+    setToast({ message: "Certificate unassigned and removed permanently.", type: "success" });
   };
 
   const handleDownloadCertFile = (cert: Certificate) => {

@@ -395,25 +395,28 @@ export default function Profile() {
   useEffect(() => {
     const loadCertificates = async () => {
       try {
-        const allCerts: Certificate[] = await getCertificatesApi();
-        if (allCerts && profile) {
-          const userEmailClean = (profile.email || "").toLowerCase().trim();
-
+        if (!profile) {
+          setUserCertificates([]);
+          return;
+        }
+        const userEmailClean = (profile.email || "").toLowerCase().trim();
+        const allCerts: Certificate[] = await getCertificatesApi(userEmailClean, profile.id);
+        if (Array.isArray(allCerts)) {
           const cleanedCerts = allCerts.filter(
             (c) =>
+              c &&
+              (c.status as string) !== "Deleted" &&
+              (c.status as string) !== "DELETED" &&
               !["john doe", "alice vance", "sarah connor"].includes((c.studentName || "").toLowerCase().trim()) &&
               !["cert-9402", "cert-1842", "cert-0691"].includes((c.id || "").toLowerCase().trim())
           );
 
-          // STRICT USER MATCH: Certificates must belong strictly to this user's email, ID, or student name
-          const profileName = (profile.name || "").toLowerCase().trim();
+          // STRICT USER MATCH: Certificates must belong strictly to this user's email or ID
           const filtered = cleanedCerts.filter((c) => {
-            const certEmail = (c.userEmail || "").toLowerCase().trim();
-            const certStudent = (c.studentName || "").toLowerCase().trim();
+            const certEmail = (c.userEmail || (c as any).recipientEmail || "").toLowerCase().trim();
             const isEmailMatch = Boolean(certEmail && userEmailClean && certEmail === userEmailClean);
             const isIdMatch = Boolean(c.userId && profile.id && c.userId === profile.id);
-            const isNameMatch = Boolean(profileName && certStudent && (certStudent === profileName || profileName.includes(certStudent) || certStudent.includes(profileName)));
-            return isEmailMatch || isIdMatch || isNameMatch;
+            return isEmailMatch || isIdMatch;
           });
 
           setUserCertificates(filtered);
@@ -422,6 +425,7 @@ export default function Profile() {
         }
       } catch (e) {
         console.warn("Failed to load user certificates:", e);
+        setUserCertificates([]);
       }
     };
     loadCertificates();
