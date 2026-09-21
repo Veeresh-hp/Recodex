@@ -122,6 +122,152 @@ router.get("/", async (req, res) => {
 });
 
 /**
+ * GET /api/projects/progress/completed
+ * Fetches the list of completed 50-suite project IDs for the requested user.
+ */
+router.get("/progress/completed", async (req, res) => {
+  try {
+    const { userId, userEmail } = req.query;
+
+    if (!userId && !userEmail) {
+      return res.json({ success: true, completedProjects: [], count: 0 });
+    }
+
+    const orConditions: any[] = [];
+    if (userId) orConditions.push({ id: String(userId) });
+    if (userEmail) orConditions.push({ email: { equals: String(userEmail).toLowerCase().trim(), mode: "insensitive" } });
+
+    const user = await prisma.user.findFirst({
+      where: { OR: orConditions },
+    });
+
+    if (!user) {
+      return res.json({ success: true, completedProjects: [], count: 0 });
+    }
+
+    const completions = await prisma.projectCompletion.findMany({
+      where: { userId: user.id },
+      select: { projectId: true, completionDate: true },
+    });
+
+    return res.json({
+      success: true,
+      completedProjects: completions.map((c: any) => c.projectId),
+      count: completions.length,
+    });
+  } catch (error: any) {
+    console.error("Error fetching completed projects:", error);
+    return res.status(500).json({ error: "Failed to fetch project completion progress." });
+  }
+});
+
+/**
+ * POST /api/projects/progress/toggle
+ * Toggles or marks a project completed for the user in MongoDB Atlas.
+ */
+router.post("/progress/toggle", async (req, res) => {
+  try {
+    const { projectId, userId, userEmail, userName, completed } = req.body;
+
+    if (!projectId) {
+      return res.status(400).json({ error: "projectId is required." });
+    }
+
+    if (!userId && !userEmail) {
+      return res.status(400).json({ error: "userId or userEmail is required." });
+    }
+
+    // Locate or create user record
+    const orConditions: any[] = [];
+    if (userId) orConditions.push({ id: String(userId) });
+    if (userEmail) orConditions.push({ email: { equals: String(userEmail).toLowerCase().trim(), mode: "insensitive" } });
+
+    let user = await prisma.user.findFirst({
+      where: { OR: orConditions },
+    });
+
+    if (!user) {
+      user = await prisma.user.create({
+        data: {
+          id: userId || `user_${Date.now()}`,
+          email: userEmail ? String(userEmail).toLowerCase().trim() : `${userId}@recodex.local`,
+          name: userName || "RecodeX Developer",
+          role: "developer",
+        },
+      });
+    }
+
+    // Ensure project exists in MongoDB
+    let project = await prisma.project.findUnique({
+      where: { id: String(projectId) },
+    });
+
+    if (!project) {
+      project = await prisma.project.create({
+        data: {
+          id: String(projectId),
+          title: String(projectId).replace(/^\d+-/, "").replace(/-/g, " "),
+          description: "50 Frontend Projects Suite item",
+          longDescription: "Interactive project in RecodeX 50 Projects Suite",
+          category: "Web Apps & Tools",
+          status: "Active",
+          imageUrl: "https://images.unsplash.com/photo-1555066931-4365d14bab8c?q=80&w=600",
+          tags: ["JAVASCRIPT", "FRONTEND"],
+          files: {},
+        },
+      });
+    }
+
+    // Check if completion record exists
+    const existing = await prisma.projectCompletion.findFirst({
+      where: {
+        userId: user.id,
+        projectId: project.id,
+      },
+    });
+
+    let isCompletedNow = false;
+
+    if (completed === false || (completed === undefined && existing)) {
+      if (existing) {
+        await prisma.projectCompletion.delete({
+          where: { id: existing.id },
+        });
+      }
+      isCompletedNow = false;
+    } else {
+      if (!existing) {
+        await prisma.projectCompletion.create({
+          data: {
+            userId: user.id,
+            projectId: project.id,
+            completedBy: "USER",
+            completionSource: "CHALLENGE_HUB",
+          },
+        });
+      }
+      isCompletedNow = true;
+    }
+
+    const allCompletions = await prisma.projectCompletion.findMany({
+      where: { userId: user.id },
+      select: { projectId: true },
+    });
+
+    return res.json({
+      success: true,
+      projectId,
+      completed: isCompletedNow,
+      completedProjects: allCompletions.map((c: any) => c.projectId),
+      count: allCompletions.length,
+    });
+  } catch (error: any) {
+    console.error("Error toggling project completion:", error);
+    return res.status(500).json({ error: "Failed to update project completion status." });
+  }
+});
+
+/**
  * GET /api/projects/my-projects
  * Authenticated endpoint: Fetches assigned projects for the logged-in user or all client projects if admin.
  * Strictly enforces that non-admin users only see projects assigned to their ID or email address.

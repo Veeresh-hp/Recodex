@@ -3,7 +3,8 @@ import { Project } from "../data/mockData";
 import { 
   X, Play, RefreshCw, Terminal, FileCode, CheckCircle, 
   Sun, Moon, Zap, Sliders, Database, Sparkles, PlayCircle,
-  Activity, ShieldCheck, ExternalLink
+  Activity, ShieldCheck, ExternalLink,
+  Monitor, Tablet, Smartphone, RotateCcw, RotateCw
 } from "lucide-react";
 
 interface TerminalModalProps {
@@ -20,6 +21,15 @@ export default function TerminalModal({ project, initialTab = "output", onClose 
   const [terminalLogs, setTerminalLogs] = useState<string[]>([]);
   const [isCompiling, setIsCompiling] = useState(false);
   const [activeTab, setActiveTab] = useState<"code" | "logs" | "output">("output");
+
+  // Device Frame Simulator State
+  const [deviceMode, setDeviceMode] = useState<"desktop" | "tablet" | "mobile">("desktop");
+  const [orientation, setOrientation] = useState<"portrait" | "landscape">("portrait");
+  const [iframeKey, setIframeKey] = useState<number>(0);
+
+  const handleReloadFrame = () => {
+    setIframeKey((prev) => prev + 1);
+  };
 
   // Sync selected file and initial logs when project selection changes
   useEffect(() => {
@@ -1244,14 +1254,14 @@ export default function TerminalModal({ project, initialTab = "output", onClose 
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#090d16]/90 backdrop-blur-md p-3 sm:p-6 select-none">
       <div className="w-full max-w-[1280px] h-[90vh] bg-[#0f172a] rounded-[20px] border border-white/10 flex flex-col overflow-hidden shadow-[0_25px_50px_-12px_rgba(0,0,0,0.8)]">
         
-        {/* Modal Header (Exact Screenshot Match) */}
+        {/* Modal Header */}
         <div className="px-3 sm:px-6 py-3 sm:py-4 bg-[#1e293b] border-b border-white/10 flex justify-between items-center shrink-0 gap-2">
           <div className="text-white font-bold text-xs sm:text-lg flex items-center gap-1.5 sm:gap-2.5 font-sans min-w-0">
             <PlayCircle size={18} className="text-[#38bdf8] shrink-0" />
             <span className="truncate">#{projectNum} <span className="truncate max-w-[100px] xs:max-w-[180px] sm:max-w-none inline-block align-bottom">{project.title}</span></span>
           </div>
 
-          <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
             {activeTab === "code" ? (
               <button
                 onClick={() => setActiveTab("output")}
@@ -1294,8 +1304,91 @@ export default function TerminalModal({ project, initialTab = "output", onClose 
           </div>
         </div>
 
-        {/* Modal Body / Full Height Preview Viewport */}
-        <div className="flex-grow w-full h-full relative overflow-hidden bg-white">
+        {/* Device Frame Simulator Sub-Header Toolbar (when in Live Preview) */}
+        {activeTab !== "code" && (
+          <div className="px-3 sm:px-6 py-2 bg-[#0c1017] border-b border-white/10 flex flex-wrap items-center justify-between gap-2 text-xs select-none">
+            {/* Device frame mode selectors */}
+            <div className="flex items-center gap-1 bg-[#1e293b]/90 p-1 rounded-xl border border-white/10">
+              <button
+                onClick={() => setDeviceMode("desktop")}
+                className={`px-2.5 py-1 rounded-lg font-mono text-[11px] font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                  deviceMode === "desktop"
+                    ? "bg-[#38bdf8] text-black shadow-sm"
+                    : "text-gray-400 hover:text-white hover:bg-white/5"
+                }`}
+                title="Desktop Viewport (100% Fluid)"
+              >
+                <Monitor size={13} />
+                <span>Desktop</span>
+              </button>
+
+              <button
+                onClick={() => setDeviceMode("tablet")}
+                className={`px-2.5 py-1 rounded-lg font-mono text-[11px] font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                  deviceMode === "tablet"
+                    ? "bg-[#38bdf8] text-black shadow-sm"
+                    : "text-gray-400 hover:text-white hover:bg-white/5"
+                }`}
+                title="Tablet Bezel (768 × 1024 px)"
+              >
+                <Tablet size={13} />
+                <span>Tablet</span>
+              </button>
+
+              <button
+                onClick={() => setDeviceMode("mobile")}
+                className={`px-2.5 py-1 rounded-lg font-mono text-[11px] font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                  deviceMode === "mobile"
+                    ? "bg-[#38bdf8] text-black shadow-sm"
+                    : "text-gray-400 hover:text-white hover:bg-white/5"
+                }`}
+                title="Mobile Bezel (390 × 844 px)"
+              >
+                <Smartphone size={13} />
+                <span>Mobile</span>
+              </button>
+            </div>
+
+            {/* Middle: Orientation Toggle & Dimension Readout */}
+            <div className="flex items-center gap-2">
+              {deviceMode !== "desktop" && (
+                <button
+                  onClick={() => setOrientation(orientation === "portrait" ? "landscape" : "portrait")}
+                  className="px-2.5 py-1 bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 hover:text-white rounded-lg text-[11px] font-mono font-medium flex items-center gap-1.5 transition-all cursor-pointer"
+                  title={`Rotate to ${orientation === "portrait" ? "Landscape" : "Portrait"}`}
+                >
+                  <RotateCw size={12} className="text-[#38bdf8]" />
+                  <span className="capitalize">{orientation}</span>
+                </button>
+              )}
+
+              <span className="px-2.5 py-1 rounded-lg bg-black/40 border border-white/10 text-[10px] font-mono text-gray-400">
+                {deviceMode === "desktop"
+                  ? "Responsive Desktop (100%)"
+                  : deviceMode === "tablet"
+                  ? orientation === "portrait" ? "Tablet: 768 × 1024 px" : "Tablet: 1024 × 768 px"
+                  : orientation === "portrait" ? "Mobile: 390 × 844 px" : "Mobile: 844 × 390 px"}
+              </span>
+
+              <button
+                onClick={handleReloadFrame}
+                className="px-2.5 py-1 bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 hover:text-white rounded-lg text-[11px] font-mono font-medium flex items-center gap-1.5 transition-all cursor-pointer"
+                title="Reload Iframe Sandbox"
+              >
+                <RotateCcw size={12} className="text-[#38bdf8]" />
+                <span className="hidden sm:inline">Reload</span>
+              </button>
+            </div>
+
+            <div className="text-[10px] font-mono text-gray-500 hidden md:flex items-center gap-1">
+              <Sparkles size={11} className="text-[#38bdf8]" />
+              <span>Interactive Sandbox Simulator</span>
+            </div>
+          </div>
+        )}
+
+        {/* Modal Body / Viewport */}
+        <div className="flex-grow w-full h-full relative overflow-hidden bg-[#070a12]">
           {activeTab === "code" ? (
             <div className="w-full h-full bg-[#050708] flex font-mono text-xs select-text">
               {/* File sidebar */}
@@ -1328,13 +1421,75 @@ export default function TerminalModal({ project, initialTab = "output", onClose 
                 </pre>
               </div>
             </div>
-          ) : (
+          ) : deviceMode === "desktop" ? (
             <iframe
+              key={iframeKey}
               src={projectUrl}
               title={project.title}
               className="w-full h-full border-none bg-white block"
               sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
             />
+          ) : deviceMode === "tablet" ? (
+            /* Realistic Tablet Device Frame */
+            <div className="w-full h-full bg-[#070a12] flex items-center justify-center p-3 sm:p-6 overflow-auto">
+              <div
+                className={`relative bg-[#1e293b] border-4 border-zinc-700/70 rounded-[36px] p-4 shadow-[0_0_60px_rgba(0,0,0,0.8),0_0_0_2px_rgba(255,255,255,0.08)] flex flex-col items-center transition-all duration-300 shrink-0 ${
+                  orientation === "portrait"
+                    ? "w-[768px] max-w-[94%] h-[960px] max-h-[94%]"
+                    : "w-[980px] max-w-[94%] h-[720px] max-h-[94%]"
+                }`}
+              >
+                {/* Tablet Camera dot */}
+                <div className="w-2.5 h-2.5 rounded-full bg-zinc-950 border border-zinc-700/80 mb-2.5 shrink-0 shadow-inner" />
+
+                {/* Screen Viewport */}
+                <div className="w-full flex-grow rounded-[22px] overflow-hidden bg-white relative shadow-inner">
+                  <iframe
+                    key={iframeKey}
+                    src={projectUrl}
+                    title={project.title}
+                    className="w-full h-full border-none bg-white block"
+                    sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+                  />
+                </div>
+
+                {/* Tablet bottom chin indicator */}
+                <div className="w-16 h-1 rounded-full bg-zinc-700/50 mt-2 shrink-0" />
+              </div>
+            </div>
+          ) : (
+            /* Realistic Mobile Smartphone Device Frame */
+            <div className="w-full h-full bg-[#070a12] flex items-center justify-center p-3 sm:p-6 overflow-auto">
+              <div
+                className={`relative bg-[#0c1017] border-4 border-zinc-700/80 rounded-[46px] p-3.5 shadow-[0_0_60px_rgba(0,0,0,0.9),0_0_0_2px_rgba(255,255,255,0.1)] flex flex-col items-center transition-all duration-300 shrink-0 ${
+                  orientation === "portrait"
+                    ? "w-[390px] max-w-[94%] h-[820px] max-h-[95%]"
+                    : "w-[780px] max-w-[94%] h-[390px] max-h-[95%]"
+                }`}
+              >
+                {/* Dynamic Island Pill (in portrait) */}
+                {orientation === "portrait" && (
+                  <div className="w-28 h-5 rounded-full bg-black mb-2 flex items-center justify-between px-3 shrink-0 shadow-md">
+                    <div className="w-2 h-2 rounded-full bg-zinc-800" />
+                    <div className="w-2 h-2 rounded-full bg-blue-950 border border-cyan-500/30" />
+                  </div>
+                )}
+
+                {/* Screen Viewport */}
+                <div className="w-full flex-grow rounded-[32px] overflow-hidden bg-white relative shadow-inner">
+                  <iframe
+                    key={iframeKey}
+                    src={projectUrl}
+                    title={project.title}
+                    className="w-full h-full border-none bg-white block"
+                    sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+                  />
+                </div>
+
+                {/* Home Indicator Bar */}
+                <div className="w-32 h-1 rounded-full bg-white/40 mt-2 shrink-0" />
+              </div>
+            </div>
           )}
         </div>
       </div>

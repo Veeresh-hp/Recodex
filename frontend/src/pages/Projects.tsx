@@ -15,8 +15,6 @@ function ProjectsContent() {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [modalTab, setModalTab] = useState<"code" | "logs" | "output">("output");
 
-
-
   const selectedCategory = searchParams.get("category") || "All";
 
   const handleCategoryChange = (cat: string) => {
